@@ -9,22 +9,20 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg:          #EDE8DF;
-      --surface:     #F5F1EB;
-      --surface2:    #E4DDD3;
-      --border:      #CEC4B8;
-      --text:        #2B2318;
-      --text2:       #6B5C50;
-      --text3:       #9A8C83;
-      --accent:      #C4522A;
-      --accent-dim:  rgba(196,82,42,.1);
-      --accent-hover:#A8401C;
+      --bg:           #EDE8DF;
+      --surface:      #F5F1EB;
+      --surface2:     #E8E2D8;
+      --border:       #CEC4B8;
+      --text:         #2B2318;
+      --text2:        #6B5C50;
+      --text3:        #9A8C83;
+      --accent:       #C4522A;
+      --accent-dim:   rgba(196,82,42,.1);
+      --accent-hover: #A8401C;
     }
-
     body {
-      font-family: 'Inter', -apple-system, sans-serif;
+      font-family: 'Inter', sans-serif;
       background: var(--bg);
       color: var(--text);
       font-size: 15px;
@@ -32,133 +30,131 @@
       min-height: 100vh;
     }
 
-    /* ── Header ───────────────────────────────────────────────────────────── */
-    .header {
+    /* Header */
+    .site-header {
       background: #1E1814;
-      padding: 0;
-    }
-    .header-inner {
-      max-width: 700px;
-      margin: 0 auto;
-      padding: 22px 28px;
+      padding: 20px 28px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      justify-content: center;
     }
-    .header-brand {
+    .site-header-brand {
       font-family: 'Cormorant Garamond', serif;
-      font-size: 22px;
+      font-size: 24px;
       font-weight: 600;
       letter-spacing: .08em;
       color: #F0EBE3;
     }
-    .header-tag {
-      font-size: 11px;
-      letter-spacing: .12em;
-      text-transform: uppercase;
-      color: #7A6E66;
-    }
 
-    /* ── Hero strip ───────────────────────────────────────────────────────── */
+    /* Hero */
     .hero {
       background: var(--accent);
-      padding: 40px 28px;
       text-align: center;
+      padding: 48px 28px 44px;
+    }
+    .hero-eyebrow {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.65);
+      margin-bottom: 12px;
     }
     .hero h1 {
       font-family: 'Cormorant Garamond', serif;
-      font-size: 38px;
+      font-size: 42px;
       font-weight: 600;
       letter-spacing: .04em;
       color: #fff;
-      line-height: 1.2;
-      margin-bottom: 10px;
+      line-height: 1.15;
+      margin-bottom: 14px;
     }
     .hero p {
       color: rgba(255,255,255,.8);
-      font-size: 14px;
-      max-width: 480px;
+      font-size: 15px;
+      max-width: 520px;
       margin: 0 auto;
+      line-height: 1.6;
     }
 
-    /* ── Form wrap ────────────────────────────────────────────────────────── */
-    .form-wrap {
-      max-width: 700px;
-      margin: 0 auto;
-      padding: 40px 28px 80px;
-    }
+    /* Wrap */
+    .form-wrap { max-width: 720px; margin: 0 auto; padding: 40px 24px 80px; }
 
-    .form-intro {
+    /* Intro card */
+    .intro-card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 28px 32px;
-      margin-bottom: 36px;
-    }
-    .form-intro p {
+      padding: 28px 30px;
+      margin-bottom: 28px;
       color: var(--text2);
       font-size: 14px;
-      line-height: 1.7;
+      line-height: 1.75;
     }
 
-    /* ── Sections ─────────────────────────────────────────────────────────── */
-    .form-section {
+    /* Section cards */
+    .fs {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: 12px;
-      padding: 28px 32px;
+      padding: 28px 30px;
       margin-bottom: 20px;
     }
-
-    .section-header {
+    .fs-header {
       display: flex;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 24px;
-      padding-bottom: 16px;
+      gap: 14px;
+      margin-bottom: 26px;
+      padding-bottom: 18px;
       border-bottom: 1px solid var(--border);
     }
-    .section-num {
-      width: 28px;
-      height: 28px;
+    .fs-num {
+      width: 30px;
+      height: 30px;
       background: var(--accent);
       border-radius: 50%;
       color: #fff;
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 700;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
     }
-    .section-title {
+    .fs-title {
       font-family: 'Cormorant Garamond', serif;
-      font-size: 20px;
+      font-size: 22px;
       font-weight: 600;
       letter-spacing: .03em;
-      color: var(--text);
+    }
+    .fs-desc {
+      font-size: 13.5px;
+      color: var(--text2);
+      line-height: 1.65;
+      margin-bottom: 20px;
+      padding: 14px 16px;
+      background: var(--surface2);
+      border-radius: 8px;
+      border-left: 3px solid var(--accent);
     }
 
-    /* ── Fields ───────────────────────────────────────────────────────────── */
+    /* Fields */
     .field { margin-bottom: 20px; }
     .field:last-child { margin-bottom: 0; }
-
     .field label {
       display: block;
       font-size: 13px;
       font-weight: 600;
       color: var(--text);
       margin-bottom: 5px;
-      letter-spacing: .01em;
     }
-    .field label .req { color: var(--accent); margin-left: 2px; }
+    .field label .req { color: var(--accent); }
     .field .hint {
       font-size: 12px;
       color: var(--text3);
       margin-bottom: 7px;
       line-height: 1.5;
     }
-
     .field input,
     .field textarea,
     .field select {
@@ -172,7 +168,6 @@
       font-family: 'Inter', sans-serif;
       outline: none;
       transition: border-color .15s;
-      appearance: none;
     }
     .field input:focus,
     .field textarea:focus,
@@ -180,29 +175,68 @@
     .field textarea { resize: vertical; min-height: 90px; }
     .field input::placeholder,
     .field textarea::placeholder { color: var(--text3); }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
-    .field-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 16px;
+    /* Checkboxes */
+    .check-list { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+    .check-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 12px 14px;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: border-color .15s, background .15s;
     }
+    .check-item:hover { border-color: var(--accent); }
+    .check-item input[type=checkbox] {
+      width: 16px;
+      height: 16px;
+      min-width: 16px;
+      margin-top: 2px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+    .check-item-text { font-size: 13.5px; color: var(--text); line-height: 1.5; }
+    .check-item-text strong { display: block; font-weight: 600; margin-bottom: 2px; }
+    .check-item-text span { color: var(--text2); font-size: 12.5px; }
 
-    /* ── Radio pills ──────────────────────────────────────────────────────── */
-    .radio-group { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
-    .radio-pill {
+    /* Inline checkbox group */
+    .check-inline { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+    .check-inline label {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
+      padding: 7px 14px;
       background: var(--surface2);
       border: 1.5px solid var(--border);
       border-radius: 20px;
-      padding: 8px 16px;
       cursor: pointer;
       font-size: 13px;
       font-weight: 500;
       color: var(--text2);
       transition: all .15s;
-      user-select: none;
+    }
+    .check-inline label:hover { border-color: var(--accent); color: var(--accent); }
+    .check-inline label input { accent-color: var(--accent); }
+
+    /* Radio pills */
+    .radio-group { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+    .radio-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 16px;
+      background: var(--surface2);
+      border: 1.5px solid var(--border);
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text2);
+      transition: all .15s;
     }
     .radio-pill input[type=radio] { display: none; }
     .radio-pill:has(input:checked) {
@@ -212,48 +246,8 @@
       font-weight: 600;
     }
 
-    /* ── Scale ────────────────────────────────────────────────────────────── */
-    .scale-row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-top: 4px;
-    }
-    .scale-pill {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 44px;
-      height: 44px;
-      border-radius: 8px;
-      background: var(--surface2);
-      border: 1.5px solid var(--border);
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text2);
-      transition: all .15s;
-    }
-    .scale-pill input[type=radio] { display: none; }
-    .scale-pill:has(input:checked) {
-      border-color: var(--accent);
-      background: var(--accent);
-      color: #fff;
-    }
-    .scale-labels {
-      display: flex;
-      justify-content: space-between;
-      font-size: 11px;
-      color: var(--text3);
-      margin-top: 5px;
-      padding: 0 2px;
-    }
-
-    /* ── Submit ───────────────────────────────────────────────────────────── */
-    .submit-wrap {
-      text-align: center;
-      padding-top: 8px;
-    }
+    /* Submit */
+    .submit-wrap { text-align: center; padding-top: 10px; }
     .btn-submit {
       background: var(--accent);
       color: #fff;
@@ -270,19 +264,10 @@
     }
     .btn-submit:hover { background: var(--accent-hover); }
     .btn-submit:disabled { opacity: .55; cursor: not-allowed; }
-    .submit-note {
-      font-size: 12px;
-      color: var(--text3);
-      margin-top: 12px;
-    }
-    .error-msg {
-      color: var(--accent);
-      font-size: 13px;
-      margin-top: 10px;
-      display: none;
-    }
+    .submit-note { font-size: 12px; color: var(--text3); margin-top: 12px; }
+    .error-msg { color: var(--accent); font-size: 13px; margin-top: 10px; display: none; }
 
-    /* ── Success ──────────────────────────────────────────────────────────── */
+    /* Success */
     #success-screen {
       display: none;
       text-align: center;
@@ -291,8 +276,7 @@
       margin: 0 auto;
     }
     .success-icon {
-      width: 72px;
-      height: 72px;
+      width: 72px; height: 72px;
       background: var(--accent-dim);
       border: 2px solid var(--accent);
       border-radius: 50%;
@@ -303,329 +287,458 @@
     }
     #success-screen h2 {
       font-family: 'Cormorant Garamond', serif;
-      font-size: 34px;
+      font-size: 36px;
       font-weight: 600;
       letter-spacing: .04em;
       margin-bottom: 14px;
     }
-    #success-screen p {
-      color: var(--text2);
-      font-size: 15px;
-      line-height: 1.7;
-    }
+    #success-screen p { color: var(--text2); font-size: 15px; line-height: 1.75; }
 
     @media (max-width: 600px) {
       .field-row { grid-template-columns: 1fr; }
-      .hero h1 { font-size: 28px; }
-      .form-section { padding: 22px 20px; }
-      .form-intro { padding: 22px 20px; }
+      .hero h1 { font-size: 30px; }
+      .fs { padding: 22px 18px; }
     }
   </style>
 </head>
 <body>
 
-<!-- Header -->
-<div class="header">
-  <div class="header-inner">
-    <div>
-      <div class="header-brand">Gathr Grow</div>
-      <div class="header-tag">Built for practitioners</div>
-    </div>
-  </div>
+<div class="site-header">
+  <div class="site-header-brand">Gathr Grow</div>
 </div>
 
-<!-- Hero -->
 <div class="hero">
-  <h1>Welcome to Gathr Grow</h1>
-  <p>We're excited to work with you. Before your first call, please take a few minutes to fill in this form.</p>
+  <div class="hero-eyebrow">New Client Intake</div>
+  <h1>Let's Build Your Brand.</h1>
+  <p>Before your first call with Gil and Glaiza, please complete this form. The more detail you give us, the better prepared we'll be to hit the ground running.</p>
 </div>
 
 <div class="form-wrap">
-  <div id="form-screen">
+<div id="form-screen">
 
-    <div class="form-intro">
-      <p>The more detail you share here, the better prepared Gil and Glaiza will be to build exactly what your practice needs. This should take about 10 minutes. Be as open and specific as you can — there are no wrong answers.</p>
-    </div>
+  <div class="intro-card">
+    This form covers everything we need to build your brand, landing page, and system from scratch. It'll take around 15–20 minutes. Be as open and specific as you can — the more detail you give us, the less time we spend clarifying on the call and the faster we move.
+  </div>
 
-    <form id="intake-form">
+  <form id="intake-form">
 
-      <!-- 1. About You -->
-      <div class="form-section">
-        <div class="section-header">
-          <div class="section-num">1</div>
-          <div class="section-title">About You</div>
-        </div>
-
-        <div class="field-row">
-          <div class="field">
-            <label>Full Name <span class="req">*</span></label>
-            <input type="text" name="name" placeholder="Jane Smith" required />
-          </div>
-          <div class="field">
-            <label>Email Address <span class="req">*</span></label>
-            <input type="email" name="email" placeholder="you@yourbusiness.com" required />
-          </div>
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label>Phone Number <span class="req">*</span></label>
-            <input type="tel" name="phone" placeholder="+61 4xx xxx xxx" required />
-          </div>
-          <div class="field">
-            <label>Business / Practice Name <span class="req">*</span></label>
-            <input type="text" name="businessName" placeholder="Jane Smith Personal Training" required />
-          </div>
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label>Instagram Handle</label>
-            <input type="text" name="instagram" placeholder="@yourbusiness" />
-          </div>
-          <div class="field">
-            <label>Website</label>
-            <input type="url" name="website" placeholder="https://yourbusiness.com" />
-          </div>
-        </div>
-        <div class="field">
-          <label>Other Social Media</label>
-          <div class="hint">Facebook, TikTok, LinkedIn, YouTube — paste any links</div>
-          <input type="text" name="otherSocials" placeholder="https://facebook.com/…" />
-        </div>
+    <!-- ── Section 1: About You ─────────────────────────────────────────── -->
+    <div class="fs">
+      <div class="fs-header">
+        <div class="fs-num">1</div>
+        <div class="fs-title">About You</div>
       </div>
 
-      <!-- 2. Your Business -->
-      <div class="form-section">
-        <div class="section-header">
-          <div class="section-num">2</div>
-          <div class="section-title">Your Business</div>
+      <div class="field-row">
+        <div class="field">
+          <label>Practitioner Name <span class="req">*</span></label>
+          <input type="text" name="name" placeholder="Jane Smith" required />
         </div>
+        <div class="field">
+          <label>Business Name</label>
+          <input type="text" name="businessName" placeholder="Jane Smith PT" />
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Business Email <span class="req">*</span></label>
+          <input type="email" name="email" placeholder="you@yourbusiness.com" required />
+        </div>
+        <div class="field">
+          <label>Business Phone Number <span class="req">*</span></label>
+          <input type="tel" name="phone" placeholder="+61 4xx xxx xxx" required />
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Website URL</label>
+          <input type="text" name="website" placeholder="https://yourbusiness.com" />
+        </div>
+        <div class="field">
+          <label>Instagram Handle</label>
+          <input type="text" name="instagram" placeholder="@yourbusiness" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Services you offer</label>
+        <div class="hint">What do you do, who do you help, and what do you charge? Give us a brief overview.</div>
+        <textarea name="servicesAndPricing" placeholder="E.g. I'm a physio specialising in sports rehab. 1:1 consults $120, 6-week programs $600, online packages from $200/month…"></textarea>
+      </div>
+    </div>
 
-        <div class="field">
-          <label>What do you do? <span class="req">*</span></label>
-          <div class="hint">Describe your practice — who you help, what you offer, and how you charge</div>
-          <textarea name="servicesAndPricing" placeholder="E.g. I'm a physiotherapist specialising in sports rehab. I offer 1:1 consults at $120, 6-week packages at $600, and online rehab programs…" required></textarea>
+    <!-- ── Section 2: Your Offer ────────────────────────────────────────── -->
+    <div class="fs">
+      <div class="fs-header">
+        <div class="fs-num">2</div>
+        <div class="fs-title">Your Offer</div>
+      </div>
+
+      <div class="field">
+        <label>What is your ONE offer for new leads?</label>
+        <div class="fs-desc" style="margin-bottom:14px">
+          This is the entry-point offer for new leads — the easiest, lowest-friction "yes" you can give them. If you already have one, great. If not, pick one as a starting point and we'll refine it on the call with Glaiza.
         </div>
-        <div class="field">
-          <label>Who is your ideal client?</label>
-          <div class="hint">Describe the person you most want to attract</div>
-          <textarea name="targetAudience" placeholder="E.g. Active adults aged 30–55 who want to recover from injury and get back to sport without long waiting times…" style="min-height:70px"></textarea>
-        </div>
-        <div class="field">
-          <label>How long have you been in business?</label>
-          <div class="radio-group">
-            <label class="radio-pill"><input type="radio" name="businessAge" value="< 1 year"> Less than 1 year</label>
-            <label class="radio-pill"><input type="radio" name="businessAge" value="1–3 years"> 1–3 years</label>
-            <label class="radio-pill"><input type="radio" name="businessAge" value="3–5 years"> 3–5 years</label>
-            <label class="radio-pill"><input type="radio" name="businessAge" value="5+ years"> 5+ years</label>
-          </div>
-        </div>
-        <div class="field-row">
-          <div class="field">
-            <label>Current Instagram Followers</label>
-            <input type="number" name="currentFollowers" placeholder="e.g. 850" min="0" />
-          </div>
-          <div class="field">
-            <label>Do you have a logo?</label>
-            <div class="radio-group">
-              <label class="radio-pill"><input type="radio" name="hasLogo" value="yes"> Yes</label>
-              <label class="radio-pill"><input type="radio" name="hasLogo" value="no"> Not yet</label>
+        <div class="check-list">
+          <label class="check-item">
+            <input type="checkbox" name="offerType" value="Free 15-30 min discovery call" />
+            <div class="check-item-text">
+              <strong>Free 15–30 min discovery call</strong>
+              <span>Best if your service is high-trust or higher-priced (coaching, psychology, ongoing programs)</span>
             </div>
-          </div>
-        </div>
-        <div class="field" id="logo-url-field" style="display:none">
-          <label>Logo file link</label>
-          <div class="hint">Google Drive, Dropbox, or any shareable link</div>
-          <input type="text" name="logoUrl" placeholder="https://drive.google.com/…" />
-        </div>
-        <div class="field">
-          <label>Any existing content you'd like us to see?</label>
-          <div class="hint">Reels, videos, website — paste any links here</div>
-          <textarea name="existingContent" placeholder="https://www.instagram.com/reel/…" style="min-height:60px"></textarea>
-        </div>
-      </div>
-
-      <!-- 3. Goals & Vision -->
-      <div class="form-section">
-        <div class="section-header">
-          <div class="section-num">3</div>
-          <div class="section-title">Goals &amp; Vision</div>
-        </div>
-
-        <div class="field">
-          <label>What do you want to achieve from this program? <span class="req">*</span></label>
-          <div class="hint">Be specific — numbers, timelines, what success looks like to you</div>
-          <textarea name="goals" placeholder="E.g. I want 10 paying online clients by week 8. I want a professional brand I'm proud to show people. I want to stop relying on word of mouth…" required></textarea>
-        </div>
-        <div class="field">
-          <label>What's the #1 thing holding you back right now?</label>
-          <textarea name="anythingElse" placeholder="E.g. I don't know where to start with content. My enquiries aren't converting. I have no consistent online presence…" style="min-height:70px"></textarea>
-        </div>
-        <div class="field">
-          <label>Describe your brand aesthetic or vibe</label>
-          <div class="hint">Colours, energy, words — or share Instagram accounts / brands you love</div>
-          <textarea name="brandDirection" placeholder="E.g. Clean and minimal, warm tones, professional but approachable. Love the look of @jessicaolie and @movementbydana…"></textarea>
-        </div>
-        <div class="field">
-          <label>How confident are you with your current online presence?</label>
-          <div class="scale-row" id="confidence-scale"></div>
-          <div class="scale-labels"><span>Not confident</span><span>Very confident</span></div>
-          <input type="hidden" name="confidenceScore" id="confidence-hidden" />
+          </label>
+          <label class="check-item">
+            <input type="checkbox" name="offerType" value="Free or discounted first session" />
+            <div class="check-item-text">
+              <strong>Free or discounted first session</strong>
+              <span>Best for treatment-based services (physio, chiro, massage) where the experience sells itself</span>
+            </div>
+          </label>
+          <label class="check-item">
+            <input type="checkbox" name="offerType" value="Paid intro session at reduced rate" />
+            <div class="check-item-text">
+              <strong>Paid intro session at a reduced rate</strong>
+              <span>E.g. $49 first session, normally $150 — best when you want to filter for serious leads</span>
+            </div>
+          </label>
+          <label class="check-item">
+            <input type="checkbox" name="offerType" value="Free/paid assessment or consultation" />
+            <div class="check-item-text">
+              <strong>Free/paid assessment or consultation</strong>
+              <span>E.g. movement screen, posture assessment, nutrition review — best when diagnosis is key to your value</span>
+            </div>
+          </label>
         </div>
       </div>
 
-      <!-- 4. Tech & Setup -->
-      <div class="form-section">
-        <div class="section-header">
-          <div class="section-num">4</div>
-          <div class="section-title">Tech &amp; Setup</div>
-        </div>
-
-        <div class="field">
-          <label>Do you have a CRM / booking system?</label>
-          <div class="radio-group">
-            <label class="radio-pill"><input type="radio" name="hasCRM" value="yes"> Yes</label>
-            <label class="radio-pill"><input type="radio" name="hasCRM" value="no"> No</label>
-            <label class="radio-pill"><input type="radio" name="hasCRM" value="something"> I use something basic</label>
-          </div>
-        </div>
-        <div class="field">
-          <label>Do you have a domain / business email?</label>
-          <div class="radio-group">
-            <label class="radio-pill"><input type="radio" name="hasDomain" value="yes"> Yes</label>
-            <label class="radio-pill"><input type="radio" name="hasDomain" value="no"> No</label>
-            <label class="radio-pill"><input type="radio" name="hasDomain" value="unsure"> Not sure</label>
-          </div>
-        </div>
-        <div class="field">
-          <label>Do you have a dedicated business phone number?</label>
-          <div class="radio-group">
-            <label class="radio-pill"><input type="radio" name="businessPhone" value="yes"> Yes</label>
-            <label class="radio-pill"><input type="radio" name="businessPhone" value="no"> No, need one set up</label>
-          </div>
-        </div>
+      <div class="field">
+        <label>What's the offer called?</label>
+        <input type="text" name="offerName" placeholder="E.g. Free 20-min Strategy Call, $49 Intro Session…" />
       </div>
-
-      <!-- 5. Filming & Logistics -->
-      <div class="form-section">
-        <div class="section-header">
-          <div class="section-num">5</div>
-          <div class="section-title">Filming &amp; Logistics</div>
-        </div>
-
-        <div class="field">
-          <label>Filming availability</label>
-          <div class="hint">Our first content session is in Week 1 — what days and times work best?</div>
-          <textarea name="filmingAvailability" placeholder="E.g. Weekday mornings Mon–Wed before 11am, or Saturday afternoons…" style="min-height:70px"></textarea>
-        </div>
-        <div class="field">
-          <label>Where are you based?</label>
-          <input type="text" name="location" placeholder="E.g. Sydney CBD, Brisbane Southside…" />
-        </div>
-        <div class="field">
-          <label>How did you hear about Gathr?</label>
-          <input type="text" name="heardAboutUs" placeholder="Referral from …, Instagram, Google, Gathr Space…" />
-        </div>
+      <div class="field">
+        <label>What's the price? (or is it free?)</label>
+        <input type="text" name="offerPrice" placeholder="E.g. Free, $49, $97…" />
       </div>
-
-      <div class="submit-wrap">
-        <button type="submit" class="btn-submit" id="btn-submit">Submit Intake Form</button>
-        <div class="error-msg" id="submit-error">Something went wrong. Please try again or email us directly.</div>
-        <p class="submit-note">Your responses go straight to the Gathr team — we'll be ready for your first call.</p>
+      <div class="field">
+        <label>What's included / what does the lead get?</label>
+        <textarea name="offerIncludes" placeholder="E.g. A 30-minute video call where we assess your current situation and map out a clear plan for the next 90 days…" style="min-height:70px"></textarea>
       </div>
-
-    </form>
-  </div>
-
-  <!-- Success -->
-  <div id="success-screen">
-    <div class="success-icon">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#C4522A" stroke-width="2.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
     </div>
-    <h2>You're all set.</h2>
-    <p>Thank you for taking the time to fill this in. Your responses are with the Gathr team and we'll be fully prepared for your first call.<br><br>We can't wait to get started with you.</p>
-  </div>
+
+    <!-- ── Section 3: The Main Problem You Solve ────────────────────────── -->
+    <div class="fs">
+      <div class="fs-header">
+        <div class="fs-num">3</div>
+        <div class="fs-title">The Main Problem You Solve</div>
+      </div>
+      <div class="fs-desc">
+        Pick the single biggest problem your ideal client is dealing with when they find you. This is what the landing page will speak to.
+      </div>
+
+      <div class="field">
+        <label>What is it?</label>
+        <textarea name="problemWhat" placeholder="E.g. Chronic lower back pain that stops them from doing what they love…" style="min-height:70px"></textarea>
+      </div>
+      <div class="field">
+        <label>What do they tell themselves to convince themselves they shouldn't do anything about it?</label>
+        <textarea name="problemExcuses" placeholder="E.g. 'It'll go away on its own', 'I'm too busy', 'It's not that bad yet'…" style="min-height:70px"></textarea>
+      </div>
+      <div class="field">
+        <label>What is the most likely outcome if they can't solve this problem?</label>
+        <textarea name="problemOutcome" placeholder="E.g. The pain becomes chronic, they stop exercising altogether, their quality of life declines…" style="min-height:70px"></textarea>
+      </div>
+      <div class="field">
+        <label>How will they feel if this outcome happens?</label>
+        <textarea name="problemFeeling" placeholder="E.g. Frustrated, isolated, like they've lost a part of themselves…" style="min-height:70px"></textarea>
+      </div>
+      <div class="field">
+        <label>What have they tried before & why didn't it work?</label>
+        <textarea name="problemPrevious" placeholder="E.g. Generic YouTube rehab exercises (no personalisation), rest (didn't fix the root cause), other practitioners (didn't stick to a plan)…" style="min-height:70px"></textarea>
+      </div>
+      <div class="field">
+        <label>How do you uniquely solve this problem?</label>
+        <textarea name="problemSolution" placeholder="E.g. I identify the root cause, build a custom 6-week program, and check in weekly so nothing falls through the cracks…" style="min-height:70px"></textarea>
+      </div>
+    </div>
+
+    <!-- ── Section 4: The Main Dream Outcome ───────────────────────────── -->
+    <div class="fs">
+      <div class="fs-header">
+        <div class="fs-num">4</div>
+        <div class="fs-title">The Main Dream Outcome</div>
+      </div>
+      <div class="fs-desc">
+        Pick the single biggest dream outcome your ideal client wants. This is the transformation the landing page will sell.
+      </div>
+
+      <div class="field">
+        <label>Dream Outcome: What is it?</label>
+        <textarea name="dreamOutcome" placeholder="E.g. Back to running pain-free, playing with their kids again, competing in their sport…" style="min-height:70px"></textarea>
+      </div>
+      <div class="field">
+        <label>What do they tell themselves to convince themselves it's not worth the effort?</label>
+        <textarea name="dreamExcuses" placeholder="E.g. 'It'll cost too much', 'I've tried everything', 'I'm too old'…" style="min-height:70px"></textarea>
+      </div>
+      <div class="field">
+        <label>How will they feel when it's true?</label>
+        <textarea name="dreamFeeling" placeholder="E.g. Relieved, confident, energised — like themselves again…" style="min-height:70px"></textarea>
+      </div>
+      <div class="field">
+        <label>What will they think when it's true?</label>
+        <textarea name="dreamThinking" placeholder="E.g. 'I wish I'd done this sooner', 'I can actually commit to exercise again'…" style="min-height:70px"></textarea>
+      </div>
+      <div class="field">
+        <label>How do you uniquely help them achieve this outcome?</label>
+        <textarea name="dreamUnique" placeholder="E.g. My 6-week structured approach means they see measurable progress every fortnight, not just 'do this and see how it goes'…" style="min-height:70px"></textarea>
+      </div>
+    </div>
+
+    <!-- ── Section 5: Credibility & Social Proof ────────────────────────── -->
+    <div class="fs">
+      <div class="fs-header">
+        <div class="fs-num">5</div>
+        <div class="fs-title">Credibility &amp; Social Proof</div>
+      </div>
+
+      <div class="field">
+        <label>Do you have any client testimonials?</label>
+        <div class="radio-group">
+          <label class="radio-pill"><input type="radio" name="hasTestimonials" value="Yes"> Yes</label>
+          <label class="radio-pill"><input type="radio" name="hasTestimonials" value="No"> No</label>
+          <label class="radio-pill"><input type="radio" name="hasTestimonials" value="Some"> Some</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>If yes — what format? (tick all that apply)</label>
+        <div class="check-inline">
+          <label><input type="checkbox" name="testimonialFormat" value="Written quotes"> Written quotes</label>
+          <label><input type="checkbox" name="testimonialFormat" value="Video testimonials"> Video testimonials</label>
+          <label><input type="checkbox" name="testimonialFormat" value="Screenshots"> Screenshots (DMs, texts, emails)</label>
+          <label><input type="checkbox" name="testimonialFormat" value="Before/after photos"> Before/after photos</label>
+          <label><input type="checkbox" name="testimonialFormat" value="Case studies"> Case studies</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Paste any written testimonials here</label>
+        <div class="hint">Use first name + last initial (e.g. "Sarah M."). For videos, screenshots or photos — paste a Google Drive / Dropbox link below.</div>
+        <textarea name="testimonialText" placeholder="'Working with Jane changed everything for me. — Sarah M.'" style="min-height:100px"></textarea>
+      </div>
+
+      <div class="field">
+        <label>Do you have any public reviews?</label>
+        <div class="radio-group">
+          <label class="radio-pill"><input type="radio" name="hasPublicReviews" value="Yes"> Yes</label>
+          <label class="radio-pill"><input type="radio" name="hasPublicReviews" value="No"> No</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>If yes — which platforms?</label>
+        <div class="check-inline">
+          <label><input type="checkbox" name="reviewPlatform" value="Google"> Google</label>
+          <label><input type="checkbox" name="reviewPlatform" value="Facebook"> Facebook</label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Other review platforms</label>
+        <input type="text" name="reviewPlatformOther" placeholder="E.g. Yelp, Healthengine, Word of mouth…" />
+      </div>
+
+      <div class="field">
+        <label>Do you offer any guarantees?</label>
+        <div class="fs-desc" style="margin-bottom:10px">
+          A guarantee is one of the most powerful tools on a landing page — it removes the "what if this doesn't work for me?" hesitation. Common examples: money-back if not happy after the first session; free first session if not a fit; results-based guarantee ("if you don't feel stronger in 4 weeks, the next month is free"). If you're not sure, leave it blank and we'll discuss on the call.
+        </div>
+        <textarea name="guarantee" placeholder="Write your guarantee here, or leave blank to discuss on the call…" style="min-height:70px"></textarea>
+      </div>
+
+      <div class="field">
+        <label>Credibility — what can you show?</label>
+        <div class="hint">Qualifications, certifications, years of experience, notable employers, results or numbers — anything that builds trust.</div>
+        <textarea name="credibility" placeholder="E.g. 10 years as a physio, worked at Olympic Park Sports Medicine Centre, APAM member, 200+ clients treated…" style="min-height:70px"></textarea>
+      </div>
+
+      <div class="field">
+        <label>What payment methods do you accept?</label>
+        <input type="text" name="paymentMethods" placeholder="E.g. Card (Stripe), cash, bank transfer, health fund rebates…" />
+      </div>
+    </div>
+
+    <!-- ── Section 6: Workflow ───────────────────────────────────────────── -->
+    <div class="fs">
+      <div class="fs-header">
+        <div class="fs-num">6</div>
+        <div class="fs-title">Workflow</div>
+      </div>
+
+      <div class="field">
+        <label>Walk us through your typical onboarding process</label>
+        <div class="hint">Once a lead books in — what happens next? From first contact to becoming a paying client, step by step.</div>
+        <textarea name="workflow" placeholder="E.g. 1. Lead books via booking link. 2. I send a confirmation + intake form. 3. We have a 20-min call to assess fit. 4. I send the program proposal. 5. They pay the first month upfront. 6. First session booked within 3 days…" style="min-height:120px"></textarea>
+      </div>
+    </div>
+
+    <!-- ── Section 7: Brand Assets ───────────────────────────────────────── -->
+    <div class="fs">
+      <div class="fs-header">
+        <div class="fs-num">7</div>
+        <div class="fs-title">Brand Assets</div>
+      </div>
+
+      <div class="field">
+        <label>High quality logo</label>
+        <div class="hint">1000×1000px, transparent background ideal. Share a Google Drive or Dropbox link.</div>
+        <input type="text" name="logoUrl" placeholder="https://drive.google.com/…" />
+      </div>
+
+      <div class="field">
+        <label>5 high-quality photos of you</label>
+        <div class="hint">Professional headshots or action shots. Share a Google Drive or Dropbox folder link.</div>
+        <input type="text" name="photosLink" placeholder="https://drive.google.com/…" />
+      </div>
+
+      <div class="field">
+        <label>Hex codes of your brand colours</label>
+        <input type="text" name="brandColours" placeholder="E.g. #C4522A, #EDE8DF, #1E1814" />
+      </div>
+
+      <div class="field">
+        <label>Brand fonts</label>
+        <input type="text" name="brandFonts" placeholder="E.g. Heading: Playfair Display, Body: Inter" />
+      </div>
+
+      <div class="field">
+        <label>3–5 reference websites or landing pages you love</label>
+        <div class="hint">Paste links and for each one, briefly note what you like — colours? layout? tone? imagery?</div>
+        <textarea name="brandDirection" placeholder="1. https://example.com — I love the minimal layout and warm photography&#10;2. https://example.com — Great headline copy, feels premium but approachable&#10;3. https://example.com — The colour palette is exactly what I'm going for" style="min-height:130px"></textarea>
+      </div>
+
+      <div class="field">
+        <label>How did you hear about Gathr?</label>
+        <input type="text" name="heardAboutUs" placeholder="Referral from …, Instagram, Google, Gathr Space…" />
+      </div>
+    </div>
+
+    <div class="submit-wrap">
+      <button type="submit" class="btn-submit" id="btn-submit">Submit Intake Form</button>
+      <div class="error-msg" id="submit-error"></div>
+      <p class="submit-note">Your responses go straight to the Gathr team — we'll be fully prepared for your first call.</p>
+    </div>
+
+  </form>
 </div>
 
+<!-- Success -->
+<div id="success-screen">
+  <div class="success-icon">
+    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#C4522A" stroke-width="2.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
+  </div>
+  <h2>You're all set.</h2>
+  <p>Thank you for taking the time to complete this. Your responses are with the Gathr team and we'll be fully prepared to hit the ground running on your first call.<br><br>We can't wait to get started with you.</p>
+</div>
+
+</div><!-- /form-wrap -->
+
 <script>
-  // Build 1–10 confidence scale
-  const scaleWrap = document.getElementById('confidence-scale');
-  const hidden    = document.getElementById('confidence-hidden');
-  for (let i = 1; i <= 10; i++) {
-    const lbl = document.createElement('label');
-    lbl.className = 'scale-pill';
-    lbl.innerHTML = `<input type="radio" name="confidenceScore" value="${i}">${i}`;
-    lbl.querySelector('input').addEventListener('change', () => { hidden.value = i; });
-    scaleWrap.appendChild(lbl);
-  }
+document.getElementById('intake-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn   = document.getElementById('btn-submit');
+  const errEl = document.getElementById('submit-error');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+  errEl.style.display = 'none';
 
-  // Show logo URL when "Yes" selected
-  document.querySelectorAll('input[name=hasLogo]').forEach(r => {
-    r.addEventListener('change', () => {
-      document.getElementById('logo-url-field').style.display = r.value === 'yes' ? 'block' : 'none';
+  const form = e.target;
+  const radio = (name) => [...form.querySelectorAll(`[name="${name}"]`)].find(r => r.checked)?.value || '';
+  const checks = (name) => [...form.querySelectorAll(`[name="${name}"]:checked`)].map(c => c.value).join(', ');
+  const val = (name) => (form.elements[name]?.value || '').trim();
+
+  // Bundle complex sections into text fields
+  const offerBlock = [
+    val('offerName')     ? 'Offer: ' + val('offerName')         : '',
+    val('offerPrice')    ? 'Price: ' + val('offerPrice')         : '',
+    checks('offerType')  ? 'Type: ' + checks('offerType')        : '',
+    val('offerIncludes') ? 'Includes: ' + val('offerIncludes')   : '',
+  ].filter(Boolean).join('\n');
+
+  const problemBlock = [
+    val('problemWhat')      ? 'Problem: ' + val('problemWhat')               : '',
+    val('problemExcuses')   ? 'Excuses: ' + val('problemExcuses')            : '',
+    val('problemOutcome')   ? 'Outcome if unsolved: ' + val('problemOutcome'): '',
+    val('problemFeeling')   ? 'How they feel: ' + val('problemFeeling')      : '',
+    val('problemPrevious')  ? 'Tried before: ' + val('problemPrevious')      : '',
+    val('problemSolution')  ? 'Our solution: ' + val('problemSolution')      : '',
+  ].filter(Boolean).join('\n\n');
+
+  const dreamBlock = [
+    val('dreamOutcome') ? 'Dream outcome: ' + val('dreamOutcome')         : '',
+    val('dreamExcuses') ? 'Objections: ' + val('dreamExcuses')            : '',
+    val('dreamFeeling') ? 'How they feel when true: ' + val('dreamFeeling'): '',
+    val('dreamThinking')? 'What they think: ' + val('dreamThinking')      : '',
+    val('dreamUnique')  ? 'How we uniquely help: ' + val('dreamUnique')   : '',
+  ].filter(Boolean).join('\n\n');
+
+  const credBlock = [
+    radio('hasTestimonials') ? 'Testimonials: ' + radio('hasTestimonials') : '',
+    checks('testimonialFormat') ? 'Formats: ' + checks('testimonialFormat') : '',
+    val('testimonialText') ? 'Written testimonials:\n' + val('testimonialText') : '',
+    radio('hasPublicReviews') ? 'Public reviews: ' + radio('hasPublicReviews') : '',
+    checks('reviewPlatform') ? 'Platforms: ' + checks('reviewPlatform') : '',
+    val('reviewPlatformOther') ? 'Other platforms: ' + val('reviewPlatformOther') : '',
+    val('guarantee')     ? 'Guarantee: ' + val('guarantee')               : '',
+    val('credibility')   ? 'Credibility: ' + val('credibility')           : '',
+    val('paymentMethods')? 'Payment: ' + val('paymentMethods')            : '',
+  ].filter(Boolean).join('\n\n');
+
+  const brandBlock = [
+    val('brandColours') ? 'Brand colours: ' + val('brandColours')  : '',
+    val('brandFonts')   ? 'Brand fonts: ' + val('brandFonts')      : '',
+    val('photosLink')   ? 'Photos link: ' + val('photosLink')      : '',
+    val('brandDirection') ? '\nReference sites:\n' + val('brandDirection') : '',
+  ].filter(Boolean).join('\n');
+
+  const goals = [offerBlock, problemBlock, dreamBlock].filter(Boolean).join('\n\n---\n\n');
+  const anythingElse = [credBlock, val('workflow') ? 'WORKFLOW:\n' + val('workflow') : ''].filter(Boolean).join('\n\n---\n\n');
+  const brandDir = brandBlock;
+
+  const data = {
+    name:               val('name'),
+    email:              val('email'),
+    phone:              val('phone'),
+    businessName:       val('businessName'),
+    instagram:          val('instagram'),
+    website:            val('website'),
+    servicesAndPricing: val('servicesAndPricing'),
+    logoUrl:            val('logoUrl'),
+    heardAboutUs:       val('heardAboutUs'),
+    goals,
+    anythingElse,
+    brandDirection:     brandDir,
+  };
+
+  try {
+    const res = await fetch('/api/intake', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
     });
-  });
-
-  document.getElementById('intake-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn   = document.getElementById('btn-submit');
-    const errEl = document.getElementById('submit-error');
-    btn.disabled = true;
-    btn.textContent = 'Submitting…';
-    errEl.style.display = 'none';
-
-    const form = e.target;
-    const radio = (name) => [...form.querySelectorAll(`[name=${name}]`)].find(r => r.checked)?.value || '';
-
-    // Combine extra details into anythingElse
-    const techNotes = [
-      radio('hasCRM')        ? 'CRM: ' + radio('hasCRM') : '',
-      radio('hasDomain')     ? 'Domain: ' + radio('hasDomain') : '',
-      radio('businessPhone') ? 'Biz phone: ' + radio('businessPhone') : '',
-      radio('businessAge')   ? 'In business: ' + radio('businessAge') : '',
-      form.location?.value   ? 'Location: ' + form.location.value : '',
-    ].filter(Boolean).join(' | ');
-
-    const data = {
-      name:               form.name.value,
-      email:              form.email.value,
-      phone:              form.phone.value,
-      businessName:       form.businessName.value,
-      instagram:          form.instagram.value,
-      website:            form.website.value,
-      otherSocials:       form.otherSocials.value,
-      servicesAndPricing: form.servicesAndPricing.value,
-      targetAudience:     form.targetAudience.value,
-      currentFollowers:   form.currentFollowers.value ? parseInt(form.currentFollowers.value) : '',
-      logoUrl:            form.logoUrl ? form.logoUrl.value : '',
-      existingContent:    form.existingContent.value,
-      goals:              form.goals.value,
-      brandDirection:     form.brandDirection.value,
-      filmingAvailability:form.filmingAvailability.value,
-      heardAboutUs:       form.heardAboutUs.value,
-      anythingElse:       [form.anythingElse.value, techNotes].filter(Boolean).join('\n\n'),
-    };
-
-    try {
-      const res = await fetch('/api/intake', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (res.ok) {
-        document.getElementById('form-screen').style.display = 'none';
-        document.getElementById('success-screen').style.display = 'block';
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-      } else {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || 'Server error');
-      }
-    } catch (err) {
-      errEl.textContent = err.message || 'Something went wrong. Please try again.';
-      errEl.style.display = 'block';
-      btn.disabled = false;
-      btn.textContent = 'Submit Intake Form';
+    if (res.ok) {
+      document.getElementById('form-screen').style.display = 'none';
+      document.getElementById('success-screen').style.display = 'block';
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Server error');
     }
-  });
+  } catch (err) {
+    errEl.textContent = err.message || 'Something went wrong. Please try again.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Submit Intake Form';
+  }
+});
 </script>
 </body>
 </html>
