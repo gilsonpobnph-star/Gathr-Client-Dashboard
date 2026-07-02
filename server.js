@@ -20,15 +20,13 @@ const TEAM_MEMBERS = (process.env.TEAM_MEMBERS || 'Gil,Glaiza').split(',').map(s
 const base = new Airtable({ apiKey: process.env.AIRTABLE_PAT }).base(process.env.AIRTABLE_BASE_ID);
 const CLIENTS_TABLE = process.env.AIRTABLE_CLIENTS_TABLE || 'Clients';
 
-// Checklist table names (Phase 1 weeks)
-const CHECKLIST_TABLES = {
-  1: 'P1 W1',
-  2: 'P1 W2',
-  3: 'P1 W3',
-  4: 'P1 W4',
-};
+// Second Airtable base (Gathr Space)
+const GATHR_SPACE_BASE_ID = process.env.GATHR_SPACE_BASE_ID || 'appwjC3yyUqr6dMPr';
+const GATHR_SPACE_TABLE   = process.env.GATHR_SPACE_TABLE   || 'tblYUmfe6voFI2slO';
+const GATHR_SPACE_VIEW    = process.env.GATHR_SPACE_VIEW    || 'viwoDRKVRA4DhvI6j';
+const spaceBase = new Airtable({ apiKey: process.env.AIRTABLE_PAT }).base(GATHR_SPACE_BASE_ID);
 
-// Checkbox field names per week (exactly as they appear in Airtable)
+const CHECKLIST_TABLES = { 1: 'P1 W1', 2: 'P1 W2', 3: 'P1 W3', 4: 'P1 W4' };
 const CHECKLIST_FIELDS = {
   1: ['IF', 'BDC', 'CFS', 'WIGM', 'BPCL'],
   2: ['CRM&F', 'Auto', 'Cal', 'Dom', 'BPN#', 'Offer', 'FOS'],
@@ -62,6 +60,18 @@ app.get('/api/me', (req, res) => {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function parseNotesLog(val) {
+  if (!val) return [];
+  try {
+    const parsed = JSON.parse(val);
+    if (Array.isArray(parsed)) return parsed;
+    // Plain text — wrap as legacy note
+    return [{ author: 'System', text: String(val), ts: new Date(0).toISOString() }];
+  } catch {
+    return [{ author: 'System', text: String(val), ts: new Date(0).toISOString() }];
+  }
+}
+
 function shapeClient(rec) {
   const f = rec.fields;
   return {
@@ -73,8 +83,8 @@ function shapeClient(rec) {
     instagram: f['Instagram'] || '',
     otherSocials: f['Other Socials'] || '',
     website: f['Website'] || '',
-    business: f['Business'] || '',          // London / Gathr cohort
-    program: f['Package'] || '',            // Package = program
+    business: f['Business'] || '',
+    program: f['Package'] || '',
     status: f['Status'] || '',
     currentWeek: f['Current Week'] || 1,
     startDate: f['Start Date'] || '',
@@ -91,12 +101,12 @@ function shapeClient(rec) {
     heardAboutUs: f['Heard About Us'] || '',
     anythingElse: f['Anything Else'] || '',
     notes: f['Notes'] || '',
+    notesLog: parseNotesLog(f['Notes Log']),
     intakeSubmitted: f['Intake Submitted'] || '',
     createdAt: rec._rawJson?.createdTime || '',
   };
 }
 
-// Map camelCase → Airtable field names for updates
 const FIELD_MAP = {
   name: 'Client Name',
   businessName: 'Business Name',
@@ -154,27 +164,78 @@ app.put('/api/clients/:id', requireAuth, async (req, res) => {
   }
 });
 
+// ── Notes Log Route ───────────────────────────────────────────────────────────
+
+app.post('/api/clients/:id/notes', requireAuth, async (req, res) => {
+  try {
+    const { author, text } = req.body;
+    if (!text || !text.trim()) return res.status(400).json({ error: 'Note text required' });
+
+    // Read current notes log
+    const rec = await base(CLIENTS_TABLE).find(req.params.id);
+    const existing = parseNotesLog(rec.fields['Notes Log']);
+
+    const newNote = {
+      author: (author || 'Team').trim(),
+      text: text.trim(),
+      ts: new Date().toISOString(),
+    };
+
+    const updated_log = [...existing, newNote];
+
+    const [updated] = await base(CLIENTS_TABLE).update([{
+      id: req.params.id,
+      fields: { 'Notes Log': JSON.stringify(updated_log) },
+    }]);
+
+    res.json(shapeClient(updated));
+  } catch (e) {
+    console.error('POST /api/notes', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/team', requireAuth, (req, res) => {
   res.json(TEAM_MEMBERS);
 });
 
+// ── Gathr Space Members ───────────────────────────────────────────────────────
+
+app.get('/api/gathr-members', requireAuth, async (req, res) => {
+  try {
+    const records = await spaceBase(GATHR_SPACE_TABLE).select({
+      view: GATHR_SPACE_VIEW,
+    }).all();
+
+    // Return raw fields so the frontend can pick what's applicable
+    const members = records.map(r => ({
+      id: r.id,
+      fields: r.fields,
+    }));
+
+    res.json(members);
+  } catch (e) {
+    console.error('GET /api/gathr-members', e.message);
+    // Non-fatal — return empty if base access denied
+    res.json([]);
+  }
+});
+
 // ── Checklist Routes ──────────────────────────────────────────────────────────
 
-// GET checklist state for a client + week
 app.get('/api/clients/:id/checklist/:week', requireAuth, async (req, res) => {
   try {
     const week = parseInt(req.params.week);
     const tableName = CHECKLIST_TABLES[week];
     if (!tableName) return res.json({ fields: {}, recordId: null });
 
-    // First get client name from Clients table
     const clientRec = await base(CLIENTS_TABLE).find(req.params.id);
     const clientName = clientRec.fields['Client Name'];
     if (!clientName) return res.json({ fields: {}, recordId: null });
 
-    // Find the matching row in the checklist table
+    // Use FIND for robustness with linked record fields
     const rows = await base(tableName).select({
-      filterByFormula: `{Client Name} = "${clientName.replace(/"/g, '\\"')}"`,
+      filterByFormula: `FIND("${clientName.replace(/"/g, '\\"')}", {Client Name})`,
       maxRecords: 1,
     }).firstPage();
 
@@ -192,7 +253,6 @@ app.get('/api/clients/:id/checklist/:week', requireAuth, async (req, res) => {
   }
 });
 
-// PATCH a single checkbox field in a checklist table
 app.patch('/api/checklist/:week/:recordId', requireAuth, async (req, res) => {
   try {
     const week = parseInt(req.params.week);
