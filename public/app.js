@@ -21,6 +21,10 @@ const PROGRAMS = {
       { name: 'Phase 4 · Custom Branded Website',    weeks: [13,14,15,16] },
     ],
   },
+  'Old Program': {
+    label: 'Old Program', duration: 4, price: '—', color: '#8A7A6E',
+    phases: [{ name: 'Phase 1 · System Build', weeks: [1,2,3,4] }],
+  },
 };
 
 // Add-ons are upsells on top of the main program
@@ -684,10 +688,8 @@ function populateModal() {
   // Notes log
   renderNotesLog(c.notesLog || []);
 
-  // Private notes (local store only)
-  const local = localStore[c.id] || {};
-  document.getElementById('cm-private-notes').value = local.privateNotes || '';
-  document.getElementById('cm-private-msg').textContent = '';
+  // Activity log (local store only)
+  renderActivityFeed((localStore[c.id] || {}).activityLog || []);
 
   document.getElementById('modal-save-msg').textContent = '';
   document.getElementById('cm-note-msg').textContent    = '';
@@ -756,32 +758,116 @@ document.getElementById('btn-add-note').addEventListener('click', async () => {
   }
 });
 
-/* ── Private Notes (local store) ─────────────────────────────────────────── */
-document.getElementById('btn-save-private').addEventListener('click', async () => {
-  const text  = document.getElementById('cm-private-notes').value;
-  const msgEl = document.getElementById('cm-private-msg');
-  const btn   = document.getElementById('btn-save-private');
-  btn.disabled = true;
-  msgEl.textContent = 'Saving…';
+/* ── Activity Log ─────────────────────────────────────────────────────────── */
+const ACTIVITY_ICONS = { note: '📝', handoff: '🤝', call: '📞', milestone: '🏁', issue: '⚠️', auto: '🔄', archive: '📦', status: '🔁', coach: '👤' };
+
+function renderActivityFeed(log) {
+  const el = document.getElementById('cm-activity-feed');
+  if (!log || !log.length) { el.innerHTML = '<div class="note-empty">No activity yet.</div>'; return; }
+  el.innerHTML = [...log].reverse().map(e => `
+    <div class="activity-item">
+      <div class="activity-icon">${ACTIVITY_ICONS[e.type] || '📝'}</div>
+      <div class="activity-body">
+        <div class="activity-meta">
+          <strong>${e.author || 'Team'}</strong>
+          <span class="note-time">${fmtTs(e.ts)}</span>
+        </div>
+        ${e.text ? `<div class="activity-text">${escHtml(e.text)}</div>` : ''}
+        ${e.changes ? e.changes.map(ch => `<div class="activity-change"><span>${ch.field}</span><span class="ch-from">${ch.from}</span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg><span class="ch-to">${ch.to}</span></div>`).join('') : ''}
+      </div>
+    </div>`).join('');
+}
+
+async function appendActivityEntry(clientId, entry) {
+  const existing = (localStore[clientId] || {}).activityLog || [];
+  const updated = [...existing, entry];
+  const res = await fetch(`/api/local/${clientId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ activityLog: updated }),
+  });
+  if (!res.ok) throw new Error(await res.text());
+  const stored = await res.json();
+  localStore[clientId] = stored;
+  return stored.activityLog || [];
+}
+
+document.getElementById('btn-log-activity').addEventListener('click', async () => {
+  const text   = document.getElementById('cm-activity-text').value.trim();
+  const type   = document.getElementById('cm-activity-type').value;
+  const author = document.getElementById('cm-note-author').value || 'Team';
+  const msgEl  = document.getElementById('cm-activity-msg');
+  if (!text) { msgEl.textContent = 'Write something first.'; return; }
+
+  const btn = document.getElementById('btn-log-activity');
+  btn.disabled = true; msgEl.textContent = 'Saving…';
 
   try {
-    const res = await fetch(`/api/local/${modalClient.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ privateNotes: text }),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const updated = await res.json();
-    localStore[modalClient.id] = updated;
-    msgEl.style.color = 'var(--green)';
-    msgEl.textContent = '✓ Saved locally';
-    setTimeout(() => { msgEl.textContent = ''; }, 2500);
+    const log = await appendActivityEntry(modalClient.id, { type, text, author, ts: new Date().toISOString() });
+    renderActivityFeed(log);
+    document.getElementById('cm-activity-text').value = '';
+    msgEl.style.color = 'var(--green)'; msgEl.textContent = '✓ Logged';
+    setTimeout(() => { msgEl.textContent = ''; }, 2000);
   } catch (e) {
-    msgEl.style.color = '#e53e3e';
-    msgEl.textContent = 'Error saving';
+    msgEl.style.color = '#e53e3e'; msgEl.textContent = 'Error';
     console.error(e);
-  } finally {
-    btn.disabled = false;
+  } finally { btn.disabled = false; }
+});
+
+/* ── Change detection ─────────────────────────────────────────────────────── */
+function detectChanges(oldClient, patch) {
+  const tracked = {
+    status: 'Status', program: 'Program',
+    leadAssignee: 'Lead Coach', techAssignee: 'Tech',
+    currentWeek: 'Current Week', startDate: 'Start Date',
+  };
+  return Object.entries(tracked)
+    .filter(([k]) => patch[k] !== undefined && String(oldClient[k] || '') !== String(patch[k] || ''))
+    .map(([k, label]) => ({ field: label, from: oldClient[k] || '—', to: patch[k] || '—' }));
+}
+
+/* ── Archive client ───────────────────────────────────────────────────────── */
+document.getElementById('btn-archive-client').addEventListener('click', async () => {
+  if (!modalClient) return;
+  if (!confirm(`Archive ${modalClient.name}? This sets them to Alumni and removes them from active views.`)) return;
+
+  const msgEl = document.getElementById('modal-save-msg');
+  msgEl.textContent = 'Archiving…'; msgEl.style.color = 'var(--accent)';
+
+  const patch = { status: 'Alumni' };
+  const updated = await patchClient(modalClient.id, patch);
+  if (updated) {
+    await appendActivityEntry(modalClient.id, { type: 'archive', text: `Client archived — moved to Alumni.`, author: 'Team', ts: new Date().toISOString() });
+    Object.assign(modalClient, updated);
+    const idx = clients.findIndex(x => x.id === modalClient.id);
+    if (idx !== -1) clients[idx] = updated;
+    document.getElementById('cm-status').value = 'Alumni';
+    const sBadge = document.getElementById('cm-status-badge');
+    sBadge.textContent = 'Alumni'; sBadge.className = 'badge badge-paused';
+    msgEl.style.color = 'var(--green)'; msgEl.textContent = '✓ Archived';
+    setTimeout(() => { msgEl.textContent = ''; }, 3000);
+  }
+});
+
+/* ── Delete client ────────────────────────────────────────────────────────── */
+document.getElementById('btn-delete-client').addEventListener('click', async () => {
+  if (!modalClient) return;
+  if (!confirm(`Permanently delete ${modalClient.name}? This cannot be undone — the record will be removed from Airtable.`)) return;
+  if (!confirm(`Are you sure? Deleting ${modalClient.name} is irreversible.`)) return;
+
+  const msgEl = document.getElementById('modal-save-msg');
+  msgEl.textContent = 'Deleting…'; msgEl.style.color = '#e53e3e';
+
+  try {
+    const res = await fetch(`/api/clients/${modalClient.id}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error(await res.text());
+    clients = clients.filter(c => c.id !== modalClient.id);
+    document.getElementById('client-modal').classList.add('hidden');
+    showTab(activeTab);
+    if (activeTab === 'overview') renderOverview();
+  } catch (e) {
+    msgEl.style.color = '#e53e3e'; msgEl.textContent = 'Delete failed — check console';
+    console.error(e);
   }
 });
 
@@ -919,18 +1005,40 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
   msgEl.textContent = 'Saving…';
   msgEl.style.color = 'var(--accent)';
 
+  const changes = detectChanges(c, patch);
   const updated = await patchClient(c.id, patch);
   if (updated) {
-    // Log what Airtable actually returned so we can spot field mismatches
-    console.log('[Save] sent:', patch);
-    console.log('[Save] returned from Airtable:', updated);
+    // Dual-save: mirror all saved data + fields to local store
+    const localSnapshot = {
+      program: patch.program, status: patch.status, currentWeek: patch.currentWeek,
+      startDate: patch.startDate, leadAssignee: patch.leadAssignee, techAssignee: patch.techAssignee,
+      brandDirection: patch.brandDirection, servicesAndPricing: patch.servicesAndPricing,
+      goals: patch.goals, filmingAvailability: patch.filmingAvailability, addOns: patch.addOns,
+      _lastSaved: new Date().toISOString(),
+    };
+    const existingLocal = localStore[c.id] || {};
+    const mergedLocal = { ...existingLocal, ...localSnapshot };
+
+    // Auto-log any detected changes
+    if (changes.length) {
+      const author = document.getElementById('cm-lead').value || 'Team';
+      const logEntry = { type: 'auto', text: '', author, ts: new Date().toISOString(), changes };
+      mergedLocal.activityLog = [...(existingLocal.activityLog || []), logEntry];
+    }
+
+    fetch(`/api/local/${c.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(mergedLocal),
+    }).then(r => r.json()).then(stored => {
+      localStore[c.id] = stored;
+      renderActivityFeed(stored.activityLog || []);
+    }).catch(console.error);
 
     Object.assign(c, updated);
     const idx = clients.findIndex(x => x.id === c.id);
     if (idx !== -1) clients[idx] = updated;
 
-    // Only update the header badge — do NOT call populateModal() which would
-    // reset every dropdown back to the Airtable-returned value
     const sBadge = document.getElementById('cm-status-badge');
     sBadge.textContent = updated.status || '—';
     sBadge.className = `badge ${statusClass(updated.status)}`;

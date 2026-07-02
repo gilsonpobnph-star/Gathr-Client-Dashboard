@@ -38,12 +38,18 @@ const GATHR_SPACE_TABLE   = process.env.GATHR_SPACE_TABLE   || 'tblYUmfe6voFI2sl
 const GATHR_SPACE_VIEW    = process.env.GATHR_SPACE_VIEW    || 'viwoDRKVRA4DhvI6j';
 const spaceBase = new Airtable({ apiKey: process.env.AIRTABLE_PAT }).base(GATHR_SPACE_BASE_ID);
 
-const CHECKLIST_TABLES = { 1: 'P1 W1', 2: 'P1 W2', 3: 'P1 W3', 4: 'P1 W4' };
+const CHECKLIST_TABLES = {
+  1: 'P1 W1',  2: 'P1 W2',  3: 'P1 W3',  4: 'P1 W4',
+  5: 'P2 W5',  6: 'P2 W6',  7: 'P2 W7',  8: 'P2 W8',
+  9: 'P3 W9',  10: 'P3 W10', 11: 'P3 W11', 12: 'P3 W12',
+  13: 'P4 W13', 14: 'P4 W14', 15: 'P4 W15', 16: 'P4 W16',
+};
 const CHECKLIST_FIELDS = {
   1: ['IF', 'BDC', 'CFS', 'WIGM', 'BPCL'],
   2: ['CRM&F', 'Auto', 'Cal', 'Dom', 'BPN#', 'Offer', 'FOS'],
   3: ['RSB', 'ACF', 'FCL'],
   4: ['1:1 CRMT', 'SOP&P', 'SMM (W4-8)', 'Launch'],
+  // Weeks 5–16: field names will be added once Airtable tables are built
 };
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -200,6 +206,20 @@ app.put('/api/clients/:id', requireAuth, async (req, res) => {
       console.error('PUT /api/clients final fetch failed', e.message);
       return res.status(500).json({ error: firstErr.message });
     }
+  }
+});
+
+app.delete('/api/clients/:id', requireAuth, async (req, res) => {
+  try {
+    await base(CLIENTS_TABLE).destroy([req.params.id]);
+    // Remove from local store too
+    const store = readStore();
+    delete store[req.params.id];
+    writeStore(store);
+    res.json({ ok: true });
+  } catch (e) {
+    console.error('DELETE /api/clients', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 

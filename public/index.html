@@ -204,6 +204,7 @@
             <option>Brand Basics</option>
             <option>Personal Brand Foundation</option>
             <option>Personal Brand Full</option>
+            <option>Old Program</option>
           </select>
           <select id="filter-assignee" class="filter-select">
             <option value="">All Assignees</option>
@@ -391,6 +392,7 @@
               <option>Brand Basics</option>
               <option>Personal Brand Foundation</option>
               <option>Personal Brand Full</option>
+              <option>Old Program</option>
             </select>
           </div>
           <div class="detail-row">
@@ -492,16 +494,28 @@
           <div id="cl-client"></div>
         </div>
 
-        <!-- Private Notes (local store only — never sent to Airtable) -->
+        <!-- Activity Log (local store — full account journey) -->
         <div class="info-card private-notes-card">
           <h3>
-            Private Notes
+            Activity Log
             <span class="private-badge">Local only</span>
           </h3>
-          <textarea id="cm-private-notes" placeholder="Internal team notes — not synced to Airtable…" rows="3"></textarea>
-          <div class="add-note-actions" style="margin-top:6px">
-            <span id="cm-private-msg" class="note-save-msg"></span>
-            <button class="btn-add-note" id="btn-save-private">Save Privately</button>
+          <div class="activity-feed" id="cm-activity-feed">
+            <div class="note-empty">No activity yet.</div>
+          </div>
+          <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
+            <select id="cm-activity-type" class="inline-select" style="font-size:12px">
+              <option value="note">📝 General Note</option>
+              <option value="handoff">🤝 Handoff</option>
+              <option value="call">📞 Call Summary</option>
+              <option value="milestone">🏁 Milestone</option>
+              <option value="issue">⚠️ Issue / Flag</option>
+            </select>
+            <textarea id="cm-activity-text" class="add-note-textarea" placeholder="Log an entry…" rows="2"></textarea>
+            <div class="add-note-actions">
+              <span id="cm-activity-msg" class="note-save-msg"></span>
+              <button class="btn-add-note" id="btn-log-activity">Log Entry</button>
+            </div>
           </div>
         </div>
 
@@ -528,6 +542,9 @@
 
     <!-- Save bar -->
     <div class="save-bar">
+      <button class="btn-danger" id="btn-delete-client">Delete</button>
+      <button class="btn-archive" id="btn-archive-client">Archive</button>
+      <span style="flex:1"></span>
       <span id="modal-save-msg" class="save-msg"></span>
       <button class="btn-primary" id="btn-save-client">Save to Airtable</button>
     </div>
