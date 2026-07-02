@@ -499,8 +499,12 @@ const OLD_FIELD_MAP = {
 };
 
 app.post('/api/migrate-old-program', requireAuth, async (req, res) => {
-  const { oldBaseId } = req.body;
+  let { oldBaseId } = req.body;
   if (!oldBaseId) return res.status(400).json({ error: 'oldBaseId required' });
+  // Extract just the base ID if user pasted a full URL or path
+  const baseMatch = oldBaseId.match(/app[A-Za-z0-9]+/);
+  if (!baseMatch) return res.status(400).json({ error: 'Could not find a valid base ID (should start with "app")' });
+  oldBaseId = baseMatch[0];
 
   const oldBase = new Airtable({ apiKey: process.env.AIRTABLE_PAT }).base(oldBaseId);
   const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').trim().replace(/\s+/g, ' ');
