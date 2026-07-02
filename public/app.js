@@ -1,7 +1,26 @@
 /* ── Program data ─────────────────────────────────────────────────────────── */
 const PROGRAMS = {
-  'Full Brand OS': { label: 'Full Brand OS',   duration: 16, price: '$4,500', color: '#7A52A0', phases: [{ name: 'Phase 1 · Build the Foundation', weeks: [1,2,3,4] },{ name: 'Phase 2 · Activate Outreach', weeks: [5,6,7,8] },{ name: 'Phase 3 · Scale + Campaigns', weeks: [9,10,11,12] },{ name: 'Phase 4 · The Event', weeks: [13,14,15,16] }] },
-  'Phase 1 Setup': { label: 'Phase 1 — Setup', duration: 4,  price: '$1,500', color: '#3B6B9A', phases: [{ name: 'Weeks 1–4 · Build the Foundation', weeks: [1,2,3,4] }] },
+  'Brand Basics': {
+    label: 'Brand Basics', duration: 4, price: '$1,500', color: '#3B6B9A',
+    phases: [{ name: 'Phase 1 · System Build', weeks: [1,2,3,4] }],
+  },
+  'Personal Brand Foundation': {
+    label: 'Personal Brand Foundation', duration: 12, price: '$4,500', color: '#7A52A0',
+    phases: [
+      { name: 'Phase 1 · System Build',              weeks: [1,2,3,4] },
+      { name: 'Phase 2 · Lead-Gen Activation',       weeks: [5,6,7,8] },
+      { name: 'Phase 3 · Independence + Paid Ads',   weeks: [9,10,11,12] },
+    ],
+  },
+  'Personal Brand Full': {
+    label: 'Personal Brand Full', duration: 16, price: 'Custom', color: '#C4522A',
+    phases: [
+      { name: 'Phase 1 · System Build',              weeks: [1,2,3,4] },
+      { name: 'Phase 2 · Lead-Gen Activation',       weeks: [5,6,7,8] },
+      { name: 'Phase 3 · Independence + Paid Ads',   weeks: [9,10,11,12] },
+      { name: 'Phase 4 · Custom Branded Website',    weeks: [13,14,15,16] },
+    ],
+  },
 };
 
 // Add-ons are upsells on top of the main program
@@ -376,7 +395,7 @@ function renderPrograms() {
   const grouped = {};
   list.forEach(c => { const key = c.program || 'Unassigned'; if (!grouped[key]) grouped[key] = []; grouped[key].push(c); });
 
-  const order = ['Full Brand OS', 'Phase 1 Setup', 'Unassigned'];
+  const order = ['Brand Basics', 'Personal Brand Foundation', 'Personal Brand Full', 'Unassigned'];
   document.getElementById('prog-view-container').innerHTML = order.filter(k => grouped[k]?.length).map(k => {
     const grp   = grouped[k];
     const color = progColor(k);
