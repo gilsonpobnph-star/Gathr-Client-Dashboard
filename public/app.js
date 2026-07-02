@@ -756,13 +756,27 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
 
   const updated = await patchClient(c.id, patch);
   if (updated) {
+    // Log what Airtable actually returned so we can spot field mismatches
+    console.log('[Save] sent:', patch);
+    console.log('[Save] returned from Airtable:', updated);
+
     Object.assign(c, updated);
     const idx = clients.findIndex(x => x.id === c.id);
     if (idx !== -1) clients[idx] = updated;
+
+    // Only update the header badge — do NOT call populateModal() which would
+    // reset every dropdown back to the Airtable-returned value
+    const sBadge = document.getElementById('cm-status-badge');
+    sBadge.textContent = updated.status || '—';
+    sBadge.className = `badge ${statusClass(updated.status)}`;
+
+    const prog  = PROGRAMS[updated.program];
+    const badge = document.getElementById('cm-prog-badge');
+    if (prog) { badge.textContent = prog.label; badge.style.background = prog.color + '20'; badge.style.color = prog.color; badge.style.display = 'inline-block'; }
+
     msgEl.style.color = 'var(--green)';
     msgEl.textContent = '✓ Saved to Airtable';
     setTimeout(() => { msgEl.textContent = ''; }, 3000);
-    populateModal();
   } else {
     msgEl.style.color = '#e53e3e';
     msgEl.textContent = 'Error saving — check console';
