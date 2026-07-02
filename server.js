@@ -129,6 +129,7 @@ function shapeClient(rec) {
 const FIELD_MAP = {
   name: 'Client Name',
   businessName: 'Business Name',
+  business: 'Business',
   email: 'Email',
   phone: 'Phone',
   instagram: 'Instagram',

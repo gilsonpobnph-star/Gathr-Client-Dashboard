@@ -662,6 +662,7 @@ function populateModal() {
   renderSpaceInfo(findGathrMember(c));
 
   // Program fields
+  document.getElementById('cm-business').value = c.business    || '';
   document.getElementById('cm-program').value = c.program     || '';
   document.getElementById('cm-status').value  = c.status      || '';
   document.getElementById('cm-week').value    = c.currentWeek || 1;
@@ -817,7 +818,7 @@ document.getElementById('btn-log-activity').addEventListener('click', async () =
 /* ── Change detection ─────────────────────────────────────────────────────── */
 function detectChanges(oldClient, patch) {
   const tracked = {
-    status: 'Status', program: 'Program',
+    business: 'Business', status: 'Status', program: 'Program',
     leadAssignee: 'Lead Coach', techAssignee: 'Tech',
     currentWeek: 'Current Week', startDate: 'Start Date',
   };
@@ -988,6 +989,7 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
   if (customAddon) addonParts.push(customAddon);
 
   const patch = {
+    business:           document.getElementById('cm-business').value,
     program:            document.getElementById('cm-program').value,
     status:             document.getElementById('cm-status').value,
     currentWeek:        parseInt(document.getElementById('cm-week').value) || 1,
@@ -1010,7 +1012,7 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
   if (updated) {
     // Dual-save: mirror all saved data + fields to local store
     const localSnapshot = {
-      program: patch.program, status: patch.status, currentWeek: patch.currentWeek,
+      business: patch.business, program: patch.program, status: patch.status, currentWeek: patch.currentWeek,
       startDate: patch.startDate, leadAssignee: patch.leadAssignee, techAssignee: patch.techAssignee,
       brandDirection: patch.brandDirection, servicesAndPricing: patch.servicesAndPricing,
       goals: patch.goals, filmingAvailability: patch.filmingAvailability, addOns: patch.addOns,
