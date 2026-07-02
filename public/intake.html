@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gathr Grow — Client Intake Form</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f1117;
+      --surface: #181c25;
+      --surface2: #1e2330;
+      --border: #2a2f3d;
+      --text: #e8eaf0;
+      --text2: #8b91a7;
+      --text3: #5a6070;
+      --accent: #22c55e;
+      --accent-hover: #16a34a;
+      --radius: 10px;
+    }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg); color: var(--text);
+      font-size: 15px; line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 0;
+    }
+    .header-inner {
+      max-width: 680px; margin: 0 auto; padding: 0 24px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    .logo {
+      width: 40px; height: 40px; background: var(--accent);
+      border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .header h1 { font-size: 18px; font-weight: 700; }
+    .header p { font-size: 13px; color: var(--text2); }
+
+    /* ── Form ── */
+    .form-wrap {
+      max-width: 680px; margin: 0 auto; padding: 40px 24px 80px;
+    }
+    .form-intro {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 24px; margin-bottom: 32px;
+    }
+    .form-intro h2 { font-size: 22px; font-weight: 800; margin-bottom: 8px; }
+    .form-intro p { color: var(--text2); font-size: 14px; line-height: 1.6; }
+
+    .form-section {
+      margin-bottom: 32px;
+    }
+    .section-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .7px; color: var(--accent);
+      margin-bottom: 16px; padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-num {
+      width: 20px; height: 20px; background: var(--accent);
+      border-radius: 50%; color: #000; font-size: 10px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .field { margin-bottom: 18px; }
+    .field label {
+      display: block; font-size: 13px; font-weight: 600;
+      margin-bottom: 6px; color: var(--text);
+    }
+    .field label .req { color: var(--accent); margin-left: 2px; }
+    .field .hint { font-size: 12px; color: var(--text3); margin-bottom: 6px; }
+
+    .field input,
+    .field textarea,
+    .field select {
+      width: 100%;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 14px;
+      color: var(--text); font-size: 14px; font-family: inherit;
+      outline: none; transition: border-color .15s;
+      appearance: none;
+    }
+    .field input:focus,
+    .field textarea:focus,
+    .field select:focus { border-color: var(--accent); }
+    .field textarea { resize: vertical; min-height: 90px; }
+    .field input::placeholder,
+    .field textarea::placeholder { color: var(--text3); }
+
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
+    .radio-group { display: flex; gap: 12px; flex-wrap: wrap; }
+    .radio-pill {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 20px; padding: 8px 16px; cursor: pointer;
+      font-size: 13px; font-weight: 500; transition: all .15s;
+    }
+    .radio-pill input[type=radio] { display: none; }
+    .radio-pill:has(input:checked) {
+      border-color: var(--accent); background: rgba(34,197,94,.12); color: var(--accent);
+    }
+
+    /* ── Submit ── */
+    .submit-section { text-align: center; padding-top: 12px; }
+    .btn-submit {
+      background: var(--accent); color: #000; font-weight: 800;
+      font-size: 16px; padding: 16px 48px; border: none;
+      border-radius: 10px; cursor: pointer; transition: background .15s;
+      display: inline-block;
+    }
+    .btn-submit:hover { background: var(--accent-hover); }
+    .btn-submit:disabled { opacity: .6; cursor: not-allowed; }
+    .submit-note { font-size: 12px; color: var(--text3); margin-top: 10px; }
+
+    /* ── Success ── */
+    #success-screen {
+      display: none;
+      text-align: center; padding: 80px 24px;
+    }
+    .success-icon {
+      width: 72px; height: 72px; background: rgba(34,197,94,.15);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 24px;
+    }
+    #success-screen h2 { font-size: 26px; font-weight: 800; margin-bottom: 12px; }
+    #success-screen p { color: var(--text2); font-size: 15px; line-height: 1.6; max-width: 420px; margin: 0 auto; }
+
+    .error-msg { color: #ef4444; font-size: 13px; margin-top: 8px; display: none; }
+
+    @media (max-width: 600px) {
+      .field-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div class="logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="#000"/></svg>
+    </div>
+    <div>
+      <h1>Gathr Grow</h1>
+      <p>Built for practitioners, by practitioners</p>
+    </div>
+  </div>
+</div>
+
+<div class="form-wrap">
+  <div id="form-screen">
+    <div class="form-intro">
+      <h2>Welcome to Gathr Grow 👋</h2>
+      <p>We're so excited to work with you. Before your first call with Gil or Glaiza, please take a few minutes to fill in this form. The more detail you share, the better prepared we'll be to build exactly what you need.</p>
+    </div>
+
+    <form id="intake-form">
+      <!-- Section 1: About You -->
+      <div class="form-section">
+        <div class="section-label"><span class="section-num">1</span>About You</div>
+
+        <div class="field-row">
+          <div class="field">
+            <label>Full Name <span class="req">*</span></label>
+            <input type="text" name="name" placeholder="Jane Smith" required />
+          </div>
+          <div class="field">
+            <label>Phone Number <span class="req">*</span></label>
+            <input type="tel" name="phone" placeholder="+61 4xx xxx xxx" required />
+          </div>
+        </div>
+        <div class="field">
+          <label>Email Address <span class="req">*</span></label>
+          <input type="email" name="email" placeholder="you@yourbusiness.com" required />
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Instagram Handle</label>
+            <div class="hint">Include the @</div>
+            <input type="text" name="instagram" placeholder="@yourbusiness" />
+          </div>
+          <div class="field">
+            <label>Website URL</label>
+            <input type="url" name="website" placeholder="https://yourbusiness.com" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Other Social Media Links</label>
+          <div class="hint">Facebook, TikTok, LinkedIn, YouTube — paste any links here</div>
+          <input type="text" name="otherSocials" placeholder="https://facebook.com/…" />
+        </div>
+      </div>
+
+      <!-- Section 2: Your Business -->
+      <div class="form-section">
+        <div class="section-label"><span class="section-num">2</span>Your Business</div>
+
+        <div class="field">
+          <label>Business / Practice Name <span class="req">*</span></label>
+          <input type="text" name="businessName" placeholder="Jane Smith Personal Training" required />
+        </div>
+        <div class="field">
+          <label>What do you do?</label>
+          <div class="hint">Brief description of your practice — who you help and how</div>
+          <textarea name="servicesAndPricing" placeholder="E.g. I'm a personal trainer specialising in postnatal fitness. I offer 1:1 sessions at $90/hr, 6-week programs at $600, and small group classes…"></textarea>
+        </div>
+        <div class="field">
+          <label>Who is your ideal client?</label>
+          <div class="hint">Describe the person you most want to attract</div>
+          <textarea name="targetAudience" placeholder="E.g. Busy mums aged 28–45 who want to get back into fitness after having kids…" style="min-height:70px"></textarea>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Current Instagram Followers</label>
+            <input type="number" name="currentFollowers" placeholder="e.g. 850" min="0" />
+          </div>
+          <div class="field">
+            <label>Do you have a logo?</label>
+            <div class="radio-group" style="margin-top:4px">
+              <label class="radio-pill"><input type="radio" name="hasLogo" value="yes"> Yes, I have one</label>
+              <label class="radio-pill"><input type="radio" name="hasLogo" value="no"> Not yet</label>
+            </div>
+          </div>
+        </div>
+        <div class="field" id="logo-url-field" style="display:none">
+          <label>Logo URL or Google Drive Link</label>
+          <input type="text" name="logoUrl" placeholder="https://drive.google.com/…" />
+        </div>
+        <div class="field">
+          <label>Do you have an existing business phone number?</label>
+          <div class="radio-group" style="margin-top:4px">
+            <label class="radio-pill"><input type="radio" name="businessPhone" value="yes"> Yes</label>
+            <label class="radio-pill"><input type="radio" name="businessPhone" value="no"> No, I need one set up</label>
+          </div>
+        </div>
+        <div class="field">
+          <label>Do you have a domain / business email set up?</label>
+          <div class="radio-group" style="margin-top:4px">
+            <label class="radio-pill"><input type="radio" name="hasDomain" value="yes"> Yes</label>
+            <label class="radio-pill"><input type="radio" name="hasDomain" value="no"> No</label>
+            <label class="radio-pill"><input type="radio" name="hasDomain" value="unsure"> Not sure</label>
+          </div>
+        </div>
+        <div class="field">
+          <label>Any existing content or marketing links?</label>
+          <div class="hint">Share links to any existing reels, videos, website, or content you're proud of</div>
+          <textarea name="existingContent" placeholder="https://www.instagram.com/reel/…" style="min-height:60px"></textarea>
+        </div>
+      </div>
+
+      <!-- Section 3: Goals & Vision -->
+      <div class="form-section">
+        <div class="section-label"><span class="section-num">3</span>Goals & Vision</div>
+
+        <div class="field">
+          <label>What do you want to achieve from this program? <span class="req">*</span></label>
+          <div class="hint">Be as specific as you can — numbers, timelines, what success looks like</div>
+          <textarea name="goals" placeholder="E.g. I want 10 paying clients by the end of the program. I want a professional online presence I'm proud of. I want to stop relying on word of mouth…" required></textarea>
+        </div>
+        <div class="field">
+          <label>Describe your brand aesthetic / vibe</label>
+          <div class="hint">Think colours, words, energy — or share Instagram accounts / brands you love the look of</div>
+          <textarea name="brandDirection" placeholder="E.g. Clean, minimal, warm tones. Think @jessicaolie mixed with @movementbydana. I want it to feel professional but approachable…"></textarea>
+        </div>
+      </div>
+
+      <!-- Section 4: Logistics -->
+      <div class="form-section">
+        <div class="section-label"><span class="section-num">4</span>Logistics</div>
+
+        <div class="field">
+          <label>Filming availability</label>
+          <div class="hint">Our first filming session is in Week 1 — what days and times work best for you?</div>
+          <textarea name="filmingAvailability" placeholder="E.g. Weekday mornings (Mon–Wed before 11am) or Saturday afternoons…" style="min-height:70px"></textarea>
+        </div>
+        <div class="field">
+          <label>How did you hear about Gathr?</label>
+          <input type="text" name="heardAboutUs" placeholder="e.g. Referral from Sarah, Instagram, Google…" />
+        </div>
+      </div>
+
+      <!-- Section 5: Anything else -->
+      <div class="form-section">
+        <div class="section-label"><span class="section-num">5</span>Anything Else?</div>
+        <div class="field">
+          <label>Is there anything else we should know before your first call?</label>
+          <textarea name="anythingElse" placeholder="Access issues, health considerations, schedule constraints, specific questions — anything at all…"></textarea>
+        </div>
+      </div>
+
+      <div class="submit-section">
+        <button type="submit" class="btn-submit" id="btn-submit">Submit My Intake Form</button>
+        <div class="error-msg" id="submit-error">Something went wrong. Please try again.</div>
+        <p class="submit-note">Your responses go straight to the Gathr team. We'll see you at your first call!</p>
+      </div>
+    </form>
+  </div>
+
+  <!-- Success screen -->
+  <div id="success-screen">
+    <div class="success-icon">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
+    </div>
+    <h2>You're all set! 🎉</h2>
+    <p>Thanks for taking the time to fill this in. Your responses are with the Gathr team and we'll be well prepared for your first call.<br><br>We can't wait to get started.</p>
+  </div>
+</div>
+
+<script>
+  // Show logo URL field when "yes" is selected
+  document.querySelectorAll('input[name=hasLogo]').forEach(r => {
+    r.addEventListener('change', () => {
+      document.getElementById('logo-url-field').style.display = r.value === 'yes' ? 'block' : 'none';
+    });
+  });
+
+  document.getElementById('intake-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btn-submit');
+    const errEl = document.getElementById('submit-error');
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+    errEl.style.display = 'none';
+
+    const form = e.target;
+    const data = {
+      name: form.name.value,
+      email: form.email.value,
+      phone: form.phone.value,
+      instagram: form.instagram.value,
+      website: form.website.value,
+      otherSocials: form.otherSocials.value,
+      businessName: form.businessName.value,
+      servicesAndPricing: form.servicesAndPricing.value,
+      targetAudience: form.targetAudience.value,
+      currentFollowers: form.currentFollowers.value,
+      logoUrl: form.logoUrl ? form.logoUrl.value : '',
+      businessPhone: (form.businessPhone ? [...form.querySelectorAll('[name=businessPhone]')].find(r => r.checked)?.value : '') || '',
+      brandDirection: form.brandDirection.value,
+      goals: form.goals.value,
+      filmingAvailability: form.filmingAvailability.value,
+      heardAboutUs: form.heardAboutUs.value,
+      anythingElse: form.anythingElse.value,
+      existingContent: form.existingContent.value,
+    };
+
+    try {
+      const res = await fetch('/api/intake', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (res.ok) {
+        document.getElementById('form-screen').style.display = 'none';
+        document.getElementById('success-screen').style.display = 'block';
+        window.scrollTo(0, 0);
+      } else {
+        throw new Error('Server error');
+      }
+    } catch {
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Submit My Intake Form';
+    }
+  });
+</script>
+</body>
+</html>
