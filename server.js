@@ -89,7 +89,7 @@ function shapeClient(rec) {
     currentWeek: f['Current Week'] || 1,
     startDate: f['Start Date'] || '',
     leadAssignee: f['Assigned Coach'] || '',
-    techAssignee: f['Assigned Tech'] || '',
+    techAssignee: f['Assigned Tech Lead'] || f['Assigned Tech'] || '',
     brandDirection: f['Brand Direction'] || '',
     servicesAndPricing: f['Services & Pricing'] || '',
     targetAudience: f['Target Audience'] || '',
@@ -102,7 +102,7 @@ function shapeClient(rec) {
     anythingElse: f['Anything Else'] || '',
     notes: f['Notes'] || '',
     notesLog: parseNotesLog(f['Notes Log']),
-    addOns: f['Add-ons'] || '',
+    addOns: f['Add ons'] || f['Add-ons'] || '',
     intakeSubmitted: f['Intake Submitted'] || '',
     createdAt: rec._rawJson?.createdTime || '',
   };
@@ -121,7 +121,7 @@ const FIELD_MAP = {
   currentWeek: 'Current Week',
   startDate: 'Start Date',
   leadAssignee: 'Assigned Coach',
-  techAssignee: 'Assigned Tech',
+  techAssignee: 'Assigned Tech Lead',
   brandDirection: 'Brand Direction',
   servicesAndPricing: 'Services & Pricing',
   targetAudience: 'Target Audience',
@@ -133,7 +133,7 @@ const FIELD_MAP = {
   heardAboutUs: 'Heard About Us',
   anythingElse: 'Anything Else',
   notes: 'Notes',
-  addOns: 'Add-ons',
+  addOns: 'Add ons',
 };
 
 // ── Client Routes ─────────────────────────────────────────────────────────────

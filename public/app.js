@@ -119,6 +119,50 @@ function getPhaseLabel(program, week) {
 
 function normalize(s) { return (s || '').toLowerCase().trim(); }
 
+/* ── Deadline logic ───────────────────────────────────────────────────────── */
+function deadlineStatus(c) {
+  if (!c.startDate || !c.program) return null;
+  const start = new Date(c.startDate);
+  if (isNaN(start)) return null;
+  const dur = progDuration(c.program);
+  const today = new Date();
+  const elapsedDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
+  const elapsedWeeks = Math.floor(elapsedDays / 7);
+  const expectedWeek = Math.min(elapsedWeeks + 1, dur);
+  const actualWeek = c.currentWeek || 1;
+  const endDate = new Date(start.getTime() + dur * 7 * 24 * 60 * 60 * 1000);
+  const daysLeft = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
+  const gap = expectedWeek - actualWeek; // positive = behind schedule
+
+  if (c.status === 'Completed' || c.status === 'Alumni') return { state: 'done', gap: 0, daysLeft };
+  if (daysLeft < 0 && c.status !== 'Completed' && c.status !== 'Alumni') return { state: 'overdue', gap, daysLeft };
+  if (gap >= 3) return { state: 'delayed', gap, daysLeft };
+  if (gap >= 1) return { state: 'at-risk', gap, daysLeft };
+  return { state: 'on-track', gap, daysLeft };
+}
+
+function deadlineBadge(c) {
+  const d = deadlineStatus(c);
+  if (!d || d.state === 'done') return '';
+  const map = {
+    'overdue':  ['🔴', '#b91c1c', '#fef2f2', 'Overdue'],
+    'delayed':  ['🟠', '#c2410c', '#fff7ed', `Behind ${d.gap}wk`],
+    'at-risk':  ['🟡', '#b45309', '#fffbeb', `Watch`],
+    'on-track': ['🟢', '#15803d', '#f0fdf4', 'On Track'],
+  };
+  const [, color, bg, label] = map[d.state] || map['on-track'];
+  return `<span class="dl-badge" style="background:${bg};color:${color}">${label}</span>`;
+}
+
+function endDateLabel(c) {
+  if (!c.startDate || !c.program) return '—';
+  const start = new Date(c.startDate);
+  if (isNaN(start)) return '—';
+  const dur = progDuration(c.program);
+  const end = new Date(start.getTime() + dur * 7 * 24 * 60 * 60 * 1000);
+  return end.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 /* ── Auth ─────────────────────────────────────────────────────────────────── */
 async function checkAuth() {
   const res = await fetch('/api/me');
@@ -273,9 +317,68 @@ function renderOverview() {
   document.getElementById('overview-subtitle').textContent =
     `Last refreshed ${new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}`;
 
+  renderTodaysRead();
   renderWeekTimeline('week-timeline-container', clients.filter(c => c.status === 'In Progress' || c.status === 'Onboarding' || c.status === 'Launch Ready'));
   renderChart('chart-programs', 'doughnut', programChartData());
   renderChart('chart-status',   'doughnut', statusChartData());
+}
+
+/* ── Today's Read ─────────────────────────────────────────────────────────── */
+function renderTodaysRead() {
+  const el = document.getElementById('todays-read');
+  if (!el) return;
+
+  const active = clients.filter(c => ['In Progress','Onboarding','Launch Ready'].includes(c.status));
+  const overdue  = active.filter(c => deadlineStatus(c)?.state === 'overdue');
+  const delayed  = active.filter(c => deadlineStatus(c)?.state === 'delayed');
+  const atRisk   = active.filter(c => deadlineStatus(c)?.state === 'at-risk');
+  const newIntakes = clients.filter(c => c.status === 'New Client');
+  const unassigned = active.filter(c => !c.leadAssignee && !c.techAssignee);
+
+  // Clients finishing within 2 weeks
+  const wrappingSoon = active.filter(c => {
+    const d = deadlineStatus(c);
+    return d && d.daysLeft >= 0 && d.daysLeft <= 14;
+  });
+
+  const items = [];
+
+  if (overdue.length) {
+    items.push({ level: 'critical', icon: '🔴', title: `${overdue.length} client${overdue.length > 1 ? 's' : ''} overdue`, body: overdue.map(c => `<span class="tr-client-link" onclick="openModal('${c.id}')">${c.name}</span>`).join(', ') });
+  }
+  if (delayed.length) {
+    items.push({ level: 'warn', icon: '🟠', title: `${delayed.length} client${delayed.length > 1 ? 's' : ''} behind schedule`, body: delayed.map(c => { const d = deadlineStatus(c); return `<span class="tr-client-link" onclick="openModal('${c.id}')">${c.name}</span> (${d.gap}wk behind)`; }).join(', ') });
+  }
+  if (atRisk.length) {
+    items.push({ level: 'caution', icon: '🟡', title: `${atRisk.length} client${atRisk.length > 1 ? 's' : ''} at risk of slipping`, body: atRisk.map(c => `<span class="tr-client-link" onclick="openModal('${c.id}')">${c.name}</span>`).join(', ') });
+  }
+  if (newIntakes.length) {
+    items.push({ level: 'info', icon: '📥', title: `${newIntakes.length} new intake${newIntakes.length > 1 ? 's' : ''} awaiting review`, body: newIntakes.map(c => `<span class="tr-client-link" onclick="openModal('${c.id}')">${c.name}</span>`).join(', ') });
+  }
+  if (wrappingSoon.length) {
+    items.push({ level: 'info', icon: '🏁', title: `${wrappingSoon.length} client${wrappingSoon.length > 1 ? 's' : ''} wrapping up soon`, body: wrappingSoon.map(c => { const d = deadlineStatus(c); return `<span class="tr-client-link" onclick="openModal('${c.id}')">${c.name}</span> (${d.daysLeft}d left)`; }).join(', ') });
+  }
+  if (unassigned.length) {
+    items.push({ level: 'caution', icon: '👤', title: `${unassigned.length} active client${unassigned.length > 1 ? 's' : ''} with no team assigned`, body: unassigned.map(c => `<span class="tr-client-link" onclick="openModal('${c.id}')">${c.name}</span>`).join(', ') });
+  }
+
+  if (!items.length) {
+    el.innerHTML = `<div class="tr-all-good"><span>✅</span><span>All active clients are on track — nothing urgent today.</span></div>`;
+    return;
+  }
+
+  const levelColor = { critical: '#b91c1c', warn: '#c2410c', caution: '#b45309', info: '#1d4ed8' };
+  const levelBg    = { critical: '#fef2f2', warn: '#fff7ed', caution: '#fffbeb', info: '#eff6ff' };
+  const levelBorder= { critical: '#fca5a5', warn: '#fdba74', caution: '#fcd34d', info: '#bfdbfe' };
+
+  el.innerHTML = items.map(item => `
+    <div class="tr-item" style="border-left-color:${levelBorder[item.level]};background:${levelBg[item.level]}">
+      <div class="tr-item-header">
+        <span class="tr-icon">${item.icon}</span>
+        <strong style="color:${levelColor[item.level]}">${item.title}</strong>
+      </div>
+      <div class="tr-item-body">${item.body}</div>
+    </div>`).join('');
 }
 
 /* ── Week timeline ────────────────────────────────────────────────────────── */
@@ -381,9 +484,11 @@ function renderClients() {
         </div>
       </td>
       <td>${c.status ? `<span class="badge ${statusClass(c.status)}">${c.status}</span>` : '—'}</td>
+      <td>${deadlineBadge(c) || '<span class="text-muted text-sm">—</span>'}</td>
       <td>${c.leadAssignee ? `<span class="assignee-chip"><span class="chip-dot"></span>${c.leadAssignee}</span>` : '<span class="text-muted text-sm">—</span>'}</td>
       <td>${c.techAssignee ? `<span class="assignee-chip"><span class="chip-dot" style="background:var(--blue)"></span>${c.techAssignee}</span>` : '<span class="text-muted text-sm">—</span>'}</td>
       <td class="text-sm text-muted">${fmtDate(c.startDate)}</td>
+      <td class="text-sm text-muted">${endDateLabel(c)}</td>
       <td><button class="btn-view" onclick="openModal('${c.id}')">View →</button></td>
     </tr>`;
   }).join('');
@@ -425,7 +530,8 @@ function renderPrograms() {
         </div>
         <div class="prog-card-meta">
           <span>Week ${wk} / ${dur}</span>
-          <div style="display:flex;gap:6px">
+          <div style="display:flex;gap:6px;align-items:center">
+            ${deadlineBadge(c)}
             ${c.leadAssignee ? `<span style="font-size:11px;color:var(--text2)">L: ${c.leadAssignee}</span>` : ''}
             ${c.techAssignee ? `<span style="font-size:11px;color:var(--text2)">T: ${c.techAssignee}</span>` : ''}
           </div>
