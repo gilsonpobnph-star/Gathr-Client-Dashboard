@@ -70,7 +70,8 @@ const WEEK_TITLES = {
 /* ── State ────────────────────────────────────────────────────────────────── */
 let clients = [];
 let team = [];
-let gathrMembers = [];   // from second Airtable base
+let gathrMembers = [];
+let localStore = {};     // persisted on server, never goes to Airtable
 let activeTab = 'overview';
 let modalClient = null;
 let modalViewWeek = 1;
@@ -199,9 +200,10 @@ async function loadAll() {
   document.getElementById('loading').classList.remove('hidden');
   document.querySelectorAll('.tab-section').forEach(s => s.classList.add('hidden'));
 
-  const [cRes, tRes] = await Promise.all([fetch('/api/clients'), fetch('/api/team')]);
-  clients = await cRes.json();
-  team    = await tRes.json();
+  const [cRes, tRes, lRes] = await Promise.all([fetch('/api/clients'), fetch('/api/team'), fetch('/api/local')]);
+  clients    = await cRes.json();
+  team       = await tRes.json();
+  localStore = await lRes.json();
 
   // Load Gathr Space members in background (non-blocking)
   fetch('/api/gathr-members').then(r => r.json()).then(data => { gathrMembers = data; }).catch(() => {});
@@ -318,9 +320,25 @@ function renderOverview() {
     `Last refreshed ${new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}`;
 
   renderTodaysRead();
+  renderDeadlineHealth();
   renderWeekTimeline('week-timeline-container', clients.filter(c => c.status === 'In Progress' || c.status === 'Onboarding' || c.status === 'Launch Ready'));
   renderChart('chart-programs', 'doughnut', programChartData());
   renderChart('chart-status',   'doughnut', statusChartData());
+}
+
+/* ── Deadline Health Cards ────────────────────────────────────────────────── */
+function renderDeadlineHealth() {
+  const active = clients.filter(c => ['In Progress','Onboarding','Launch Ready'].includes(c.status));
+  const counts = { 'on-track': 0, 'at-risk': 0, 'delayed': 0, 'overdue': 0 };
+  active.forEach(c => {
+    const d = deadlineStatus(c);
+    if (!d) return;
+    counts[d.state] = (counts[d.state] || 0) + 1;
+  });
+  document.getElementById('dlh-on-track').textContent = counts['on-track'];
+  document.getElementById('dlh-at-risk').textContent  = counts['at-risk'];
+  document.getElementById('dlh-behind').textContent   = counts['delayed'];
+  document.getElementById('dlh-overdue').textContent  = counts['overdue'];
 }
 
 /* ── Today's Read ─────────────────────────────────────────────────────────── */
@@ -666,6 +684,11 @@ function populateModal() {
   // Notes log
   renderNotesLog(c.notesLog || []);
 
+  // Private notes (local store only)
+  const local = localStore[c.id] || {};
+  document.getElementById('cm-private-notes').value = local.privateNotes || '';
+  document.getElementById('cm-private-msg').textContent = '';
+
   document.getElementById('modal-save-msg').textContent = '';
   document.getElementById('cm-note-msg').textContent    = '';
   document.getElementById('cm-note-text').value         = '';
@@ -727,6 +750,35 @@ document.getElementById('btn-add-note').addEventListener('click', async () => {
     setTimeout(() => { msgEl.textContent = ''; }, 2500);
   } catch (e) {
     msgEl.textContent = 'Error saving note';
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* ── Private Notes (local store) ─────────────────────────────────────────── */
+document.getElementById('btn-save-private').addEventListener('click', async () => {
+  const text  = document.getElementById('cm-private-notes').value;
+  const msgEl = document.getElementById('cm-private-msg');
+  const btn   = document.getElementById('btn-save-private');
+  btn.disabled = true;
+  msgEl.textContent = 'Saving…';
+
+  try {
+    const res = await fetch(`/api/local/${modalClient.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ privateNotes: text }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const updated = await res.json();
+    localStore[modalClient.id] = updated;
+    msgEl.style.color = 'var(--green)';
+    msgEl.textContent = '✓ Saved locally';
+    setTimeout(() => { msgEl.textContent = ''; }, 2500);
+  } catch (e) {
+    msgEl.style.color = '#e53e3e';
+    msgEl.textContent = 'Error saving';
     console.error(e);
   } finally {
     btn.disabled = false;

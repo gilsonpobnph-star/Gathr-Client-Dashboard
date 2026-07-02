@@ -133,6 +133,30 @@
           </div>
         </div>
 
+        <!-- Deadline Health Row -->
+        <div class="dl-health-row">
+          <div class="dl-health-card dlh-green">
+            <div class="dlh-label">On Track</div>
+            <div class="dlh-value" id="dlh-on-track">—</div>
+            <div class="dlh-sub">Running to schedule</div>
+          </div>
+          <div class="dl-health-card dlh-yellow">
+            <div class="dlh-label">At Risk</div>
+            <div class="dlh-value" id="dlh-at-risk">—</div>
+            <div class="dlh-sub">1 week behind</div>
+          </div>
+          <div class="dl-health-card dlh-orange">
+            <div class="dlh-label">Behind</div>
+            <div class="dlh-value" id="dlh-behind">—</div>
+            <div class="dlh-sub">2+ weeks behind</div>
+          </div>
+          <div class="dl-health-card dlh-red">
+            <div class="dlh-label">Overdue</div>
+            <div class="dlh-value" id="dlh-overdue">—</div>
+            <div class="dlh-sub">Past end date</div>
+          </div>
+        </div>
+
         <div class="chart-card" style="margin-bottom:16px">
           <div class="chart-card-title">
             <span class="dot" style="background:var(--accent)"></span>
@@ -466,6 +490,19 @@
             Client Delivers
           </div>
           <div id="cl-client"></div>
+        </div>
+
+        <!-- Private Notes (local store only — never sent to Airtable) -->
+        <div class="info-card private-notes-card">
+          <h3>
+            Private Notes
+            <span class="private-badge">Local only</span>
+          </h3>
+          <textarea id="cm-private-notes" placeholder="Internal team notes — not synced to Airtable…" rows="3"></textarea>
+          <div class="add-note-actions" style="margin-top:6px">
+            <span id="cm-private-msg" class="note-save-msg"></span>
+            <button class="btn-add-note" id="btn-save-private">Save Privately</button>
+          </div>
         </div>
 
         <!-- Brand / goals info -->

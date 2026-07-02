@@ -4,3 +4,4 @@ node_modules/
 ._*
 ._.DS_Store
 .claude/
+data/store.json

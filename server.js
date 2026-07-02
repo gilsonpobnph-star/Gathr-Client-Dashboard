@@ -3,6 +3,18 @@ const express = require('express');
 const session = require('express-session');
 const Airtable = require('airtable');
 const path = require('path');
+const fs = require('fs');
+
+// ── Local persistent store ────────────────────────────────────────────────────
+const STORE_PATH = path.join(__dirname, 'data', 'store.json');
+function readStore() {
+  try { return JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')); }
+  catch { return {}; }
+}
+function writeStore(data) {
+  fs.mkdirSync(path.dirname(STORE_PATH), { recursive: true });
+  fs.writeFileSync(STORE_PATH, JSON.stringify(data, null, 2));
+}
 
 const app = express();
 app.use(express.json());
@@ -429,6 +441,24 @@ app.post('/api/intake', async (req, res) => {
     console.error('POST /api/intake', e.message);
     res.status(500).json({ error: e.message });
   }
+});
+
+// ── Local Store Routes ────────────────────────────────────────────────────────
+
+app.get('/api/local/:clientId', requireAuth, (req, res) => {
+  const store = readStore();
+  res.json(store[req.params.clientId] || {});
+});
+
+app.put('/api/local/:clientId', requireAuth, (req, res) => {
+  const store = readStore();
+  store[req.params.clientId] = { ...(store[req.params.clientId] || {}), ...req.body };
+  writeStore(store);
+  res.json(store[req.params.clientId]);
+});
+
+app.get('/api/local', requireAuth, (req, res) => {
+  res.json(readStore());
 });
 
 // ── Static ────────────────────────────────────────────────────────────────────
