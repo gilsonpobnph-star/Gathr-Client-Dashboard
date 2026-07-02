@@ -83,7 +83,14 @@ function initials(name) {
 }
 
 function statusClass(s) {
-  const m = { 'Active': 'badge-active', 'Paused': 'badge-paused', 'Completed': 'badge-completed', 'Intake Received': 'badge-intake', 'Onboarding': 'badge-onboarding' };
+  const m = {
+    'New Client':   'badge-intake',
+    'Onboarding':   'badge-onboarding',
+    'In Progress':  'badge-active',
+    'Launch Ready': 'badge-completed',
+    'Completed':    'badge-blue',
+    'Alumni':       'badge-paused',
+  };
   return m[s] || 'badge-intake';
 }
 
@@ -253,10 +260,10 @@ function renderSpaceInfo(member) {
 
 /* ── Overview ─────────────────────────────────────────────────────────────── */
 function renderOverview() {
-  const active    = clients.filter(c => c.status === 'Active').length;
-  const intake    = clients.filter(c => c.status === 'Intake Received').length;
-  const paused    = clients.filter(c => c.status === 'Paused').length;
-  const completed = clients.filter(c => c.status === 'Completed').length;
+  const active    = clients.filter(c => c.status === 'In Progress').length;
+  const intake    = clients.filter(c => c.status === 'New Client').length;
+  const paused    = clients.filter(c => c.status === 'Alumni').length;
+  const completed = clients.filter(c => c.status === 'Completed' || c.status === 'Launch Ready').length;
 
   document.getElementById('kpi-active').textContent     = active;
   document.getElementById('kpi-intake').textContent     = intake;
@@ -266,7 +273,7 @@ function renderOverview() {
   document.getElementById('overview-subtitle').textContent =
     `Last refreshed ${new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}`;
 
-  renderWeekTimeline('week-timeline-container', clients.filter(c => c.status === 'Active'));
+  renderWeekTimeline('week-timeline-container', clients.filter(c => c.status === 'In Progress' || c.status === 'Onboarding' || c.status === 'Launch Ready'));
   renderChart('chart-programs', 'doughnut', programChartData());
   renderChart('chart-status',   'doughnut', statusChartData());
 }
@@ -325,7 +332,7 @@ function programChartData() {
 function statusChartData() {
   const counts = {};
   clients.forEach(c => { const k = c.status || 'Unknown'; counts[k] = (counts[k] || 0) + 1; });
-  const colors = { Active: '#4A7C5C', Paused: '#B07A28', Completed: '#3B6B9A', 'Intake Received': '#7A52A0', Onboarding: '#C4522A', Unknown: '#8A7A6E' };
+  const colors = { 'In Progress': '#4A7C5C', Alumni: '#B07A28', Completed: '#3B6B9A', 'New Client': '#7A52A0', Onboarding: '#C4522A', 'Launch Ready': '#3B6B9A', Unknown: '#8A7A6E' };
   const labels = Object.keys(counts);
   return { labels, datasets: [{ data: Object.values(counts), backgroundColor: labels.map(l => colors[l] || '#8A7A6E'), borderWidth: 0 }] };
 }
@@ -452,12 +459,12 @@ function renderAnalytics() {
   clients.forEach(c => { const k = c.techAssignee || 'Unassigned'; techCounts[k] = (techCounts[k] || 0) + 1; });
   renderChart('chart-a-tech', 'bar', { labels: Object.keys(techCounts), datasets: [{ label: 'Clients', data: Object.values(techCounts), backgroundColor: '#B07A2888', borderColor: '#B07A28', borderWidth: 1 }] });
 
-  renderWeekTimeline('analytics-timeline', clients.filter(c => c.status === 'Active' || c.status === 'Onboarding'));
+  renderWeekTimeline('analytics-timeline', clients.filter(c => c.status === 'In Progress' || c.status === 'Onboarding' || c.status === 'Launch Ready'));
 }
 
 /* ── New Intakes ──────────────────────────────────────────────────────────── */
 function renderIntakes() {
-  const intakes = clients.filter(c => c.status === 'Intake Received');
+  const intakes = clients.filter(c => c.status === 'New Client');
   document.getElementById('intake-subtitle').textContent = `${intakes.length} awaiting review`;
   const tbody = document.getElementById('intake-tbody');
   const empty = document.getElementById('intake-empty');

@@ -274,7 +274,8 @@ body {
 }
 .badge-active     { background: var(--green-dim);  color: var(--green); }
 .badge-paused     { background: var(--amber-dim);  color: var(--amber); }
-.badge-completed  { background: var(--blue-dim);   color: var(--blue); }
+.badge-completed  { background: var(--green-dim);  color: var(--green); }
+.badge-blue       { background: var(--blue-dim);   color: var(--blue); }
 .badge-intake     { background: var(--purple-dim); color: var(--purple); }
 .badge-onboarding { background: var(--accent-dim); color: var(--accent); }
 

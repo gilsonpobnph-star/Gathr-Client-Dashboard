@@ -419,7 +419,7 @@ app.post('/api/intake', async (req, res) => {
         'Existing Content': b.existingContent || '',
         'Heard About Us': b.heardAboutUs || '',
         'Anything Else': b.anythingElse || '',
-        'Status': 'Intake Received',
+        'Status': 'New Client',
         'Intake Submitted': new Date().toISOString().split('T')[0],
         'Current Week': 1,
       },
