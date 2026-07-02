@@ -167,10 +167,6 @@
             <option value="">All Programs</option>
             <option>Full Brand OS</option>
             <option>Phase 1 Setup</option>
-            <option>Content</option>
-            <option>Ads Management</option>
-            <option>Website</option>
-            <option>Custom</option>
           </select>
           <select id="filter-assignee" class="filter-select">
             <option value="">All Assignees</option>
@@ -353,10 +349,6 @@
               <option value="">— Select —</option>
               <option>Full Brand OS</option>
               <option>Phase 1 Setup</option>
-              <option>Content</option>
-              <option>Ads Management</option>
-              <option>Website</option>
-              <option>Custom</option>
             </select>
           </div>
           <div class="detail-row">
@@ -377,6 +369,22 @@
             <span class="detail-label">Start Date</span>
             <input type="date" id="cm-start" class="inline-input" style="width:auto" />
           </div>
+        </div>
+
+        <div class="detail-group">
+          <h3>Add-ons</h3>
+          <div style="display:flex;flex-direction:column;gap:7px;margin-bottom:8px">
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="addon-content" style="accent-color:var(--accent);width:15px;height:15px"> Content Management
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="addon-ads" style="accent-color:var(--accent);width:15px;height:15px"> Ads Management
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+              <input type="checkbox" id="addon-website" style="accent-color:var(--accent);width:15px;height:15px"> Website
+            </label>
+          </div>
+          <input type="text" id="addon-custom" class="inline-input" placeholder="Other add-on details…" style="width:100%;font-size:12.5px" />
         </div>
 
         <div class="detail-group">

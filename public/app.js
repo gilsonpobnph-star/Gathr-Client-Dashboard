@@ -1,12 +1,15 @@
 /* ── Program data ─────────────────────────────────────────────────────────── */
 const PROGRAMS = {
-  'Full Brand OS':  { label: 'Full Brand OS',     duration: 16, price: '$4,500',           color: '#7A52A0', phases: [{ name: 'Phase 1 · Build the Foundation', weeks: [1,2,3,4] },{ name: 'Phase 2 · Activate Outreach', weeks: [5,6,7,8] },{ name: 'Phase 3 · Scale + Campaigns', weeks: [9,10,11,12] },{ name: 'Phase 4 · The Event', weeks: [13,14,15,16] }] },
-  'Phase 1 Setup':  { label: 'Phase 1 — Setup',   duration: 4,  price: '$1,500',           color: '#3B6B9A', phases: [{ name: 'Weeks 1–4 · Build the Foundation', weeks: [1,2,3,4] }] },
-  'Content':        { label: 'Content',            duration: 1,  price: '$1,000–$1,500/mo', color: '#B07A28', phases: [{ name: 'Monthly', weeks: [1] }] },
-  'Ads Management': { label: 'Ads Management',     duration: 1,  price: '$1,000–$1,500/mo', color: '#C4522A', phases: [{ name: 'Monthly', weeks: [1] }] },
-  'Website':        { label: 'Website',            duration: 1,  price: '$3,500',           color: '#4A7C5C', phases: [{ name: 'Build', weeks: [1] }] },
-  'Custom':         { label: 'Custom / Hourly',    duration: 1,  price: 'Custom quote',     color: '#8A7A6E', phases: [{ name: 'Custom', weeks: [1] }] },
+  'Full Brand OS': { label: 'Full Brand OS',   duration: 16, price: '$4,500', color: '#7A52A0', phases: [{ name: 'Phase 1 · Build the Foundation', weeks: [1,2,3,4] },{ name: 'Phase 2 · Activate Outreach', weeks: [5,6,7,8] },{ name: 'Phase 3 · Scale + Campaigns', weeks: [9,10,11,12] },{ name: 'Phase 4 · The Event', weeks: [13,14,15,16] }] },
+  'Phase 1 Setup': { label: 'Phase 1 — Setup', duration: 4,  price: '$1,500', color: '#3B6B9A', phases: [{ name: 'Weeks 1–4 · Build the Foundation', weeks: [1,2,3,4] }] },
 };
+
+// Add-ons are upsells on top of the main program
+const ADDONS = [
+  { id: 'Content',        label: 'Content Management', color: '#B07A28' },
+  { id: 'Ads Management', label: 'Ads Management',     color: '#C4522A' },
+  { id: 'Website',        label: 'Website',            color: '#4A7C5C' },
+];
 
 const CHECKLIST_DEFS = {
   1: [
@@ -373,7 +376,7 @@ function renderPrograms() {
   const grouped = {};
   list.forEach(c => { const key = c.program || 'Unassigned'; if (!grouped[key]) grouped[key] = []; grouped[key].push(c); });
 
-  const order = ['Full Brand OS', 'Phase 1 Setup', 'Content', 'Ads Management', 'Website', 'Custom', 'Unassigned'];
+  const order = ['Full Brand OS', 'Phase 1 Setup', 'Unassigned'];
   document.getElementById('prog-view-container').innerHTML = order.filter(k => grouped[k]?.length).map(k => {
     const grp   = grouped[k];
     const color = progColor(k);
@@ -511,6 +514,16 @@ function populateModal() {
   document.getElementById('cm-start').value   = c.startDate   || '';
   document.getElementById('cm-lead').value    = c.leadAssignee || '';
   document.getElementById('cm-tech').value    = c.techAssignee || '';
+
+  // Add-ons
+  const addOnStr = c.addOns || '';
+  document.getElementById('addon-content').checked = addOnStr.includes('Content');
+  document.getElementById('addon-ads').checked     = addOnStr.includes('Ads Management');
+  document.getElementById('addon-website').checked = addOnStr.includes('Website');
+  // Extract custom text (anything after known keywords)
+  const customText = addOnStr.split(',').map(s => s.trim())
+    .filter(s => !['Content', 'Ads Management', 'Website'].includes(s)).join(', ');
+  document.getElementById('addon-custom').value = customText;
 
   // Content fields
   document.getElementById('cm-brand').value    = c.brandDirection || '';
@@ -696,6 +709,14 @@ document.getElementById('cl-next').addEventListener('click', () => { modalViewWe
 /* ── Save client ──────────────────────────────────────────────────────────── */
 document.getElementById('btn-save-client').addEventListener('click', async () => {
   const c     = modalClient;
+  // Build add-ons string
+  const addonParts = [];
+  if (document.getElementById('addon-content').checked)  addonParts.push('Content');
+  if (document.getElementById('addon-ads').checked)      addonParts.push('Ads Management');
+  if (document.getElementById('addon-website').checked)  addonParts.push('Website');
+  const customAddon = document.getElementById('addon-custom').value.trim();
+  if (customAddon) addonParts.push(customAddon);
+
   const patch = {
     program:            document.getElementById('cm-program').value,
     status:             document.getElementById('cm-status').value,
@@ -707,6 +728,7 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
     servicesAndPricing: document.getElementById('cm-services').value,
     goals:              document.getElementById('cm-goals').value,
     filmingAvailability:document.getElementById('cm-filming').value,
+    addOns:             addonParts.join(', '),
   };
 
   const msgEl = document.getElementById('modal-save-msg');

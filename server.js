@@ -102,6 +102,7 @@ function shapeClient(rec) {
     anythingElse: f['Anything Else'] || '',
     notes: f['Notes'] || '',
     notesLog: parseNotesLog(f['Notes Log']),
+    addOns: f['Add-ons'] || '',
     intakeSubmitted: f['Intake Submitted'] || '',
     createdAt: rec._rawJson?.createdTime || '',
   };
@@ -132,6 +133,7 @@ const FIELD_MAP = {
   heardAboutUs: 'Heard About Us',
   anythingElse: 'Anything Else',
   notes: 'Notes',
+  addOns: 'Add-ons',
 };
 
 // ── Client Routes ─────────────────────────────────────────────────────────────
@@ -149,18 +151,43 @@ app.get('/api/clients', requireAuth, async (req, res) => {
 });
 
 app.put('/api/clients/:id', requireAuth, async (req, res) => {
+  const fields = {};
+  for (const [key, val] of Object.entries(req.body)) {
+    if (FIELD_MAP[key] && val !== undefined) {
+      fields[FIELD_MAP[key]] = val;
+    }
+  }
+
+  // Try full update first; if Airtable rejects unknown fields, retry
+  // field-by-field and skip the ones that don't exist in this base
+  const tryUpdate = async (f) => {
+    const [updated] = await base(CLIENTS_TABLE).update([{ id: req.params.id, fields: f }]);
+    return updated;
+  };
+
   try {
-    const fields = {};
-    for (const [key, val] of Object.entries(req.body)) {
-      if (FIELD_MAP[key] && val !== undefined) {
-        fields[FIELD_MAP[key]] = val;
+    const updated = await tryUpdate(fields);
+    return res.json(shapeClient(updated));
+  } catch (firstErr) {
+    console.warn('PUT bulk failed, retrying field-by-field:', firstErr.message);
+    // Field-by-field fallback — skip any field that errors
+    const safe = {};
+    for (const [k, v] of Object.entries(fields)) {
+      try {
+        await base(CLIENTS_TABLE).update([{ id: req.params.id, fields: { [k]: v } }]);
+        safe[k] = v;
+      } catch (e) {
+        console.warn(`Skipping field "${k}":`, e.message);
       }
     }
-    const [updated] = await base(CLIENTS_TABLE).update([{ id: req.params.id, fields }]);
-    res.json(shapeClient(updated));
-  } catch (e) {
-    console.error('PUT /api/clients', e.message);
-    res.status(500).json({ error: e.message });
+    try {
+      // Fetch the latest record after individual updates
+      const rec = await base(CLIENTS_TABLE).find(req.params.id);
+      return res.json(shapeClient(rec));
+    } catch (e) {
+      console.error('PUT /api/clients final fetch failed', e.message);
+      return res.status(500).json({ error: firstErr.message });
+    }
   }
 });
 
