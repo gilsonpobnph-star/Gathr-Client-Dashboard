@@ -1211,37 +1211,73 @@ async function patchClient(id, patch) {
   }
 }
 
-/* ── Import from Gathr Space ──────────────────────────────────────────────── */
-async function importGathrSpace() {
-  const btn    = document.getElementById('btn-import-space');
+/* ── Backup & Restore ─────────────────────────────────────────────────────── */
+async function downloadBackup() {
+  const res      = await fetch('/api/backup');
+  const blob     = await res.blob();
+  const date     = new Date().toISOString().split('T')[0];
+  const url      = URL.createObjectURL(blob);
+  const a        = document.createElement('a');
+  a.href         = url;
+  a.download     = `gathr-backup-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function restoreBackup(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!confirm(`Restore from "${file.name}"? This will overwrite ALL current data.`)) { input.value = ''; return; }
+  try {
+    const text = await file.text();
+    const data = JSON.parse(text);
+    const res  = await fetch('/api/restore', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const result = await res.json();
+    if (result.ok) {
+      alert(`✓ Restored ${result.clientCount} clients. Reloading…`);
+      await loadAll();
+    } else {
+      alert('Restore failed: ' + result.error);
+    }
+  } catch (e) {
+    alert('Restore failed: ' + e.message);
+  } finally {
+    input.value = '';
+  }
+}
+
+/* ── Import from Airtable (one-time migration) ────────────────────────────── */
+async function importFromAirtable() {
   const result = document.getElementById('import-result');
-  btn.disabled = true;
-  btn.textContent = 'Importing…';
-  result.style.display = 'none';
+  if (!confirm('Import all clients from Airtable into the app? Existing local data is preserved — only missing fields will be filled.')) return;
+
+  result.style.display = 'block';
+  result.style.background  = 'var(--surface2)';
+  result.style.borderColor = 'var(--border)';
+  result.style.color       = 'var(--text2)';
+  result.textContent       = 'Importing from Airtable…';
 
   try {
-    const res  = await fetch('/api/import-gathr-space', { method: 'POST' });
+    const res  = await fetch('/api/import-from-airtable', { method: 'POST' });
     const data = await res.json();
-    result.style.display = 'block';
     if (data.ok) {
       result.style.background  = 'var(--green-dim)';
       result.style.borderColor = 'var(--green)';
       result.style.color       = 'var(--green)';
-      result.textContent       = '✓ ' + data.message;
-      // Reload clients to pick up merged data
+      result.textContent       = `✓ Imported ${data.imported} clients from Airtable into local storage.`;
       await loadAll();
     } else {
       result.style.background  = 'var(--accent-dim)';
       result.style.borderColor = 'var(--accent)';
       result.style.color       = 'var(--accent)';
-      result.textContent       = 'Error: ' + (data.error || 'Unknown error');
+      result.textContent       = 'Error: ' + (data.error || 'Unknown');
     }
   } catch (e) {
-    result.style.display = 'block';
-    result.textContent   = 'Error: ' + e.message;
-  } finally {
-    btn.disabled    = false;
-    btn.innerHTML   = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;vertical-align:-1px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Import from Gathr Space';
+    result.style.color = 'var(--accent)';
+    result.textContent = 'Error: ' + e.message;
   }
 }
 
