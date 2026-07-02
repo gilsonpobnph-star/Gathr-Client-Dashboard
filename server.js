@@ -507,7 +507,10 @@ app.post('/api/migrate-old-program', requireAuth, async (req, res) => {
   oldBaseId = baseMatch[0];
 
   const oldBase = new Airtable({ apiKey: process.env.AIRTABLE_PAT }).base(oldBaseId);
-  const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').trim().replace(/\s+/g, ' ');
+  const norm = s => {
+    if (Array.isArray(s)) s = s[0];
+    return String(s || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').trim().replace(/\s+/g, ' ');
+  };
 
   try {
     const [oldRecords, mainRecords] = await Promise.all([
