@@ -755,5 +755,39 @@ async function patchClient(id, patch) {
   }
 }
 
+/* ── Import from Gathr Space ──────────────────────────────────────────────── */
+async function importGathrSpace() {
+  const btn    = document.getElementById('btn-import-space');
+  const result = document.getElementById('import-result');
+  btn.disabled = true;
+  btn.textContent = 'Importing…';
+  result.style.display = 'none';
+
+  try {
+    const res  = await fetch('/api/import-gathr-space', { method: 'POST' });
+    const data = await res.json();
+    result.style.display = 'block';
+    if (data.ok) {
+      result.style.background  = 'var(--green-dim)';
+      result.style.borderColor = 'var(--green)';
+      result.style.color       = 'var(--green)';
+      result.textContent       = '✓ ' + data.message;
+      // Reload clients to pick up merged data
+      await loadAll();
+    } else {
+      result.style.background  = 'var(--accent-dim)';
+      result.style.borderColor = 'var(--accent)';
+      result.style.color       = 'var(--accent)';
+      result.textContent       = 'Error: ' + (data.error || 'Unknown error');
+    }
+  } catch (e) {
+    result.style.display = 'block';
+    result.textContent   = 'Error: ' + e.message;
+  } finally {
+    btn.disabled    = false;
+    btn.innerHTML   = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;vertical-align:-1px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Import from Gathr Space';
+  }
+}
+
 /* ── Boot ─────────────────────────────────────────────────────────────────── */
 checkAuth();

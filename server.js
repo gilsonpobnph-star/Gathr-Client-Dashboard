@@ -206,18 +206,106 @@ app.get('/api/gathr-members', requireAuth, async (req, res) => {
     const records = await spaceBase(GATHR_SPACE_TABLE).select({
       view: GATHR_SPACE_VIEW,
     }).all();
-
-    // Return raw fields so the frontend can pick what's applicable
-    const members = records.map(r => ({
-      id: r.id,
-      fields: r.fields,
-    }));
-
-    res.json(members);
+    res.json(records.map(r => ({ id: r.id, fields: r.fields })));
   } catch (e) {
     console.error('GET /api/gathr-members', e.message);
-    // Non-fatal — return empty if base access denied
     res.json([]);
+  }
+});
+
+// ── Import from Gathr Space base → main base ──────────────────────────────────
+
+app.post('/api/import-gathr-space', requireAuth, async (req, res) => {
+  try {
+    // Read all records from both bases in parallel
+    const [spaceRecords, mainRecords] = await Promise.all([
+      spaceBase(GATHR_SPACE_TABLE).select({ view: GATHR_SPACE_VIEW }).all(),
+      base(CLIENTS_TABLE).select().all(),
+    ]);
+
+    const normalize = s => (s || '').toLowerCase().trim();
+
+    // Build lookup index of main-base clients by email and name
+    const byEmail = {};
+    const byName  = {};
+    mainRecords.forEach(r => {
+      const email = normalize(r.fields['Email']);
+      const name  = normalize(r.fields['Client Name']);
+      if (email) byEmail[email] = r;
+      if (name)  byName[name]   = r;
+    });
+
+    // Fields we know how to write into the main base (reverse of FIELD_MAP)
+    const WRITABLE = {
+      'Email':              'Email',
+      'Phone':              'Phone',
+      'Instagram':          'Instagram',
+      'Website':            'Website',
+      'Business Name':      'Business Name',
+      'Brand Direction':    'Brand Direction',
+      'Services & Pricing': 'Services & Pricing',
+      'Target Audience':    'Target Audience',
+      'Goals':              'Goals',
+      'Filming Availability':'Filming Availability',
+      'Existing Content':   'Existing Content',
+      // Common alternate field names from Gathr Space base
+      'Business':           'Business Name',
+      'Mobile':             'Phone',
+      'IG':                 'Instagram',
+      'IG Handle':          'Instagram',
+      'Social':             'Instagram',
+      'Site':               'Website',
+      'Web':                'Website',
+      'About':              'Brand Direction',
+      'Bio':                'Brand Direction',
+      'Services':           'Services & Pricing',
+      'Pricing':            'Services & Pricing',
+      'Audience':           'Target Audience',
+      'Goal':               'Goals',
+    };
+
+    const results = { matched: 0, updated: 0, skipped: 0, unmatched: [] };
+
+    for (const sr of spaceRecords) {
+      const sf = sr.fields;
+      const sEmail = normalize(sf['Email'] || sf['email'] || '');
+      const sName  = normalize(sf['Name'] || sf['Full Name'] || sf['Client Name'] || '');
+
+      // Find matching main-base record
+      const mainRec = (sEmail && byEmail[sEmail]) || (sName && byName[sName]) || null;
+
+      if (!mainRec) {
+        if (sName) results.unmatched.push(sf['Name'] || sf['Full Name'] || sf['Client Name']);
+        continue;
+      }
+
+      results.matched++;
+
+      // Build patch: copy non-empty fields from space record that are empty in main
+      const patch = {};
+      for (const [spaceField, mainField] of Object.entries(WRITABLE)) {
+        const val = sf[spaceField];
+        if (val === undefined || val === null || String(val).trim() === '') continue;
+        // Only fill if main record field is currently empty
+        if (!mainRec.fields[mainField]) {
+          patch[mainField] = String(val).trim();
+        }
+      }
+
+      if (!Object.keys(patch).length) { results.skipped++; continue; }
+
+      await base(CLIENTS_TABLE).update([{ id: mainRec.id, fields: patch }]);
+      results.updated++;
+    }
+
+    res.json({
+      ok: true,
+      message: `Matched ${results.matched} clients. Updated ${results.updated}, skipped ${results.skipped} (already had data). Unmatched: ${results.unmatched.length}.`,
+      ...results,
+    });
+  } catch (e) {
+    console.error('POST /api/import-gathr-space', e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
