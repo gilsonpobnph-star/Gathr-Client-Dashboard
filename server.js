@@ -464,6 +464,95 @@ app.post('/api/intake', async (req, res) => {
   }
 });
 
+// ── Old Program Migration ─────────────────────────────────────────────────────
+const OLD_FIELD_MAP = {
+  'Intake Call Completed':          'ICC',
+  'Brand Assets Received':          'BAR',
+  'Social Links Received':          'SLR',
+  'Domain Access Received':         'DAR',
+  'Content Questionnaire Received': 'CQR',
+  'Funnel Built':                   'FB',
+  'Funnel Approved':                'FA',
+  'Domain Connected':               'DC',
+  'Business Number Purchased':      'BNP',
+  'Sending Domain Connected':       'SDC',
+  'Calendar Connected':             'CC',
+  'Pipelines Created':              'PC',
+  'Automations Created':            'AC',
+  'Email Templates Loaded':         'ETL',
+  'Booking Calendar Created':       'BCC',
+  'Integrations Connected':         'ICN',
+  'Bio Optimized':                  'BO',
+  'CTA Finalized':                  'CTAF',
+  'Pinned Posts Planned':           'PPP',
+  'Content Strategy Completed':     'CSC',
+  'Filming Session Scheduled':      'FSS',
+  'First Content Batch Delivered':  'FCBD',
+  'Revision Call Completed':        'RCC',
+  'Client Training Completed':      'CTC',
+  'Playbook Sent':                  'PS',
+  'Weekly Tech Call Assigned':      'WTCA',
+  'Client Added To Support Group':  'CASG',
+  'Internal QA Completed':          'IQAC',
+  'Ready For Launch':               'RFL',
+  'Launch Completed':               'LC',
+};
+
+app.post('/api/migrate-old-program', requireAuth, async (req, res) => {
+  const { oldBaseId } = req.body;
+  if (!oldBaseId) return res.status(400).json({ error: 'oldBaseId required' });
+
+  const oldBase = new Airtable({ apiKey: process.env.AIRTABLE_PAT }).base(oldBaseId);
+  const norm = s => (s || '').toLowerCase().replace(/[^a-z0-9]/g, ' ').trim().replace(/\s+/g, ' ');
+
+  try {
+    const [oldRecords, mainRecords] = await Promise.all([
+      oldBase('Onboarding & Build').select().all(),
+      base(CLIENTS_TABLE).select().all(),
+    ]);
+
+    // Build name index from main base
+    const byName = {};
+    mainRecords.forEach(r => {
+      byName[norm(r.fields['Client Name'])] = r;
+    });
+
+    const store = readStore();
+    const results = { updated: [], notFound: [], errors: [] };
+
+    for (const oldRec of oldRecords) {
+      const oldName = oldRec.fields['Clients Name'] || oldRec.fields['Client Name'] || '';
+      if (!oldName) continue;
+
+      const mainRec = byName[norm(oldName)];
+      if (!mainRec) { results.notFound.push(oldName); continue; }
+
+      // Update Package to "Old Program" in main Airtable
+      try {
+        await base(CLIENTS_TABLE).update([{ id: mainRec.id, fields: { 'Package': 'Old Program' } }]);
+      } catch (e) {
+        results.errors.push(`${oldName}: ${e.message}`);
+      }
+
+      // Build checklist state from old base checkboxes
+      const checklist = {};
+      for (const [fieldName, key] of Object.entries(OLD_FIELD_MAP)) {
+        checklist[key] = !!oldRec.fields[fieldName];
+      }
+
+      store[mainRec.id] = store[mainRec.id] || {};
+      store[mainRec.id].oldProgramChecklist = checklist;
+      results.updated.push(oldName);
+    }
+
+    writeStore(store);
+    res.json({ ok: true, updated: results.updated, notFound: results.notFound, errors: results.errors });
+  } catch (e) {
+    console.error('migrate-old-program', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // ── Local Store Routes ────────────────────────────────────────────────────────
 
 app.get('/api/local/:clientId', requireAuth, (req, res) => {

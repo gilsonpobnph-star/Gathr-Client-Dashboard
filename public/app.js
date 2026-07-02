@@ -1245,5 +1245,50 @@ async function importGathrSpace() {
   }
 }
 
+/* ── Migrate Old Program ──────────────────────────────────────────────────── */
+function showMigrateOldProgram() {
+  document.getElementById('migrate-result').style.display = 'none';
+  document.getElementById('migrate-base-id').value = '';
+  document.getElementById('migrate-modal').classList.remove('hidden');
+}
+
+async function runMigrateOldProgram() {
+  const oldBaseId = document.getElementById('migrate-base-id').value.trim();
+  const resultEl  = document.getElementById('migrate-result');
+  const btn       = document.getElementById('btn-run-migrate');
+  if (!oldBaseId) { resultEl.style.display = 'block'; resultEl.style.background = 'var(--accent-dim)'; resultEl.style.color = 'var(--accent)'; resultEl.textContent = 'Paste the base ID first.'; return; }
+
+  btn.disabled = true; btn.textContent = 'Running…';
+  resultEl.style.display = 'none';
+
+  try {
+    const res  = await fetch('/api/migrate-old-program', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldBaseId }),
+    });
+    const data = await res.json();
+    resultEl.style.display = 'block';
+    if (data.ok) {
+      resultEl.style.background = 'var(--green-dim)';
+      resultEl.style.color = 'var(--green)';
+      resultEl.innerHTML = `✓ Updated ${data.updated.length} clients to Old Program.<br>
+        ${data.notFound.length ? `<span style="color:var(--amber)">Not matched: ${data.notFound.join(', ')}</span><br>` : ''}
+        ${data.errors.length ? `<span style="color:var(--accent)">Errors: ${data.errors.join('; ')}</span>` : ''}`;
+      await loadAll();
+    } else {
+      resultEl.style.background = 'var(--accent-dim)';
+      resultEl.style.color = 'var(--accent)';
+      resultEl.textContent = 'Error: ' + (data.error || 'Unknown');
+    }
+  } catch (e) {
+    resultEl.style.display = 'block';
+    resultEl.style.background = 'var(--accent-dim)';
+    resultEl.style.color = 'var(--accent)';
+    resultEl.textContent = 'Error: ' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Run Migration';
+  }
+}
+
 /* ── Boot ─────────────────────────────────────────────────────────────────── */
 checkAuth();
