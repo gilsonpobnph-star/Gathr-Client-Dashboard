@@ -1136,32 +1136,21 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
   const changes = detectChanges(c, patch);
   const updated = await patchClient(c.id, patch);
   if (updated) {
-    // Dual-save: mirror all saved data + fields to local store
-    const localSnapshot = {
-      business: patch.business, program: patch.program, status: patch.status, currentWeek: patch.currentWeek,
-      startDate: patch.startDate, leadAssignee: patch.leadAssignee, techAssignee: patch.techAssignee,
-      brandDirection: patch.brandDirection, servicesAndPricing: patch.servicesAndPricing,
-      goals: patch.goals, filmingAvailability: patch.filmingAvailability, addOns: patch.addOns,
-      _lastSaved: new Date().toISOString(),
-    };
-    const existingLocal = localStore[c.id] || {};
-    const mergedLocal = { ...existingLocal, ...localSnapshot };
-
-    // Auto-log any detected changes
+    // Auto-log any detected changes to local activity log
     if (changes.length) {
+      const existingLocal = localStore[c.id] || {};
       const author = document.getElementById('cm-lead').value || 'Team';
       const logEntry = { type: 'auto', text: '', author, ts: new Date().toISOString(), changes };
-      mergedLocal.activityLog = [...(existingLocal.activityLog || []), logEntry];
+      const mergedLocal = { ...existingLocal, activityLog: [...(existingLocal.activityLog || []), logEntry] };
+      fetch(`/api/local/${c.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mergedLocal),
+      }).then(r => r.json()).then(stored => {
+        localStore[c.id] = stored;
+        renderActivityFeed(stored.activityLog || []);
+      }).catch(console.error);
     }
-
-    fetch(`/api/local/${c.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(mergedLocal),
-    }).then(r => r.json()).then(stored => {
-      localStore[c.id] = stored;
-      renderActivityFeed(stored.activityLog || []);
-    }).catch(console.error);
 
     Object.assign(c, updated);
     const idx = clients.findIndex(x => x.id === c.id);
@@ -1176,7 +1165,7 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
     if (prog) { badge.textContent = prog.label; badge.style.background = prog.color + '20'; badge.style.color = prog.color; badge.style.display = 'inline-block'; }
 
     msgEl.style.color = 'var(--green)';
-    msgEl.textContent = '✓ Saved to Airtable';
+    msgEl.textContent = '✓ Saved';
     setTimeout(() => { msgEl.textContent = ''; }, 3000);
   } else {
     msgEl.style.color = '#e53e3e';
