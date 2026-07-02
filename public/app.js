@@ -34,6 +34,64 @@ const ADDONS = [
   { id: 'Website',        label: 'Website',            color: '#4A7C5C' },
 ];
 
+// Old Program checklist — stored locally only, never synced to Airtable
+const OLD_PROGRAM_CHECKLIST = {
+  1: {
+    title: 'Week 1 — Onboarding & Setup',
+    phase: 'Onboarding',
+    items: [
+      { field: 'ICC',  label: 'Intake Call Completed' },
+      { field: 'BAR',  label: 'Brand Assets Received' },
+      { field: 'SLR',  label: 'Social Links Received' },
+      { field: 'DAR',  label: 'Domain Access Received' },
+      { field: 'CQR',  label: 'Content Questionnaire Received' },
+    ],
+  },
+  2: {
+    title: 'Week 2 — Funnel & Tech Build',
+    phase: 'Build',
+    items: [
+      { field: 'FB',   label: 'Funnel Built' },
+      { field: 'FA',   label: 'Funnel Approved' },
+      { field: 'DC',   label: 'Domain Connected' },
+      { field: 'BNP',  label: 'Business Number Purchased' },
+      { field: 'SDC',  label: 'Sending Domain Connected' },
+      { field: 'CC',   label: 'Calendar Connected' },
+      { field: 'PC',   label: 'Pipelines Created' },
+      { field: 'AC',   label: 'Automations Created' },
+      { field: 'ETL',  label: 'Email Templates Loaded' },
+      { field: 'BCC',  label: 'Booking Calendar Created' },
+      { field: 'ICN',  label: 'Integrations Connected' },
+    ],
+  },
+  3: {
+    title: 'Week 3 — Content & Optimisation',
+    phase: 'Content',
+    items: [
+      { field: 'BO',   label: 'Bio Optimized' },
+      { field: 'CTAF', label: 'CTA Finalized' },
+      { field: 'PPP',  label: 'Pinned Posts Planned' },
+      { field: 'CSC',  label: 'Content Strategy Completed' },
+      { field: 'FSS',  label: 'Filming Session Scheduled' },
+      { field: 'FCBD', label: 'First Content Batch Delivered' },
+      { field: 'RCC',  label: 'Revision Call Completed' },
+    ],
+  },
+  4: {
+    title: 'Week 4 — Launch',
+    phase: 'Launch',
+    items: [
+      { field: 'CTC',  label: 'Client Training Completed' },
+      { field: 'PS',   label: 'Playbook Sent' },
+      { field: 'WTCA', label: 'Weekly Tech Call Assigned' },
+      { field: 'CASG', label: 'Client Added To Support Group' },
+      { field: 'IQAC', label: 'Internal QA Completed' },
+      { field: 'RFL',  label: 'Ready For Launch' },
+      { field: 'LC',   label: 'Launch Completed' },
+    ],
+  },
+};
+
 const CHECKLIST_DEFS = {
   1: [
     { field: 'IF',   label: 'Intake form submitted' },
@@ -872,10 +930,15 @@ document.getElementById('btn-delete-client').addEventListener('click', async () 
   }
 });
 
-/* ── Checklist (live Airtable) ────────────────────────────────────────────── */
+/* ── Checklist (live Airtable OR local for Old Program) ───────────────────── */
+function isOldProgram() { return modalClient?.program === 'Old Program'; }
+
 async function loadChecklist(week) {
   const c = modalClient;
   if (!c) return;
+
+  if (isOldProgram()) { renderOldProgramChecklist(week); return; }
+
   if (modalChecklistData[week]) { renderChecklist(week); return; }
 
   setChecklistLoading(true);
@@ -883,6 +946,7 @@ async function loadChecklist(week) {
   const defs = CHECKLIST_DEFS[week];
   if (!defs) {
     modalChecklistData[week] = { fields: {}, recordId: null, noTable: true };
+    setChecklistLoading(false);
     renderChecklist(week);
     return;
   }
@@ -902,6 +966,68 @@ async function loadChecklist(week) {
 function setChecklistLoading(on) {
   document.getElementById('cl-gathr').innerHTML  = on ? '<p style="color:var(--text3);font-size:12px;padding:8px 0">Loading…</p>' : '';
   document.getElementById('cl-client').innerHTML = '';
+}
+
+/* Old Program — renders from hardcoded defs + local store state */
+function renderOldProgramChecklist(week) {
+  const wk  = week || modalViewWeek;
+  const def = OLD_PROGRAM_CHECKLIST[wk];
+
+  document.getElementById('cl-week-display').textContent = `Week ${wk}`;
+  document.getElementById('cl-prev').disabled = wk <= 1;
+  document.getElementById('cl-next').disabled = wk >= 4;
+  document.getElementById('checklist-section-client').style.display = 'none';
+
+  if (!def) {
+    document.getElementById('cl-week-title').textContent = `Week ${wk}`;
+    document.getElementById('cl-phase-label').textContent = '';
+    document.getElementById('checklist-section-gathr').style.display = 'none';
+    document.getElementById('cl-gathr').innerHTML = '<p style="color:var(--text3);font-size:12px;padding:8px 0">No deliverables defined for this week.</p>';
+    return;
+  }
+
+  document.getElementById('cl-week-title').textContent = def.title;
+  document.getElementById('cl-phase-label').textContent = def.phase;
+  document.getElementById('checklist-section-gathr').style.display = '';
+
+  const state = (localStore[modalClient.id] || {}).oldProgramChecklist || {};
+
+  document.getElementById('cl-gathr').innerHTML = def.items.map(({ field, label }) => {
+    const done = !!state[field];
+    return `<div class="checklist-item" onclick="toggleOldProgramCheck('${field}',${!done})">
+      <div class="check-box ${done ? 'checked' : ''}">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
+      </div>
+      <span class="check-label ${done ? 'done' : ''}">${label}</span>
+    </div>`;
+  }).join('');
+}
+
+async function toggleOldProgramCheck(field, newValue) {
+  const id = modalClient?.id;
+  if (!id) return;
+
+  // Optimistic update
+  localStore[id] = localStore[id] || {};
+  localStore[id].oldProgramChecklist = localStore[id].oldProgramChecklist || {};
+  localStore[id].oldProgramChecklist[field] = newValue;
+  renderOldProgramChecklist(modalViewWeek);
+
+  try {
+    const res = await fetch(`/api/local/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldProgramChecklist: localStore[id].oldProgramChecklist }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+    const stored = await res.json();
+    localStore[id] = stored;
+  } catch (e) {
+    // Revert on failure
+    localStore[id].oldProgramChecklist[field] = !newValue;
+    renderOldProgramChecklist(modalViewWeek);
+    console.error('toggleOldProgramCheck failed', e);
+  }
 }
 
 function renderChecklist(week) {
