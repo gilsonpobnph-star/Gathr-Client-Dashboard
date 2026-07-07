@@ -401,6 +401,15 @@ app.delete('/api/users/:id', requireAdmin, (req, res) => {
 app.get('/api/team', requireAuth, (req, res) => {
   const store = readStore();
   ensureTeam(store);
+  // Sync any registered users who aren't already in store.team
+  const users = Object.values(store.users || {});
+  for (const u of users) {
+    const alreadyIn = store.team.some(m => m.email && m.email.toLowerCase() === u.email.toLowerCase());
+    if (!alreadyIn) {
+      store.team.push({ id: 'tm_u_' + u.id, name: u.name, email: u.email, role: 'lead', createdAt: u.createdAt });
+    }
+  }
+  writeStore(store);
   res.json(store.team || []);
 });
 
