@@ -887,22 +887,6 @@ function populateModal() {
   sBadge.textContent = c.status || '—';
   sBadge.className   = `badge ${statusClass(c.status)}`;
 
-  // Contact
-  const emailEl = document.getElementById('cm-email');
-  emailEl.textContent = c.email || '—';
-  emailEl.href = c.email ? `mailto:${c.email}` : '#';
-  document.getElementById('cm-phone').textContent = c.phone || '—';
-  document.getElementById('cm-insta').textContent = c.instagram || '—';
-
-  const websiteEl    = document.getElementById('cm-website');
-  const websiteEmpty = document.getElementById('cm-website-empty');
-  if (c.website) {
-    websiteEl.href = c.website; websiteEl.textContent = c.website;
-    websiteEl.classList.remove('hidden'); websiteEmpty.classList.add('hidden');
-  } else {
-    websiteEl.classList.add('hidden'); websiteEmpty.classList.remove('hidden');
-  }
-
   // Gathr Space cross-reference
   renderSpaceInfo(findGathrMember(c));
 
