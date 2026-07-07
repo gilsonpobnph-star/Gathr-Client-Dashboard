@@ -22,6 +22,8 @@ let activeTab = 'mydash';
 let modalClient = null;
 let modalViewWeek = 1;
 let modalChecklistData = {};
+let modalActiveProgram = '';
+let modalProgramWeeks  = {};
 let charts = {};
 let addonsMap = {};
 // Program builder state
@@ -294,16 +296,14 @@ function populateAssigneeFilters() {
 
   // Populate program dropdowns from dynamic programsMap
   const progNames = Object.keys(programsMap);
-  ['filter-program', 'cm-program'].forEach(id => {
-    const s = document.getElementById(id);
-    if (!s) return;
-    const isFilter = id === 'filter-program';
-    s.innerHTML = isFilter ? '<option value="">All Programs</option>' : '<option value="">— Select —</option>';
+  const filterProgEl = document.getElementById('filter-program');
+  if (filterProgEl) {
+    filterProgEl.innerHTML = '<option value="">All Programs</option>';
     progNames.forEach(name => {
       const o = document.createElement('option'); o.value = name; o.textContent = name;
-      s.appendChild(o);
+      filterProgEl.appendChild(o);
     });
-  });
+  }
 
   // Populate addon checkboxes dynamically
   const addonBox = document.getElementById('addon-checkboxes');
@@ -559,20 +559,23 @@ async function renderMyPriorities(myClients) {
 
   const tasks = [];
   for (const c of myClients) {
-    if (!c.program || !programsMap[c.program]) continue;
-    const week = c.currentWeek || 1;
-    const def  = getWeekDef(c.program, week);
-    if (!def || !def.items?.length) continue;
-    let fields = {};
-    try {
-      const r = await fetch(`/api/clients/${c.id}/checklist/${week}`);
-      if (r.ok) { const d = await r.json(); fields = d.fields || {}; }
-    } catch {}
-    const ds = deadlineStatus(c);
-    const urgency = { overdue: 0, delayed: 1, 'at-risk': 2, 'on-track': 3 }[ds?.state || 'on-track'];
-    for (const item of def.items) {
-      if (!fields[item.id]) {
-        tasks.push({ client: c, week, item, phase: def.phase, urgency, ds });
+    const progs = c.programs?.length ? c.programs : (c.program ? [c.program] : []);
+    for (const prog of progs) {
+      if (!programsMap[prog]) continue;
+      const week = (c.programWeeks?.[prog]) || c.currentWeek || 1;
+      const def  = getWeekDef(prog, week);
+      if (!def || !def.items?.length) continue;
+      let fields = {};
+      try {
+        const r = await fetch(`/api/clients/${c.id}/checklist/${week}?program=${encodeURIComponent(prog)}`);
+        if (r.ok) { const d = await r.json(); fields = d.fields || {}; }
+      } catch {}
+      const ds = deadlineStatus(c);
+      const urgency = { overdue: 0, delayed: 1, 'at-risk': 2, 'on-track': 3 }[ds?.state || 'on-track'];
+      for (const item of def.items) {
+        if (!fields[item.id]) {
+          tasks.push({ client: c, prog, week, item, phase: def.phase, urgency, ds });
+        }
       }
     }
   }
@@ -595,7 +598,7 @@ async function renderMyPriorities(myClients) {
         <span class="priority-task-client">${escHtml(t.client.name)}</span>
         <span class="priority-task-badge" style="color:${urgencyColor[t.urgency]}">${t.ds?.state === 'overdue' ? 'Overdue' : t.ds?.state === 'delayed' ? 'Behind' : t.ds?.state === 'at-risk' ? 'At Risk' : 'On Track'}</span>
       </div>
-      <div class="priority-task-label">Wk ${t.week}${t.phase ? ` · ${escHtml(t.phase)}` : ''}</div>
+      <div class="priority-task-label">${t.prog ? escHtml(t.prog) + ' · ' : ''}Wk ${t.week}${t.phase ? ` · ${escHtml(t.phase)}` : ''}</div>
       <div class="priority-task-task">${escHtml(t.item.label)}</div>
     </div>`).join('');
 }
@@ -1026,7 +1029,14 @@ function renderClients() {
           <div><strong>${c.name}</strong><small>${c.businessName || c.email}</small></div>
         </div>
       </td>
-      <td>${c.program ? `<span class="prog-badge" style="background:${color}20;color:${color}">${c.program}</span>` : '<span class="text-muted text-sm">—</span>'}</td>
+      <td>${(() => {
+        const progs = c.programs?.length ? c.programs : (c.program ? [c.program] : []);
+        if (!progs.length) return '<span class="text-muted text-sm">—</span>';
+        return progs.map(p => {
+          const pc = progColor(p);
+          return `<span class="prog-badge" style="background:${pc}20;color:${pc};margin-right:3px">${p}</span>`;
+        }).join('');
+      })()}</td>
       <td style="min-width:140px">
         <div class="week-progress">
           <span class="week-label">Wk ${week}/${dur}</span>
@@ -1436,11 +1446,17 @@ function openClientById(id) {
 function openModal(id) {
   modalClient = clients.find(c => c.id === id);
   if (!modalClient) return;
-  modalViewWeek    = modalClient.currentWeek || 1;
   modalChecklistData = {};
+  // Init per-program week state
+  const progs = modalClient.programs?.length ? modalClient.programs : (modalClient.program ? [modalClient.program] : []);
+  modalProgramWeeks = { ...(modalClient.programWeeks || {}) };
+  progs.forEach(p => { if (!modalProgramWeeks[p]) modalProgramWeeks[p] = 1; });
+  // Default active program = first program
+  modalActiveProgram = progs[0] || '';
+  modalViewWeek = modalProgramWeeks[modalActiveProgram] || modalClient.currentWeek || 1;
   populateModal();
   document.getElementById('client-modal').classList.remove('hidden');
-  loadChecklist(modalViewWeek);
+  renderChecklistTabs();
 }
 
 function populateModal() {
@@ -1456,12 +1472,15 @@ function populateModal() {
   document.getElementById('cm-insta').value              = c.instagram || '';
   document.getElementById('cm-website').value            = c.website || '';
 
-  const prog  = programsMap[c.program];
+  const clientProgsForBadge = c.programs?.length ? c.programs : (c.program ? [c.program] : []);
   const badge = document.getElementById('cm-prog-badge');
-  if (prog) {
-    badge.textContent  = prog.name;
-    badge.style.background = prog.color + '20';
-    badge.style.color  = prog.color;
+  if (clientProgsForBadge.length) {
+    const firstProg = programsMap[clientProgsForBadge[0]];
+    badge.textContent = clientProgsForBadge.length > 1
+      ? clientProgsForBadge.map(p => programsMap[p]?.name || p).join(' · ')
+      : (firstProg?.name || clientProgsForBadge[0]);
+    badge.style.background = (firstProg?.color || '#8A7A6E') + '20';
+    badge.style.color  = firstProg?.color || '#8A7A6E';
     badge.style.display = 'inline-block';
   } else {
     badge.style.display = 'none';
@@ -1476,12 +1495,40 @@ function populateModal() {
 
   // Program fields
   document.getElementById('cm-business').value = c.business    || '';
-  document.getElementById('cm-program').value = c.program     || '';
   document.getElementById('cm-status').value  = c.status      || '';
-  document.getElementById('cm-week').value    = c.currentWeek || 1;
   document.getElementById('cm-start').value   = c.startDate   || '';
   document.getElementById('cm-lead').value    = c.leadAssignee || '';
   document.getElementById('cm-tech').value    = c.techAssignee || '';
+
+  // Multi-program checkboxes
+  const clientProgs = c.programs?.length ? c.programs : (c.program ? [c.program] : []);
+  const container = document.getElementById('cm-programs-container');
+  const allProgs = Object.keys(programsMap).filter(k => k !== 'Old Program');
+  container.innerHTML = allProgs.map(name => {
+    const prog = programsMap[name];
+    const checked = clientProgs.includes(name);
+    const color = prog?.color || '#8A7A6E';
+    return `<label class="prog-check-label" onclick="event.stopPropagation()">
+      <input type="checkbox" class="prog-checkbox" value="${escHtml(name)}" ${checked ? 'checked' : ''}
+        onchange="onProgramToggle()">
+      <div class="prog-check-box ${checked ? 'checked' : ''}" style="${checked ? `background:${color}` : ''}">
+        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
+      </div>
+      <span class="prog-check-dot" style="background:${color}"></span>
+      <span>${escHtml(name)}</span>
+    </label>`;
+  }).join('');
+
+  // Sync checkbox visuals on change
+  container.querySelectorAll('.prog-checkbox').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const box = cb.closest('label').querySelector('.prog-check-box');
+      const prog = programsMap[cb.value];
+      const color = prog?.color || '#8A7A6E';
+      if (cb.checked) { box.classList.add('checked'); box.style.background = color; }
+      else            { box.classList.remove('checked'); box.style.background = ''; }
+    });
+  });
 
   // Add-ons — tick dynamic checkboxes
   const addOnStr = c.addOns || '';
@@ -1690,6 +1737,49 @@ document.getElementById('btn-delete-client').addEventListener('click', async () 
   }
 });
 
+/* ── Program tabs + switchProgram ─────────────────────────────────────────── */
+function renderChecklistTabs() {
+  const container = document.getElementById('cl-prog-tabs');
+  if (!container) return;
+  const c = modalClient;
+  if (!c) { container.innerHTML = ''; return; }
+  const progs = c.programs?.length ? c.programs : (c.program ? [c.program] : []);
+  if (progs.length <= 1) {
+    container.innerHTML = '';
+    return;
+  }
+  container.innerHTML = progs.map(name => {
+    const prog = programsMap[name];
+    const active = name === modalActiveProgram;
+    const color = prog?.color || '#8A7A6E';
+    return `<button class="prog-tab ${active ? 'active' : ''}"
+      style="${active ? `border-color:${color};color:${color}` : ''}"
+      onclick="switchProgram('${escHtml(name).replace(/'/g,"\\'")}')">
+      <span class="prog-tab-dot" style="background:${color}"></span>
+      ${escHtml(prog?.name || name)}
+    </button>`;
+  }).join('');
+}
+
+function switchProgram(name) {
+  if (name === modalActiveProgram) return;
+  modalActiveProgram = name;
+  modalViewWeek = modalProgramWeeks[name] || 1;
+  modalChecklistData = {};
+  renderChecklistTabs();
+  loadChecklist(modalViewWeek);
+}
+
+function onProgramToggle() {
+  // Keep modalProgramWeeks in sync when a program is added
+  const checked = [...document.querySelectorAll('.prog-checkbox:checked')].map(cb => cb.value);
+  checked.forEach(p => { if (!modalProgramWeeks[p]) modalProgramWeeks[p] = 1; });
+  if (!checked.includes(modalActiveProgram)) {
+    modalActiveProgram = checked[0] || '';
+    modalViewWeek = modalProgramWeeks[modalActiveProgram] || 1;
+  }
+}
+
 /* ── Checklist (dynamic from programsMap) ─────────────────────────────────── */
 async function loadChecklist(week) {
   const c = modalClient;
@@ -1697,16 +1787,19 @@ async function loadChecklist(week) {
 
   const wk = week || 1;
   modalViewWeek = wk;
+  modalProgramWeeks[modalActiveProgram] = wk;
 
-  if (c.program === 'Old Program') { renderOldProgramChecklist(wk); return; }
+  if (modalActiveProgram === 'Old Program') { renderOldProgramChecklist(wk); return; }
 
   setChecklistLoading(true);
+  const cacheKey = `${modalActiveProgram}__${wk}`;
   try {
-    const res  = await fetch(`/api/clients/${c.id}/checklist/${wk}`);
+    const url = `/api/clients/${c.id}/checklist/${wk}?program=${encodeURIComponent(modalActiveProgram)}`;
+    const res  = await fetch(url);
     const data = await res.json();
-    modalChecklistData[wk] = data;
+    modalChecklistData[cacheKey] = data;
   } catch {
-    modalChecklistData[wk] = { fields: {}, recordId: null };
+    modalChecklistData[cacheKey] = { fields: {}, recordId: null };
   }
   setChecklistLoading(false);
   renderChecklist(wk);
@@ -1773,7 +1866,7 @@ async function toggleOldProgramCheck(field, newValue) {
 }
 
 function renderChecklist(wk) {
-  const prog = programsMap[modalClient?.program];
+  const prog = programsMap[modalActiveProgram] || programsMap[modalClient?.program];
   const def  = prog?.weeks?.[wk] || prog?.weeks?.[String(wk)];
   const maxWeek = prog?.duration || 1;
 
@@ -1791,8 +1884,10 @@ function renderChecklist(wk) {
   }
 
   document.getElementById('checklist-section-gathr').style.display = '';
-  const fields = (modalChecklistData[wk] || {}).fields || {};
-  const notes  = (modalClient?.checklistNotes?.[wk]) || {};
+  const cacheKey = `${modalActiveProgram}__${wk}`;
+  const fields = (modalChecklistData[cacheKey] || {}).fields || {};
+  const progNotes = modalClient?.checklistNotes?.[modalActiveProgram] || {};
+  const notes  = progNotes[wk] || {};
 
   document.getElementById('cl-gathr').innerHTML = def.items.map(({ id, label }) => {
     const done    = !!fields[id];
@@ -1843,7 +1938,8 @@ async function setChecklistStatus(itemId, wk, status) {
 async function saveChecklistNote(itemId, wk) {
   const noteEl = document.getElementById(`cl-note-text-${wk}-${itemId}`);
   const note   = noteEl?.value || '';
-  const existing = (modalClient?.checklistNotes?.[wk]?.[itemId]) || {};
+  const progNotes = modalClient?.checklistNotes?.[modalActiveProgram] || {};
+  const existing = (progNotes[wk]?.[itemId]) || {};
   await saveChecklistNoteData(itemId, wk, note, existing.status || 'pending');
 }
 
@@ -1854,12 +1950,11 @@ async function saveChecklistNoteData(itemId, wk, note, status) {
     const res = await fetch(`/api/checklist-notes/${modalClient.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ week: wk, itemId, note, status }),
+      body: JSON.stringify({ week: wk, itemId, note, status, programId: modalActiveProgram }),
     });
     if (res.ok) {
       const data = await res.json();
       modalClient.checklistNotes = data.checklistNotes;
-      // Update client in global list
       const idx = clients.findIndex(x => x.id === modalClient.id);
       if (idx !== -1) clients[idx].checklistNotes = data.checklistNotes;
       if (msgEl) { msgEl.textContent = '✓ Saved'; setTimeout(() => { if (msgEl) msgEl.textContent = ''; }, 2000); }
@@ -1872,10 +1967,11 @@ async function saveChecklistNoteData(itemId, wk, note, status) {
 }
 
 async function toggleCheck(week, field, newValue, label) {
-  const data = modalChecklistData[week] || {};
+  const cacheKey = `${modalActiveProgram}__${week}`;
+  const data = modalChecklistData[cacheKey] || {};
   data.fields = data.fields || {};
   data.recordId = data.recordId || modalClient?.id;
-  modalChecklistData[week] = data;
+  modalChecklistData[cacheKey] = data;
 
   data.fields[field] = newValue;
   renderChecklist(week);
@@ -1884,10 +1980,10 @@ async function toggleCheck(week, field, newValue, label) {
     const res = await fetch(`/api/checklist/${week}/${modalClient.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ field, value: newValue, label: label || field }),
+      body: JSON.stringify({ field, value: newValue, label: label || field, programId: modalActiveProgram }),
     });
     const updated = await res.json();
-    if (updated.fields) { modalChecklistData[week].fields = updated.fields; renderChecklist(week); }
+    if (updated.fields) { modalChecklistData[cacheKey].fields = updated.fields; renderChecklist(week); }
   } catch (e) {
     data.fields[field] = !newValue;
     renderChecklist(week);
@@ -1895,8 +1991,16 @@ async function toggleCheck(week, field, newValue, label) {
   }
 }
 
-document.getElementById('cl-prev').addEventListener('click', () => { modalViewWeek--; loadChecklist(modalViewWeek); });
-document.getElementById('cl-next').addEventListener('click', () => { modalViewWeek++; loadChecklist(modalViewWeek); });
+document.getElementById('cl-prev').addEventListener('click', () => {
+  modalViewWeek--;
+  if (modalActiveProgram) modalProgramWeeks[modalActiveProgram] = modalViewWeek;
+  loadChecklist(modalViewWeek);
+});
+document.getElementById('cl-next').addEventListener('click', () => {
+  modalViewWeek++;
+  if (modalActiveProgram) modalProgramWeeks[modalActiveProgram] = modalViewWeek;
+  loadChecklist(modalViewWeek);
+});
 
 /* ── Save client ──────────────────────────────────────────────────────────── */
 document.getElementById('btn-save-client').addEventListener('click', async () => {
@@ -1917,9 +2021,9 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
     instagram:          document.getElementById('cm-insta').value.trim(),
     website:            document.getElementById('cm-website').value.trim(),
     business:           document.getElementById('cm-business').value,
-    program:            document.getElementById('cm-program').value,
+    programs:           [...document.querySelectorAll('.prog-checkbox:checked')].map(cb => cb.value),
+    programWeeks:       { ...modalProgramWeeks },
     status:             document.getElementById('cm-status').value,
-    currentWeek:        parseInt(document.getElementById('cm-week').value) || 1,
     startDate:          document.getElementById('cm-start').value,
     leadAssignee:       document.getElementById('cm-lead').value,
     techAssignee:       document.getElementById('cm-tech').value,
@@ -1963,9 +2067,17 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
     sBadge.textContent = updated.status || '—';
     sBadge.className = `badge ${statusClass(updated.status)}`;
 
-    const prog  = programsMap[updated.program];
+    const updatedProgs = updated.programs?.length ? updated.programs : (updated.program ? [updated.program] : []);
     const badge = document.getElementById('cm-prog-badge');
-    if (prog) { badge.textContent = prog.name; badge.style.background = prog.color + '20'; badge.style.color = prog.color; badge.style.display = 'inline-block'; }
+    if (updatedProgs.length) {
+      const fp = programsMap[updatedProgs[0]];
+      badge.textContent = updatedProgs.length > 1
+        ? updatedProgs.map(p => programsMap[p]?.name || p).join(' · ')
+        : (fp?.name || updatedProgs[0]);
+      badge.style.background = (fp?.color || '#8A7A6E') + '20';
+      badge.style.color = fp?.color || '#8A7A6E';
+      badge.style.display = 'inline-block';
+    }
 
     msgEl.style.color = 'var(--green)';
     msgEl.textContent = '✓ Saved';
@@ -1976,17 +2088,6 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
   }
 });
 
-document.getElementById('cm-program').addEventListener('change', () => {
-  if (!modalClient) return;
-  modalClient.program = document.getElementById('cm-program').value;
-  modalViewWeek = 1;
-  modalChecklistData = {};
-  const prog  = programsMap[modalClient.program];
-  const badge = document.getElementById('cm-prog-badge');
-  if (prog) { badge.textContent = prog.name; badge.style.background = prog.color + '20'; badge.style.color = prog.color; badge.style.display = 'inline-block'; }
-  else badge.style.display = 'none';
-  loadChecklist(modalViewWeek);
-});
 
 /* ── API ──────────────────────────────────────────────────────────────────── */
 async function patchClient(id, patch) {

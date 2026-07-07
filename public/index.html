@@ -836,11 +836,9 @@
               <option>London</option>
             </select>
           </div>
-          <div class="detail-row">
-            <span class="detail-label">Program</span>
-            <select id="cm-program" class="inline-select">
-              <option value="">— Select —</option>
-            </select>
+          <div class="detail-row" style="align-items:flex-start">
+            <span class="detail-label" style="padding-top:4px">Programs</span>
+            <div id="cm-programs-container" style="display:flex;flex-direction:column;gap:5px;flex:1"></div>
           </div>
           <div class="detail-row">
             <span class="detail-label">Status</span>
@@ -853,10 +851,7 @@
               <option>Alumni</option>
             </select>
           </div>
-          <div class="detail-row">
-            <span class="detail-label">Current Week</span>
-            <input type="number" id="cm-week" class="inline-input" min="1" max="16" style="width:60px" />
-          </div>
+          
           <div class="detail-row">
             <span class="detail-label">Start Date</span>
             <input type="date" id="cm-start" class="inline-input" style="width:auto" />
@@ -908,6 +903,7 @@
 
         <!-- Weekly checklist -->
         <div class="checklist-card">
+          <div id="cl-prog-tabs" class="cl-prog-tabs"></div>
           <div class="checklist-card-title">
             <h3 id="cl-week-title">Week 1 Checklist</h3>
             <div class="week-nav">

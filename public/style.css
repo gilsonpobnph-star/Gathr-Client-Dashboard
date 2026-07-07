@@ -1156,3 +1156,47 @@ body::before {
   background: var(--bg); border-radius: 4px; padding: 4px 7px;
   border: 1px solid var(--border); word-break: break-word;
 }
+
+/* ── Multi-program select ─────────────────────────────────────────────────── */
+.prog-check-label {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 12.5px; color: var(--text); cursor: pointer;
+  padding: 4px 6px; border-radius: 6px;
+  transition: background .12s;
+}
+.prog-check-label:hover { background: var(--surface); }
+.prog-check-label input[type=checkbox] { display: none; }
+.prog-check-box {
+  width: 14px; height: 14px; border-radius: 4px; flex-shrink: 0;
+  border: 2px solid var(--border); display: flex; align-items: center;
+  justify-content: center; transition: all .15s;
+}
+.prog-check-box.checked { border-color: transparent; }
+.prog-check-box svg { display: none; }
+.prog-check-box.checked svg { display: block; }
+.prog-check-dot {
+  width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+}
+
+/* ── Program tabs in checklist ────────────────────────────────────────────── */
+.cl-prog-tabs {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  padding: 10px 12px 0; border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.cl-prog-tabs:empty { display: none; }
+.prog-tab {
+  font-size: 11.5px; font-weight: 600; padding: 5px 11px;
+  border-radius: 6px 6px 0 0; border: 1px solid var(--border);
+  border-bottom: none; background: var(--surface);
+  color: var(--text2); cursor: pointer; transition: all .15s;
+  margin-bottom: -1px;
+}
+.prog-tab:hover { color: var(--text); background: var(--bg); }
+.prog-tab.active {
+  background: var(--bg); color: var(--text);
+  border-color: var(--border);
+}
+.prog-tab-dot {
+  width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0;
+}

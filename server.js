@@ -442,6 +442,32 @@ function genId() {
 }
 
 function shapeClient(c) {
+  // ── Multi-program migration ──────────────────────────────────────────────
+  const programs = Array.isArray(c.programs)
+    ? [...new Set(c.programs.filter(Boolean))]
+    : (c.program ? [c.program] : []);
+
+  // Per-program week tracking
+  let programWeeks = c.programWeeks ? { ...c.programWeeks } : {};
+  if (programs[0] && !programWeeks[programs[0]] && c.currentWeek) {
+    programWeeks[programs[0]] = parseInt(c.currentWeek) || 1;
+  }
+  programs.forEach(p => { if (!programWeeks[p]) programWeeks[p] = 1; });
+
+  // Migrate checklists: flat { week: fields } → { programId: { week: fields } }
+  let checklists = c.checklists ? JSON.parse(JSON.stringify(c.checklists)) : {};
+  if (programs[0] && Object.keys(checklists).length > 0) {
+    const firstKey = Object.keys(checklists)[0];
+    if (!isNaN(firstKey)) checklists = { [programs[0]]: checklists };
+  }
+
+  // Migrate checklistNotes: flat { week: notes } → { programId: { week: notes } }
+  let checklistNotes = c.checklistNotes ? JSON.parse(JSON.stringify(c.checklistNotes)) : {};
+  if (programs[0] && Object.keys(checklistNotes).length > 0) {
+    const firstKey = Object.keys(checklistNotes)[0];
+    if (!isNaN(firstKey)) checklistNotes = { [programs[0]]: checklistNotes };
+  }
+
   return {
     id:                 c.id                 || genId(),
     name:               c.name               || '',
@@ -452,9 +478,11 @@ function shapeClient(c) {
     otherSocials:       c.otherSocials       || '',
     website:            c.website            || '',
     business:           c.business           || '',
-    program:            c.program            || '',
+    program:            programs[0]          || '',   // primary (backward compat)
+    programs,                                         // all programs (new)
     status:             c.status             || '',
-    currentWeek:        c.currentWeek        || 1,
+    currentWeek:        programWeeks[programs[0]] || parseInt(c.currentWeek) || 1,
+    programWeeks,                                     // per-program weeks (new)
     startDate:          c.startDate          || '',
     leadAssignee:       c.leadAssignee       || '',
     techAssignee:       c.techAssignee       || '',
@@ -474,9 +502,9 @@ function shapeClient(c) {
     intakeSubmitted:    c.intakeSubmitted     || '',
     activityLog:        c.activityLog        || [],
     oldProgramChecklist:c.oldProgramChecklist|| {},
-    checklists:         c.checklists         || {},
+    checklists,                                       // now namespaced by programId
     addonChecklists:    c.addonChecklists    || {},
-    checklistNotes:     c.checklistNotes     || {},
+    checklistNotes,                                   // now namespaced by programId
     addonChecklistNotes: c.addonChecklistNotes || {},
     createdAt:          c.createdAt          || new Date().toISOString(),
   };
@@ -709,11 +737,15 @@ app.put('/api/clients/:id', requireAuth, (req, res) => {
   const existing = store.clients?.[req.params.id];
   if (!existing) return res.status(404).json({ error: 'Client not found' });
   const changes = [];
-  const fields = { name:'Name', program:'Program', leadCoach:'Lead Coach', techSupport:'Tech', status:'Status', currentWeek:'Week', addOns:'Add-ons' };
+  const fields = { name:'Name', leadAssignee:'Lead Coach', techAssignee:'Tech', status:'Status', addOns:'Add-ons' };
   for (const [key, label] of Object.entries(fields)) {
     if (req.body[key] !== undefined && String(req.body[key]) !== String(existing[key] || ''))
       changes.push(`${label}: "${existing[key] || '—'}" → "${req.body[key]}"`);
   }
+  // Track programs changes
+  const oldProgs = (existing.programs || (existing.program ? [existing.program] : [])).join(', ') || '—';
+  const newProgs = (req.body.programs || (req.body.program ? [req.body.program] : [])).join(', ') || '—';
+  if (oldProgs !== newProgs) changes.push(`Programs: "${oldProgs}" → "${newProgs}"`);
   const updated  = shapeClient({ ...existing, ...req.body, id: req.params.id });
   store.clients[req.params.id] = updated;
   if (changes.length) logActivity(store, req, 'Client updated', { clientId: req.params.id, clientName: updated.name, details: changes.join(' | ') });
@@ -778,23 +810,24 @@ app.put('/api/local/:clientId', requireAuth, (req, res) => {
 
 // ── Checklist Notes ───────────────────────────────────────────────────────────
 app.patch('/api/checklist-notes/:clientId', requireAuth, (req, res) => {
-  const { week, itemId, note, status } = req.body;
+  const { week, itemId, note, status, programId } = req.body;
   if (!week || !itemId) return res.status(400).json({ error: 'week and itemId required' });
   const store  = readStore();
   const client = store.clients?.[req.params.clientId];
   if (!client) return res.status(404).json({ error: 'Not found' });
-  client.checklistNotes = client.checklistNotes || {};
-  client.checklistNotes[week] = client.checklistNotes[week] || {};
-  client.checklistNotes[week][itemId] = {
-    note:      note      || '',
-    status:    status    || 'pending',
-    updatedAt: new Date().toISOString(),
-    author:    req.session.name || 'Team',
+  const shaped = shapeClient(client);
+  const pId = programId || shaped.programs[0] || '';
+  shaped.checklistNotes[pId] = shaped.checklistNotes[pId] || {};
+  shaped.checklistNotes[pId][week] = shaped.checklistNotes[pId][week] || {};
+  shaped.checklistNotes[pId][week][itemId] = {
+    note: note || '', status: status || 'pending',
+    updatedAt: new Date().toISOString(), author: req.session.name || 'Team',
   };
+  Object.assign(client, { checklistNotes: shaped.checklistNotes });
   store.clients[req.params.clientId] = client;
-  logActivity(store, req, 'Task note saved', { clientId: req.params.clientId, clientName: client.name, details: `Week ${week} · ${itemId} · ${status || 'pending'}${note ? ': ' + note.slice(0,80) : ''}` });
+  logActivity(store, req, 'Task note saved', { clientId: req.params.clientId, clientName: client.name, details: `${pId} · Week ${week} · ${status || 'pending'}${note ? ': ' + note.slice(0,80) : ''}` });
   writeStore(store);
-  res.json({ checklistNotes: client.checklistNotes });
+  res.json({ checklistNotes: shaped.checklistNotes });
 });
 
 // ── Checklists (local) ────────────────────────────────────────────────────────
@@ -802,25 +835,29 @@ app.get('/api/clients/:id/checklist/:week', requireAuth, (req, res) => {
   const store  = readStore();
   const client = store.clients?.[req.params.id];
   if (!client) return res.json({ fields: {}, recordId: null });
-  const week   = parseInt(req.params.week);
-  const fields = (client.checklists || {})[week] || {};
-  // Return client id as recordId so PATCH knows which client to update
-  res.json({ fields, recordId: req.params.id });
+  const shaped  = shapeClient(client);
+  const week    = parseInt(req.params.week);
+  const pId     = req.query.program || shaped.programs[0] || '';
+  const fields  = (shaped.checklists[pId] || {})[week] || {};
+  res.json({ fields, recordId: req.params.id, programId: pId });
 });
 
 app.patch('/api/checklist/:week/:clientId', requireAuth, (req, res) => {
-  const { field, value, label } = req.body;
+  const { field, value, label, programId } = req.body;
   const week   = parseInt(req.params.week);
   const store  = readStore();
   const client = store.clients?.[req.params.clientId];
   if (!client) return res.status(404).json({ error: 'Not found' });
-  client.checklists         = client.checklists || {};
-  client.checklists[week]   = client.checklists[week] || {};
-  client.checklists[week][field] = !!value;
+  const shaped = shapeClient(client);
+  const pId    = programId || shaped.programs[0] || '';
+  shaped.checklists[pId]        = shaped.checklists[pId] || {};
+  shaped.checklists[pId][week]  = shaped.checklists[pId][week] || {};
+  shaped.checklists[pId][week][field] = !!value;
+  Object.assign(client, { checklists: shaped.checklists });
   store.clients[req.params.clientId] = client;
-  logActivity(store, req, value ? 'Task checked' : 'Task unchecked', { clientId: req.params.clientId, clientName: client.name, details: `Week ${week} — ${label || field}` });
+  logActivity(store, req, value ? 'Task checked' : 'Task unchecked', { clientId: req.params.clientId, clientName: client.name, details: `${pId} · Week ${week} — ${label || field}` });
   writeStore(store);
-  res.json({ fields: client.checklists[week], recordId: req.params.clientId });
+  res.json({ fields: shaped.checklists[pId][week], recordId: req.params.clientId, programId: pId });
 });
 
 // ── Add-ons CRUD ──────────────────────────────────────────────────────────────
