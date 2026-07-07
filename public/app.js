@@ -39,12 +39,13 @@ function initials(name) {
 
 function statusClass(s) {
   const m = {
-    'New Client':   'badge-intake',
-    'Onboarding':   'badge-onboarding',
-    'In Progress':  'badge-active',
-    'Launch Ready': 'badge-completed',
-    'Completed':    'badge-blue',
-    'Alumni':       'badge-paused',
+    'New':            'badge-intake',
+    'Onboarding':     'badge-onboarding',
+    'Active':         'badge-active',
+    'On New Program': 'badge-completed',
+    'Completed':      'badge-blue',
+    'Alumni':         'badge-paused',
+    'Closed':         'badge-alumni',
   };
   return m[s] || 'badge-intake';
 }
@@ -83,8 +84,8 @@ function deadlineStatus(c) {
   const daysLeft = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
   const gap = expectedWeek - actualWeek; // positive = behind schedule
 
-  if (c.status === 'Completed' || c.status === 'Alumni') return { state: 'done', gap: 0, daysLeft };
-  if (daysLeft < 0 && c.status !== 'Completed' && c.status !== 'Alumni') return { state: 'overdue', gap, daysLeft };
+  if (['Completed','Alumni','Closed'].includes(c.status)) return { state: 'done', gap: 0, daysLeft };
+  if (daysLeft < 0 && !['Completed','Alumni','Closed'].includes(c.status)) return { state: 'overdue', gap, daysLeft };
   if (gap >= 3) return { state: 'delayed', gap, daysLeft };
   if (gap >= 1) return { state: 'at-risk', gap, daysLeft };
   return { state: 'on-track', gap, daysLeft };
@@ -364,10 +365,10 @@ function renderSpaceInfo(member) {
 }
 
 /* ── Overview ─────────────────────────────────────────────────────────────── */
-const ACTIVE_STATUSES    = ['In Progress', 'Active', 'Onboarding', 'Launch Ready'];
+const ACTIVE_STATUSES    = ['Active', 'Onboarding', 'On New Program'];
 const COMPLETED_STATUSES = ['Completed'];
-const INTAKE_STATUSES    = ['New Client'];
-const HOLD_STATUSES      = ['Alumni', 'Paused'];
+const INTAKE_STATUSES    = ['New'];
+const HOLD_STATUSES      = ['Alumni', 'Closed'];
 
 function renderOverview() {
   const active    = clients.filter(c => ACTIVE_STATUSES.includes(c.status)).length;
@@ -394,7 +395,7 @@ function renderOverview() {
 
 /* ── Deadline Health Cards ────────────────────────────────────────────────── */
 function renderDeadlineHealth() {
-  const active = clients.filter(c => ['In Progress','Onboarding','Launch Ready'].includes(c.status));
+  const active = clients.filter(c => ACTIVE_STATUSES.includes(c.status));
   const counts = { 'on-track': 0, 'at-risk': 0, 'delayed': 0, 'overdue': 0 };
   active.forEach(c => {
     const d = deadlineStatus(c);
@@ -412,11 +413,11 @@ function renderTodaysRead() {
   const el = document.getElementById('todays-read');
   if (!el) return;
 
-  const active = clients.filter(c => ['In Progress','Onboarding','Launch Ready'].includes(c.status));
+  const active = clients.filter(c => ACTIVE_STATUSES.includes(c.status));
   const overdue  = active.filter(c => deadlineStatus(c)?.state === 'overdue');
   const delayed  = active.filter(c => deadlineStatus(c)?.state === 'delayed');
   const atRisk   = active.filter(c => deadlineStatus(c)?.state === 'at-risk');
-  const newIntakes = clients.filter(c => c.status === 'New Client');
+  const newIntakes = clients.filter(c => c.status === 'New');
   const unassigned = active.filter(c => !c.leadAssignee && !c.techAssignee);
 
   // Clients finishing within 2 weeks
@@ -983,7 +984,7 @@ function programChartData() {
 function statusChartData() {
   const counts = {};
   clients.forEach(c => { const k = c.status || 'Unknown'; counts[k] = (counts[k] || 0) + 1; });
-  const colors = { 'In Progress': '#4A7C5C', Active: '#2E7D5E', Alumni: '#B07A28', Completed: '#3B6B9A', 'New Client': '#7A52A0', Onboarding: '#C4522A', 'Launch Ready': '#3B6B9A', Unknown: '#8A7A6E' };
+  const colors = { New: '#7A52A0', Onboarding: '#C4522A', Active: '#2E7D5E', 'On New Program': '#4A7C5C', Completed: '#3B6B9A', Alumni: '#B07A28', Closed: '#5A5A5A', Unknown: '#8A7A6E' };
   const labels = Object.keys(counts);
   return { labels, datasets: [{ data: Object.values(counts), backgroundColor: labels.map(l => colors[l] || '#8A7A6E'), borderWidth: 0 }] };
 }
@@ -1017,7 +1018,7 @@ function renderClients() {
     const color = progColor(c.program);
     const cid   = c.id;
 
-    const statusOpts = ['New Client','Onboarding','In Progress','Active','Launch Ready','Completed','Alumni']
+    const statusOpts = ['New','Onboarding','Active','On New Program','Completed','Alumni','Closed']
       .map(s => `<option value="${s}" ${c.status===s?'selected':''}>${s}</option>`).join('');
     const teamOpts = (sel) => `<option value="">—</option>` +
       team.map(t => `<option value="${t}" ${sel===t?'selected':''}>${t}</option>`).join('');
@@ -1415,12 +1416,12 @@ function renderAnalytics() {
   clients.forEach(c => { const k = c.techAssignee || 'Unassigned'; techCounts[k] = (techCounts[k] || 0) + 1; });
   renderChart('chart-a-tech', 'bar', { labels: Object.keys(techCounts), datasets: [{ label: 'Clients', data: Object.values(techCounts), backgroundColor: '#B07A2888', borderColor: '#B07A28', borderWidth: 1 }] });
 
-  renderWeekTimeline('analytics-timeline', clients.filter(c => c.status === 'In Progress' || c.status === 'Onboarding' || c.status === 'Launch Ready'));
+  renderWeekTimeline('analytics-timeline', clients.filter(c => ACTIVE_STATUSES.includes(c.status)));
 }
 
 /* ── New Intakes ──────────────────────────────────────────────────────────── */
 function renderIntakes() {
-  const intakes = clients.filter(c => c.status === 'New Client');
+  const intakes = clients.filter(c => c.status === 'New');
   document.getElementById('intake-subtitle').textContent = `${intakes.length} awaiting review`;
   const tbody = document.getElementById('intake-tbody');
   const empty = document.getElementById('intake-empty');
