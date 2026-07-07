@@ -200,6 +200,20 @@ function ensureAddons(store) {
   }
 }
 
+function ensureTeam(store) {
+  if (!store.team) {
+    // Seed from env var on first boot so existing deployments keep their names
+    const fromEnv = (process.env.TEAM_MEMBERS || 'Gil,Glaiza').split(',').map(s => s.trim()).filter(Boolean);
+    store.team = fromEnv.map((name, i) => ({
+      id: 'tm_' + (i + 1),
+      name,
+      email: '',
+      role: 'lead', // 'admin' | 'lead' | 'tech'
+      createdAt: new Date().toISOString(),
+    }));
+  }
+}
+
 function writeStore(data) {
   data.meta = data.meta || {};
   data.meta.lastModified = new Date().toISOString();
@@ -274,13 +288,51 @@ app.post('/api/login', (req, res) => {
 
 app.post('/api/logout', (req, res) => { req.session.destroy(() => res.json({ ok: true })); });
 app.get('/api/me', (req, res) => { res.json({ authenticated: !!req.session.authenticated }); });
-app.get('/api/team', requireAuth, (req, res) => { res.json(TEAM_MEMBERS); });
+
+// Team CRUD — names only for dropdowns
+app.get('/api/team', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureTeam(store);
+  res.json(store.team || []);
+});
+
+app.post('/api/team', requireAuth, (req, res) => {
+  const { name, email, role } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Name required' });
+  const store = readStore();
+  ensureTeam(store);
+  if (store.team.some(m => m.name.toLowerCase() === name.trim().toLowerCase()))
+    return res.status(409).json({ error: 'Team member already exists' });
+  const member = { id: 'tm_' + Date.now(), name: name.trim(), email: email?.trim() || '', role: role || 'lead', createdAt: new Date().toISOString() };
+  store.team.push(member);
+  writeStore(store);
+  res.json(member);
+});
+
+app.put('/api/team/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureTeam(store);
+  const idx = store.team.findIndex(m => m.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Not found' });
+  store.team[idx] = { ...store.team[idx], ...req.body, id: req.params.id };
+  writeStore(store);
+  res.json(store.team[idx]);
+});
+
+app.delete('/api/team/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureTeam(store);
+  store.team = store.team.filter(m => m.id !== req.params.id);
+  writeStore(store);
+  res.json({ ok: true });
+});
 
 // ── Client CRUD ───────────────────────────────────────────────────────────────
 app.get('/api/clients', requireAuth, (req, res) => {
   const store = readStore();
   ensurePrograms(store);
   ensureAddons(store);
+  ensureTeam(store);
   const list  = Object.values(store.clients || {})
     .map(shapeClient)
     .sort((a, b) => a.name.localeCompare(b.name));

@@ -150,7 +150,10 @@ async function loadAll() {
     fetch('/api/clients'), fetch('/api/team'), fetch('/api/local'), fetch('/api/programs'), fetch('/api/addons'),
   ]);
   clients    = await cRes.json();
-  team       = await tRes.json();
+  const teamData = await tRes.json();
+  // teamData is now [{id,name,email,role}] — extract names for backward compat
+  team       = teamData.map(m => typeof m === 'string' ? m : m.name);
+  window._teamFull = teamData; // full objects for Team Management UI
   localStore = await lRes.json();
   programsMap = await pRes.json();
   addonsMap   = await aRes.json();
@@ -182,6 +185,7 @@ function showTab(tab) {
   else if (tab === 'programs')   renderPrograms();
   else if (tab === 'analytics')  renderAnalytics();
   else if (tab === 'intake')     renderIntakes();
+  else if (tab === 'team')       renderTeam();
 }
 
 /* ── Assignee filters ─────────────────────────────────────────────────────── */
@@ -455,7 +459,14 @@ function renderClients() {
     const week  = Math.min(c.currentWeek || 1, dur);
     const pct   = Math.round((week / dur) * 100);
     const color = progColor(c.program);
-    return `<tr class="client-row" onclick="openModal('${c.id}')">
+    const cid   = c.id;
+
+    const statusOpts = ['New Client','Onboarding','In Progress','Active','Launch Ready','Completed','Alumni']
+      .map(s => `<option value="${s}" ${c.status===s?'selected':''}>${s}</option>`).join('');
+    const teamOpts = (sel) => `<option value="">—</option>` +
+      team.map(t => `<option value="${t}" ${sel===t?'selected':''}>${t}</option>`).join('');
+
+    return `<tr class="client-row" onclick="openModal('${cid}')">
       <td>
         <div class="name-cell">
           <div class="avatar">${initials(c.name)}</div>
@@ -471,13 +482,28 @@ function renderClients() {
           </div>
         </div>
       </td>
-      <td>${c.status ? `<span class="badge ${statusClass(c.status)}">${c.status}</span>` : '—'}</td>
-      <td>${deadlineBadge(c) || '<span class="text-muted text-sm">—</span>'}</td>
-      <td>${c.leadAssignee ? `<span class="assignee-chip"><span class="chip-dot"></span>${c.leadAssignee}</span>` : '<span class="text-muted text-sm">—</span>'}</td>
-      <td>${c.techAssignee ? `<span class="assignee-chip"><span class="chip-dot" style="background:var(--blue)"></span>${c.techAssignee}</span>` : '<span class="text-muted text-sm">—</span>'}</td>
-      <td class="text-sm text-muted">${fmtDate(c.startDate)}</td>
+      <td onclick="event.stopPropagation()">
+        <select class="tbl-select tbl-status" onchange="quickPatch('${cid}','status',this.value,this)">
+          ${statusOpts}
+        </select>
+      </td>
+      <td class="text-sm text-muted">${deadlineBadge(c) || '<span class="text-muted text-sm">—</span>'}</td>
+      <td onclick="event.stopPropagation()">
+        <select class="tbl-select tbl-assignee" onchange="quickPatch('${cid}','leadAssignee',this.value,this)">
+          ${teamOpts(c.leadAssignee)}
+        </select>
+      </td>
+      <td onclick="event.stopPropagation()">
+        <select class="tbl-select tbl-assignee" onchange="quickPatch('${cid}','techAssignee',this.value,this)">
+          ${teamOpts(c.techAssignee)}
+        </select>
+      </td>
+      <td onclick="event.stopPropagation()">
+        <input type="date" class="tbl-date" value="${c.startDate||''}"
+          onchange="quickPatch('${cid}','startDate',this.value,this)">
+      </td>
       <td class="text-sm text-muted">${endDateLabel(c)}</td>
-      <td><button class="btn-view" onclick="event.stopPropagation();openModal('${c.id}')">Edit →</button></td>
+      <td><button class="btn-view" onclick="event.stopPropagation();openModal('${cid}')">Edit →</button></td>
     </tr>`;
   }).join('');
 }
@@ -1351,6 +1377,23 @@ async function patchClient(id, patch) {
   }
 }
 
+/* ── Quick inline patch from table ───────────────────────────────────────── */
+async function quickPatch(id, field, value, el) {
+  const client = clients.find(c => c.id === id);
+  if (!client) return;
+  const patch = { ...client, [field]: value };
+  el.disabled = true;
+  const updated = await patchClient(id, patch);
+  el.disabled = false;
+  if (updated) {
+    Object.assign(client, updated);
+    const idx = clients.findIndex(c => c.id === id);
+    if (idx !== -1) clients[idx] = updated;
+    // Re-render to reflect badge/progress changes without resetting the dropdown
+    renderClients();
+  }
+}
+
 /* ── Backup & Restore ─────────────────────────────────────────────────────── */
 async function downloadBackup() {
   const res      = await fetch('/api/backup');
@@ -1463,6 +1506,104 @@ async function runMigrateOldProgram() {
     resultEl.textContent = 'Error: ' + e.message;
   } finally {
     btn.disabled = false; btn.textContent = 'Run Migration';
+  }
+}
+
+/* ── Team Management ─────────────────────────────────────────────────────── */
+function renderTeam() {
+  const members = window._teamFull || [];
+  document.getElementById('team-subtitle').textContent = `${members.length} member${members.length !== 1 ? 's' : ''}`;
+  const tbody = document.getElementById('team-tbody');
+  const empty = document.getElementById('team-empty');
+
+  if (!members.length) {
+    tbody.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  const roleLabel = { admin: 'Admin', lead: 'Lead Coach', tech: 'Tech' };
+  const roleBadge = { admin: 'badge-alumni', lead: 'badge-active', tech: 'badge-completed' };
+
+  tbody.innerHTML = members.map(m => `
+    <tr class="client-row" onclick="editTeamMember('${m.id}')">
+      <td><div class="name-cell">
+        <div class="avatar" style="background:var(--accent-dim);color:var(--accent)">${initials(m.name)}</div>
+        <div><strong>${escHtml(m.name)}</strong></div>
+      </div></td>
+      <td class="text-sm text-muted">${escHtml(m.email || '—')}</td>
+      <td><span class="badge ${roleBadge[m.role] || ''}">${roleLabel[m.role] || m.role}</span></td>
+      <td class="text-sm text-muted">${fmtDate(m.createdAt)}</td>
+      <td><button class="btn-view" onclick="event.stopPropagation();deleteTeamMember('${m.id}','${escHtml(m.name)}')">Remove</button></td>
+    </tr>`).join('');
+}
+
+function showAddTeamMember() {
+  document.getElementById('team-modal-title').textContent = 'Add Team Member';
+  document.getElementById('tm-id').value   = '';
+  document.getElementById('tm-name').value  = '';
+  document.getElementById('tm-email').value = '';
+  document.getElementById('tm-role').value  = 'lead';
+  document.getElementById('tm-msg').textContent = '';
+  document.getElementById('team-modal').classList.remove('hidden');
+}
+
+function editTeamMember(id) {
+  const m = (window._teamFull || []).find(x => x.id === id);
+  if (!m) return;
+  document.getElementById('team-modal-title').textContent = 'Edit Team Member';
+  document.getElementById('tm-id').value   = m.id;
+  document.getElementById('tm-name').value  = m.name;
+  document.getElementById('tm-email').value = m.email || '';
+  document.getElementById('tm-role').value  = m.role || 'lead';
+  document.getElementById('tm-msg').textContent = '';
+  document.getElementById('team-modal').classList.remove('hidden');
+}
+
+async function saveTeamMember() {
+  const id    = document.getElementById('tm-id').value;
+  const name  = document.getElementById('tm-name').value.trim();
+  const email = document.getElementById('tm-email').value.trim();
+  const role  = document.getElementById('tm-role').value;
+  const msgEl = document.getElementById('tm-msg');
+
+  if (!name) { msgEl.style.color = '#e53e3e'; msgEl.textContent = 'Name is required.'; return; }
+  msgEl.textContent = 'Saving…'; msgEl.style.color = 'var(--text3)';
+
+  const method = id ? 'PUT' : 'POST';
+  const url    = id ? `/api/team/${id}` : '/api/team';
+  const res = await fetch(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, email, role }),
+  });
+  const data = await res.json();
+  if (res.ok) {
+    document.getElementById('team-modal').classList.add('hidden');
+    // Reload team data
+    const tRes = await fetch('/api/team');
+    const teamData = await tRes.json();
+    team = teamData.map(m => typeof m === 'string' ? m : m.name);
+    window._teamFull = teamData;
+    populateAssigneeFilters();
+    renderTeam();
+  } else {
+    msgEl.style.color = '#e53e3e';
+    msgEl.textContent = data.error || 'Error saving.';
+  }
+}
+
+async function deleteTeamMember(id, name) {
+  if (!confirm(`Remove ${name} from the team?`)) return;
+  const res = await fetch(`/api/team/${id}`, { method: 'DELETE' });
+  if (res.ok) {
+    const tRes = await fetch('/api/team');
+    const teamData = await tRes.json();
+    team = teamData.map(m => typeof m === 'string' ? m : m.name);
+    window._teamFull = teamData;
+    populateAssigneeFilters();
+    renderTeam();
   }
 }
 
