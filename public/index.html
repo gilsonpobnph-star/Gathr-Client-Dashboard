@@ -17,20 +17,32 @@
   <div class="login-card">
     <div class="login-brand">Gathr Grow</div>
     <div class="login-divider"></div>
-    <div class="login-sub" id="login-mode-label">Internal Client Dashboard</div>
+    <div class="login-sub">Internal Client Dashboard</div>
 
-    <!-- Sign In form -->
-    <div id="login-form-wrap">
-      <div id="login-email-row">
-        <label class="login-label" for="login-email">Email <span style="color:var(--text3);font-weight:400;font-size:10px">(team members)</span></label>
-        <input type="email" id="login-email" class="login-input" placeholder="your@email.com" autocomplete="email" />
-      </div>
+    <!-- Mode picker -->
+    <div id="login-mode-pick" class="login-mode-row">
+      <button class="login-mode-btn active" id="mode-admin-btn" onclick="switchLoginMode('admin')">Admin</button>
+      <button class="login-mode-btn" id="mode-team-btn" onclick="switchLoginMode('team')">Team Member</button>
+    </div>
+
+    <!-- Admin: password only -->
+    <div id="login-admin-wrap">
       <label class="login-label" for="login-pw">Password</label>
-      <input type="password" id="login-pw" class="login-input" placeholder="Password" autocomplete="current-password" />
-      <button class="btn-login" id="btn-login">Sign In</button>
+      <input type="password" id="login-pw" class="login-input" placeholder="Admin password" autocomplete="current-password" />
+      <button class="btn-login" id="btn-login">Sign In as Admin</button>
       <div class="login-error" id="login-error"></div>
+    </div>
+
+    <!-- Team member: email + password -->
+    <div id="login-team-wrap" class="hidden">
+      <label class="login-label" for="login-email">Email</label>
+      <input type="email" id="login-email" class="login-input" placeholder="your@email.com" autocomplete="email" />
+      <label class="login-label" for="login-pw-team">Password</label>
+      <input type="password" id="login-pw-team" class="login-input" placeholder="Password" autocomplete="current-password" />
+      <button class="btn-login" id="btn-login-team">Sign In</button>
+      <div class="login-error" id="login-error-team"></div>
       <div style="text-align:center;margin-top:16px">
-        <button onclick="showSignup()" style="background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;text-decoration:underline">New team member? Request access →</button>
+        <button onclick="showSignup()" style="background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;text-decoration:underline">New here? Create account →</button>
       </div>
     </div>
 

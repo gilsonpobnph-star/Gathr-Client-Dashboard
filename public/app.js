@@ -123,18 +123,26 @@ async function checkAuth() {
 function showLogin() {
   document.getElementById('login-screen').classList.remove('hidden');
   document.getElementById('app').classList.add('hidden');
+  document.getElementById('login-admin-wrap').classList.remove('hidden');
+  document.getElementById('login-team-wrap').classList.add('hidden');
+  document.getElementById('signup-form-wrap').classList.add('hidden');
+  document.getElementById('login-mode-pick').classList.remove('hidden');
+  switchLoginMode('admin');
+}
+
+function switchLoginMode(mode) {
+  document.getElementById('login-admin-wrap').classList.toggle('hidden', mode !== 'admin');
+  document.getElementById('login-team-wrap').classList.toggle('hidden', mode !== 'team');
+  document.getElementById('signup-form-wrap').classList.add('hidden');
+  document.getElementById('login-mode-pick').classList.remove('hidden');
+  document.getElementById('mode-admin-btn').classList.toggle('active', mode === 'admin');
+  document.getElementById('mode-team-btn').classList.toggle('active', mode === 'team');
 }
 
 function showSignup() {
-  document.getElementById('login-form-wrap').classList.add('hidden');
+  document.getElementById('login-mode-pick').classList.add('hidden');
+  document.getElementById('login-team-wrap').classList.add('hidden');
   document.getElementById('signup-form-wrap').classList.remove('hidden');
-  document.getElementById('login-mode-label').textContent = 'Create your account';
-}
-
-function showLogin() {
-  document.getElementById('signup-form-wrap').classList.add('hidden');
-  document.getElementById('login-form-wrap').classList.remove('hidden');
-  document.getElementById('login-mode-label').textContent = 'Internal Client Dashboard';
 }
 
 function showApp() {
@@ -161,24 +169,39 @@ function applyRoleUI() {
   }
 }
 
-document.getElementById('btn-login').addEventListener('click', doLogin);
-document.getElementById('login-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('btn-login').addEventListener('click', doAdminLogin);
+document.getElementById('login-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doAdminLogin(); });
+document.getElementById('btn-login-team').addEventListener('click', doTeamLogin);
+document.getElementById('login-pw-team').addEventListener('keydown', e => { if (e.key === 'Enter') doTeamLogin(); });
 document.getElementById('btn-signup').addEventListener('click', doSignup);
 
-async function doLogin() {
-  const email = document.getElementById('login-email').value.trim();
-  const pw    = document.getElementById('login-pw').value;
-  const err   = document.getElementById('login-error');
+async function doAdminLogin() {
+  const pw  = document.getElementById('login-pw').value;
+  const err = document.getElementById('login-error');
   err.textContent = '';
-  const body = email ? { email, password: pw } : { password: pw };
-  const res  = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) });
   if (res.ok) {
     const data = await res.json();
-    currentUser = { authenticated: true, role: data.role || 'admin', name: data.name || 'Admin', userId: data.userId || (email ? '' : 'admin') };
+    currentUser = { authenticated: true, role: 'admin', name: data.name || 'Admin', userId: 'admin' };
+    showApp();
+  } else {
+    err.textContent = 'Incorrect password.';
+  }
+}
+
+async function doTeamLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pw    = document.getElementById('login-pw-team').value;
+  const err   = document.getElementById('login-error-team');
+  err.textContent = '';
+  const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: pw }) });
+  if (res.ok) {
+    const data = await res.json();
+    currentUser = { authenticated: true, role: data.role || 'member', name: data.name || email, userId: data.userId || '' };
     showApp();
   } else {
     const d = await res.json().catch(() => ({}));
-    err.textContent = d.error || 'Incorrect credentials.';
+    err.textContent = d.error || 'Invalid email or password.';
   }
 }
 
