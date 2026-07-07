@@ -481,6 +481,7 @@ function shapeClient(c) {
     program:            programs[0]          || '',   // primary (backward compat)
     programs,                                         // all programs (new)
     programStatuses:    c.programStatuses    || {},   // per-program status (new)
+    programStartDates:    c.programStartDates    || {},   // per-program start date
     status:             c.status             || '',
     currentWeek:        programWeeks[programs[0]] || parseInt(c.currentWeek) || 1,
     programWeeks,                                     // per-program weeks (new)

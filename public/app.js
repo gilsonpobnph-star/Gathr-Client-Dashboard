@@ -71,24 +71,39 @@ function normalize(s) { return (s || '').toLowerCase().trim(); }
 
 /* ── Deadline logic ───────────────────────────────────────────────────────── */
 function deadlineStatus(c) {
-  if (!c.startDate || !c.program) return null;
-  const start = new Date(c.startDate);
-  if (isNaN(start)) return null;
-  const dur = progDuration(c.program);
-  const today = new Date();
-  const elapsedDays = Math.floor((today - start) / (1000 * 60 * 60 * 24));
-  const elapsedWeeks = Math.floor(elapsedDays / 7);
-  const expectedWeek = Math.min(elapsedWeeks + 1, dur);
-  const actualWeek = c.currentWeek || 1;
-  const endDate = new Date(start.getTime() + dur * 7 * 24 * 60 * 60 * 1000);
-  const daysLeft = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
-  const gap = expectedWeek - actualWeek; // positive = behind schedule
+  // Use per-program start dates; pick the worst status across all enrolled programs
+  const progs = c.programs?.length ? c.programs : (c.program ? [c.program] : []);
+  const startDates = c.programStartDates || {};
+  // Fallback to legacy single startDate
+  const legacyStart = c.startDate;
 
-  if (['Completed','Alumni','Closed'].includes(c.status)) return { state: 'done', gap: 0, daysLeft };
-  if (daysLeft < 0 && !['Completed','Alumni','Closed'].includes(c.status)) return { state: 'overdue', gap, daysLeft };
-  if (gap >= 3) return { state: 'delayed', gap, daysLeft };
-  if (gap >= 1) return { state: 'at-risk', gap, daysLeft };
-  return { state: 'on-track', gap, daysLeft };
+  let worst = null;
+  const stateRank = { overdue: 0, delayed: 1, 'at-risk': 2, 'on-track': 3, done: 4 };
+
+  for (const prog of progs) {
+    const sd = startDates[prog] || (progs[0] === prog ? legacyStart : null);
+    if (!sd) continue;
+    const dur = progDuration(prog);
+    if (!dur) continue;
+    const start   = new Date(sd);
+    const today   = new Date();
+    const endDate = new Date(start.getTime() + dur * 7 * 24 * 60 * 60 * 1000);
+    const daysLeft = Math.ceil((endDate - today) / (1000 * 60 * 60 * 24));
+    const gap     = Math.abs(Math.round((today - endDate) / (1000 * 60 * 60 * 24 * 7)));
+    const ps      = (c.programStatuses || {})[prog];
+
+    let state;
+    if (['Completed','Cancelled'].includes(ps)) { state = 'done'; }
+    else if (['Completed','Alumni','Closed'].includes(c.status)) { state = 'done'; }
+    else if (daysLeft < 0) { state = 'overdue'; }
+    else if (daysLeft < 14) { state = 'at-risk'; }
+    else if (daysLeft < 21) { state = 'delayed'; }
+    else { state = 'on-track'; }
+
+    const d = { state, gap, daysLeft, prog };
+    if (!worst || (stateRank[state] ?? 99) < (stateRank[worst.state] ?? 99)) worst = d;
+  }
+  return worst;
 }
 
 function deadlineBadge(c) {
@@ -105,12 +120,17 @@ function deadlineBadge(c) {
 }
 
 function endDateLabel(c) {
-  if (!c.startDate || !c.program) return '—';
-  const start = new Date(c.startDate);
-  if (isNaN(start)) return '—';
-  const dur = progDuration(c.program);
-  const end = new Date(start.getTime() + dur * 7 * 24 * 60 * 60 * 1000);
-  return end.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
+  const progs = c.programs?.length ? c.programs : (c.program ? [c.program] : []);
+  const startDates = c.programStartDates || {};
+  for (const prog of progs) {
+    const sd = startDates[prog] || (progs[0] === prog ? c.startDate : null);
+    if (!sd) continue;
+    const dur = progDuration(prog);
+    if (!dur) continue;
+    const end = new Date(new Date(sd).getTime() + dur * 7 * 24 * 60 * 60 * 1000);
+    return end.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+  return '—';
 }
 
 /* ── Auth ─────────────────────────────────────────────────────────────────── */
@@ -1051,7 +1071,6 @@ function renderClients() {
           ${statusOpts}
         </select>
       </td>
-      <td class="text-sm text-muted">${deadlineBadge(c) || '<span class="text-muted text-sm">—</span>'}</td>
       <td onclick="event.stopPropagation()">
         <select class="tbl-select tbl-assignee" onchange="quickPatch('${cid}','leadAssignee',this.value,this)">
           ${teamOpts(c.leadAssignee)}
@@ -1066,7 +1085,6 @@ function renderClients() {
         <input type="date" class="tbl-date" value="${c.startDate||''}"
           onchange="quickPatch('${cid}','startDate',this.value,this)">
       </td>
-      <td class="text-sm text-muted">${endDateLabel(c)}</td>
       <td><button class="btn-view" onclick="event.stopPropagation();openModal('${cid}')">Edit →</button></td>
     </tr>`;
   }).join('');
@@ -1501,49 +1519,83 @@ function populateModal() {
   document.getElementById('cm-lead').value    = c.leadAssignee || '';
   document.getElementById('cm-tech').value    = c.techAssignee || '';
 
-  // Multi-program checkboxes
+  // --- Programs cards ---
+  const progStatuses  = c.programStatuses  || {};
+  const progStartDates = c.programStartDates || {};
   const clientProgs = c.programs?.length ? c.programs : (c.program ? [c.program] : []);
-  const container = document.getElementById('cm-programs-container');
   const allProgs = Object.keys(programsMap).filter(k => k !== 'Old Program');
-  const progStatuses = c.programStatuses || {};
   const PROG_STATUS_OPTS = ['Active','In Progress','On Hold','Completed','Cancelled'];
-  container.innerHTML = allProgs.map(name => {
-    const prog = programsMap[name];
-    const checked = clientProgs.includes(name);
-    const color = prog?.color || '#8A7A6E';
-    const ps = progStatuses[name] || 'Active';
+  const container = document.getElementById('cm-programs-container');
+  const addArea   = document.getElementById('cm-programs-add');
+
+  // Enrolled programs — shown as cards
+  container.innerHTML = clientProgs.length ? clientProgs.map(name => {
+    const prog   = programsMap[name];
+    const color  = prog?.color || '#8A7A6E';
+    const ps     = progStatuses[name]  || 'Active';
+    const sd     = progStartDates[name] || '';
+    const dur    = prog?.duration || 0;
+    const wk     = modalProgramWeeks[name] || 1;
+    const endLabel = (sd && dur) ? (() => {
+      const end = new Date(new Date(sd).getTime() + dur * 7 * 86400000);
+      return end.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+    })() : '—';
     const statusSel = PROG_STATUS_OPTS.map(s => `<option value="${s}" ${ps===s?'selected':''}>${s}</option>`).join('');
-    return `<div class="prog-enroll-row" id="prog-row-${escHtml(name).replace(/\s+/g,'_')}">
-      <label class="prog-check-label" onclick="event.stopPropagation()">
-        <input type="checkbox" class="prog-checkbox" value="${escHtml(name)}" ${checked ? 'checked' : ''}
-          onchange="onProgramToggle(this)">
-        <div class="prog-check-box ${checked ? 'checked' : ''}" style="${checked ? `background:${color}` : ''}">
-          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
+    const safeName = name.replace(/'/g,"\\'");
+    return `<div class="prog-card" data-prog="${escHtml(name)}">
+      <div class="prog-card-header">
+        <span class="prog-card-dot" style="background:${color}"></span>
+        <strong class="prog-card-name">${escHtml(name)}</strong>
+        <select class="prog-status-sel inline-select" data-prog="${escHtml(name)}" style="font-size:11px;padding:2px 6px;margin-left:auto">${statusSel}</select>
+        <button class="prog-card-remove" title="Remove program" onclick="removeProgramCard('${safeName}')">×</button>
+      </div>
+      <div class="prog-card-body">
+        <div class="prog-card-dates">
+          <div class="prog-date-field">
+            <label class="prog-date-label">Start Date</label>
+            <input type="date" class="prog-start-input inline-input" data-prog="${escHtml(name)}" value="${sd}" style="font-size:12px;padding:3px 6px" onchange="updateProgEndDate('${safeName}',this.value)">
+          </div>
+          <div class="prog-date-field">
+            <label class="prog-date-label">End Date (${dur}wk)</label>
+            <span class="prog-end-label" id="prog-end-${escHtml(name).replace(/\s+/g,'_')}">${endLabel}</span>
+          </div>
         </div>
-        <span class="prog-check-dot" style="background:${color}"></span>
-        <span>${escHtml(name)}</span>
-      </label>
-      <div class="prog-enroll-meta ${checked ? '' : 'hidden'}" data-prog="${escHtml(name)}">
-        <select class="prog-status-sel inline-select" data-prog="${escHtml(name)}" style="font-size:11px;padding:2px 6px;min-width:100px">${statusSel}</select>
-        <button class="prog-restart-btn" title="Start new cycle (reset to Week 1)" onclick="restartProgram('${escHtml(name).replace(/'/g,"\\'")}')">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
-          New cycle
-        </button>
+        <div class="prog-card-meta">
+          Week ${wk} of ${dur || '?'}
+          <button class="prog-restart-btn" onclick="restartProgram('${safeName}')">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
+            New cycle
+          </button>
+        </div>
       </div>
     </div>`;
-  }).join('');
+  }).join('') : '<p style="font-size:12px;color:var(--text3);padding:4px 0">No programs enrolled yet.</p>';
 
-  // Sync checkbox visuals and show/hide meta on change
-  container.querySelectorAll('.prog-checkbox').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const box = cb.closest('label').querySelector('.prog-check-box');
-      const meta = cb.closest('.prog-enroll-row').querySelector('.prog-enroll-meta');
-      const prog = programsMap[cb.value];
-      const color = prog?.color || '#8A7A6E';
-      if (cb.checked) { box.classList.add('checked'); box.style.background = color; meta?.classList.remove('hidden'); }
-      else            { box.classList.remove('checked'); box.style.background = ''; meta?.classList.add('hidden'); }
+  // "Add program" dropdown for unenrolled programs
+  const unenrolled = allProgs.filter(p => !clientProgs.includes(p));
+  addArea.innerHTML = unenrolled.length ? `
+    <select id="cm-add-prog-sel" class="inline-select" style="font-size:12px">
+      <option value="">+ Enroll in a program…</option>
+      ${unenrolled.map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('')}
+    </select>` : '';
+  const addSel = addArea.querySelector('#cm-add-prog-sel');
+  if (addSel) {
+    addSel.addEventListener('change', () => {
+      const name = addSel.value;
+      if (!name) return;
+      if (!modalProgramWeeks[name]) modalProgramWeeks[name] = 1;
+      if (name && !modalActiveProgram) modalActiveProgram = name;
+      // Temporarily update modalClient.programs so re-render works
+      const progs = modalClient.programs?.length ? [...modalClient.programs] : (modalClient.program ? [modalClient.program] : []);
+      if (!progs.includes(name)) progs.push(name);
+      modalClient.programs = progs;
+      if (!modalActiveProgram) modalActiveProgram = progs[0] || '';
+      // Re-render programs section
+      populateModal();
+      renderChecklistTabs();
+      addSel.value = '';
     });
-  });
+  }
 
   // Add-ons — tick dynamic checkboxes
   const addOnStr = c.addOns || '';
@@ -1567,10 +1619,8 @@ function populateModal() {
   // Notes log
   renderNotesLog(c.notesLog || []);
 
-  // Legacy manual activity feed (kept for backward compat)
-  renderActivityFeed((localStore[c.id] || {}).activityLog || []);
-  // Auto-tracked activity log from server
-  renderClientActivityLog(c.id);
+  // Unified feed (server auto-tracked + local manual entries)
+  renderUnifiedFeed(c, localStore[c.id] || {});
 
   document.getElementById('modal-save-msg').textContent = '';
   document.getElementById('cm-note-msg').textContent    = '';
@@ -1643,7 +1693,9 @@ document.getElementById('btn-add-note').addEventListener('click', async () => {
 const ACTIVITY_ICONS = { note: '📝', handoff: '🤝', call: '📞', milestone: '🏁', issue: '⚠️', auto: '🔄', archive: '📦', status: '🔁', coach: '👤' };
 
 function renderActivityFeed(log) {
+  // Legacy shim — routes to unified feed if available
   const el = document.getElementById('cm-activity-feed');
+  if (!el) return;
   if (!log || !log.length) { el.innerHTML = '<div class="note-empty">No activity yet.</div>'; return; }
   el.innerHTML = [...log].reverse().map(e => `
     <div class="activity-item">
@@ -1657,6 +1709,54 @@ function renderActivityFeed(log) {
         ${e.changes ? e.changes.map(ch => `<div class="activity-change"><span>${ch.field}</span><span class="ch-from">${ch.from}</span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg><span class="ch-to">${ch.to}</span></div>`).join('') : ''}
       </div>
     </div>`).join('');
+}
+
+function renderUnifiedFeed(c, localData) {
+  const el = document.getElementById('cm-unified-feed');
+  if (!el) return;
+  const ACTION_ICON = {
+    'Client created': '🟢', 'Client updated': '✏️', 'Task checked': '✅',
+    'Task unchecked': '⬜', 'Task note saved': '📝', 'Add-on task checked': '✅',
+    'Add-on task unchecked': '⬜', 'Add-on task note saved': '📝', 'Note added': '💬',
+  };
+  // Server auto-tracked entries
+  const serverLog = (c.activityLog || [])
+    .filter(e => e.action && !e.action.includes('undefined') && e.details !== 'undefined')
+    .map(e => ({ ...e, _source: 'server' }));
+  // Local manual entries
+  const localLog = ((localData || {}).activityLog || [])
+    .map(e => ({ ...e, _source: 'local' }));
+  // Merge and sort descending by ts
+  const merged = [...serverLog, ...localLog].sort((a, b) => new Date(b.ts) - new Date(a.ts));
+  if (!merged.length) { el.innerHTML = '<div class="note-empty">No entries yet.</div>'; return; }
+  el.innerHTML = merged.map(e => {
+    if (e._source === 'server') {
+      return `<div class="actlog-row">
+        <div class="actlog-icon">${ACTION_ICON[e.action] || '📋'}</div>
+        <div class="actlog-body">
+          <div class="actlog-top">
+            <span class="actlog-action">${escHtml(e.action)}</span>
+            <span class="actlog-time">${fmtTs(e.ts)}</span>
+          </div>
+          <div class="actlog-who">by <strong>${escHtml(e.userName || 'System')}</strong></div>
+          ${e.details ? `<div class="actlog-details">${escHtml(e.details)}</div>` : ''}
+        </div>
+      </div>`;
+    } else {
+      return `<div class="actlog-row">
+        <div class="actlog-icon">${ACTIVITY_ICONS[e.type] || '📝'}</div>
+        <div class="actlog-body">
+          <div class="actlog-top">
+            <span class="actlog-action">${escHtml(e.type || 'note')}</span>
+            <span class="actlog-time">${fmtTs(e.ts)}</span>
+          </div>
+          <div class="actlog-who">by <strong>${escHtml(e.author || 'Team')}</strong></div>
+          ${e.text ? `<div class="actlog-details">${escHtml(e.text)}</div>` : ''}
+          ${e.changes ? e.changes.map(ch => `<div class="activity-change"><span>${ch.field}</span><span class="ch-from">${ch.from}</span><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg><span class="ch-to">${ch.to}</span></div>`).join('') : ''}
+        </div>
+      </div>`;
+    }
+  }).join('');
 }
 
 async function appendActivityEntry(clientId, entry) {
@@ -1684,8 +1784,8 @@ document.getElementById('btn-log-activity').addEventListener('click', async () =
   btn.disabled = true; msgEl.textContent = 'Saving…';
 
   try {
-    const log = await appendActivityEntry(modalClient.id, { type, text, author, ts: new Date().toISOString() });
-    renderActivityFeed(log);
+    await appendActivityEntry(modalClient.id, { type, text, author, ts: new Date().toISOString() });
+    renderUnifiedFeed(modalClient, localStore[modalClient.id] || {});
     document.getElementById('cm-activity-text').value = '';
     msgEl.style.color = 'var(--green)'; msgEl.textContent = '✓ Logged';
     setTimeout(() => { msgEl.textContent = ''; }, 2000);
@@ -1698,9 +1798,8 @@ document.getElementById('btn-log-activity').addEventListener('click', async () =
 /* ── Change detection ─────────────────────────────────────────────────────── */
 function detectChanges(oldClient, patch) {
   const tracked = {
-    business: 'Business', status: 'Status', program: 'Program',
+    business: 'Business', status: 'Status', programs: 'Programs',
     leadAssignee: 'Lead Coach', techAssignee: 'Tech',
-    currentWeek: 'Current Week', startDate: 'Start Date',
   };
   return Object.entries(tracked)
     .filter(([k]) => patch[k] !== undefined && String(oldClient[k] || '') !== String(patch[k] || ''))
@@ -1806,6 +1905,32 @@ function restartProgram(progName) {
     modalViewWeek = 1;
     modalChecklistData = {};
     loadChecklist(1);
+  }
+}
+
+function removeProgramCard(name) {
+  if (!modalClient) return;
+  if (!confirm(`Remove "${name}" from this client's programs?`)) return;
+  modalClient.programs = (modalClient.programs || []).filter(p => p !== name);
+  if (modalActiveProgram === name) {
+    modalActiveProgram = modalClient.programs[0] || '';
+    modalViewWeek = modalProgramWeeks[modalActiveProgram] || 1;
+  }
+  populateModal();
+  renderChecklistTabs();
+}
+
+function updateProgEndDate(name, startVal) {
+  const prog = programsMap[name];
+  const dur  = prog?.duration || 0;
+  const key  = name.replace(/\s+/g, '_');
+  const el   = document.getElementById(`prog-end-${key}`);
+  if (!el) return;
+  if (startVal && dur) {
+    const end = new Date(new Date(startVal).getTime() + dur * 7 * 86400000);
+    el.textContent = end.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+  } else {
+    el.textContent = '—';
   }
 }
 
@@ -2050,11 +2175,13 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
     instagram:          document.getElementById('cm-insta').value.trim(),
     website:            document.getElementById('cm-website').value.trim(),
     business:           document.getElementById('cm-business').value,
-    programs:           [...document.querySelectorAll('.prog-checkbox:checked')].map(cb => cb.value),
+    programs:           [...document.querySelectorAll('.prog-card')].map(el => el.dataset.prog),
     programWeeks:       { ...modalProgramWeeks },
     programStatuses:    Object.fromEntries([...document.querySelectorAll('.prog-status-sel')].map(s => [s.dataset.prog, s.value])),
+    programStartDates: Object.fromEntries(
+      [...document.querySelectorAll('.prog-start-input')].map(i => [i.dataset.prog, i.value])
+    ),
     status:             document.getElementById('cm-status').value,
-    startDate:          document.getElementById('cm-start').value,
     leadAssignee:       document.getElementById('cm-lead').value,
     techAssignee:       document.getElementById('cm-tech').value,
     brandDirection:     document.getElementById('cm-brand').value,
@@ -2083,7 +2210,7 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
         body: JSON.stringify(mergedLocal),
       }).then(r => r.json()).then(stored => {
         localStore[c.id] = stored;
-        renderActivityFeed(stored.activityLog || []);
+        renderUnifiedFeed(modalClient, stored);
       }).catch(console.error);
     }
 

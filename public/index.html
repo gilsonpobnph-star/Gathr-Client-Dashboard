@@ -342,11 +342,9 @@
               <th>Program</th>
               <th>Progress</th>
               <th>Status</th>
-              <th>Deadline</th>
               <th>Lead</th>
               <th>Tech</th>
               <th>Start Date</th>
-              <th>End Date</th>
               <th></th>
             </tr>
           </thead>
@@ -838,10 +836,6 @@
               <option>London</option>
             </select>
           </div>
-          <div class="detail-row" style="align-items:flex-start">
-            <span class="detail-label" style="padding-top:4px">Programs</span>
-            <div id="cm-programs-container" style="display:flex;flex-direction:column;gap:5px;flex:1"></div>
-          </div>
           <div class="detail-row">
             <span class="detail-label">Status</span>
             <select id="cm-status" class="inline-select">
@@ -855,21 +849,6 @@
               <option>Closed</option>
             </select>
           </div>
-          
-          <div class="detail-row">
-            <span class="detail-label">Start Date</span>
-            <input type="date" id="cm-start" class="inline-input" style="width:auto" />
-          </div>
-        </div>
-
-        <div class="detail-group">
-          <h3>Add-ons</h3>
-          <div id="addon-checkboxes" style="display:flex;flex-direction:column;gap:7px;margin-bottom:8px"></div>
-          <input type="text" id="addon-custom" class="inline-input" placeholder="Other add-on details…" style="width:100%;font-size:12.5px" />
-        </div>
-
-        <div class="detail-group">
-          <h3>Assignment</h3>
           <div class="detail-row">
             <span class="detail-label">Lead Coach</span>
             <select id="cm-lead" class="inline-select"></select>
@@ -880,9 +859,19 @@
           </div>
         </div>
 
-        <!-- Notes log (replaces single textarea) -->
         <div class="detail-group">
-          <h3>Notes &amp; Activity</h3>
+          <h3>Enrolled Programs</h3>
+          <div id="cm-programs-container" style="display:flex;flex-direction:column;gap:8px"></div>
+          <div id="cm-programs-add" style="margin-top:8px"></div>
+        </div>
+
+        <div class="detail-group">
+          <h3>Hourly / Out-of-Scope</h3>
+          <textarea id="addon-custom" class="add-note-textarea" placeholder="Custom hourly work, out-of-scope projects, details…" rows="3" style="width:100%;font-size:12.5px"></textarea>
+        </div>
+
+        <!-- Notes log -->
+        <div class="detail-group" style="display:none">
           <div class="notes-feed">
             <div class="notes-list" id="cm-notes-list">
               <div class="note-empty">No notes yet.</div>
@@ -934,36 +923,25 @@
         <!-- Add-on checklists (shown when client has active add-ons) -->
         <div id="addon-checklist-section"></div>
 
-        <!-- Auto-tracked changes log -->
+        <!-- Unified Notes & History -->
         <div class="info-card">
-          <h3>Change History <span class="private-badge" style="background:rgba(224,91,46,.15);color:var(--accent)">Auto-tracked</span></h3>
-          <div class="actlog-list" id="client-actlog-list" style="max-height:320px;overflow-y:auto">
-            <div class="note-empty">No tracked changes yet.</div>
-          </div>
-        </div>
-
-        <!-- Activity Log (local store — full account journey) -->
-        <div class="info-card private-notes-card">
-          <h3>
-            Activity Log
-            <span class="private-badge">Manual entries</span>
+          <h3>Notes &amp; History
+            <span class="private-badge" style="background:rgba(224,91,46,.15);color:var(--accent)">Auto-tracked</span>
           </h3>
-          <div class="activity-feed" id="cm-activity-feed">
-            <div class="note-empty">No activity yet.</div>
+          <div class="actlog-list" id="cm-unified-feed" style="max-height:380px;overflow-y:auto;margin-bottom:12px">
+            <div class="note-empty">No entries yet.</div>
           </div>
-          <div style="margin-top:8px;display:flex;flex-direction:column;gap:6px">
-            <select id="cm-activity-type" class="inline-select" style="font-size:12px">
-              <option value="note">📝 General Note</option>
-              <option value="handoff">🤝 Handoff</option>
-              <option value="call">📞 Call Summary</option>
-              <option value="milestone">🏁 Milestone</option>
-              <option value="issue">⚠️ Issue / Flag</option>
-            </select>
-            <textarea id="cm-activity-text" class="add-note-textarea" placeholder="Log an entry…" rows="2"></textarea>
-            <div class="add-note-actions">
-              <span id="cm-activity-msg" class="note-save-msg"></span>
-              <button class="btn-add-note" id="btn-log-activity">Log Entry</button>
-            </div>
+          <select id="cm-activity-type" class="inline-select" style="font-size:12px;margin-bottom:6px">
+            <option value="note">📝 General Note</option>
+            <option value="handoff">🤝 Handoff</option>
+            <option value="call">📞 Call Summary</option>
+            <option value="milestone">🏁 Milestone</option>
+            <option value="issue">⚠️ Issue / Flag</option>
+          </select>
+          <textarea id="cm-activity-text" class="add-note-textarea" placeholder="Log an entry…" rows="2"></textarea>
+          <div class="add-note-actions">
+            <span id="cm-activity-msg" class="note-save-msg"></span>
+            <button class="btn-add-note" id="btn-log-activity">Log Entry</button>
           </div>
         </div>
 
