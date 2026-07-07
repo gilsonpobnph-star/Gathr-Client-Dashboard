@@ -1158,21 +1158,34 @@ function renderProgramClientsView() {
   document.getElementById('programs-tab-title').textContent = 'By Program';
 
   const grouped = {};
-  list.forEach(c => { const key = c.program || 'Unassigned'; if (!grouped[key]) grouped[key] = []; grouped[key].push(c); });
+  list.forEach(c => {
+    const progs = c.programs?.length ? c.programs : (c.program ? [c.program] : []);
+    if (!progs.length) {
+      grouped['Unassigned'] = grouped['Unassigned'] || [];
+      grouped['Unassigned'].push({ c, prog: 'Unassigned' });
+    } else {
+      progs.forEach(prog => {
+        grouped[prog] = grouped[prog] || [];
+        grouped[prog].push({ c, prog });
+      });
+    }
+  });
 
   const order = [...Object.keys(programsMap), 'Unassigned'];
   document.getElementById('prog-view-container').innerHTML = order.filter(k => grouped[k]?.length).map(k => {
     const grp   = grouped[k];
     const color = progColor(k);
-    const cards = grp.map(c => {
-      const dur   = progDuration(c.program);
-      const wk    = Math.min(c.currentWeek || 1, dur);
+    const cards = grp.map(({ c, prog }) => {
+      const dur   = progDuration(prog);
+      const wk    = Math.min((c.programWeeks?.[prog]) || c.currentWeek || 1, dur);
       const pct   = Math.round((wk / dur) * 100);
-      const phase = getPhaseLabel(c.program, wk);
+      const phase = getPhaseLabel(prog, wk);
+      const ps    = (c.programStatuses?.[prog]) || '';
+      const lead  = (c.programLeads?.[prog]) || c.leadAssignee || '';
       return `<div class="prog-client-card" onclick="openModal('${c.id}')">
         <div class="prog-card-top">
           <div><div class="prog-card-name">${c.name}</div><div class="prog-card-biz">${c.businessName || c.email}</div></div>
-          <span class="badge ${statusClass(c.status)}">${c.status || '—'}</span>
+          <span class="badge ${statusClass(c.status)}">${ps || c.status || '—'}</span>
         </div>
         ${phase ? `<div style="font-size:11px;color:var(--text3);margin-bottom:6px">${phase}</div>` : ''}
         <div style="background:var(--surface3);border-radius:4px;height:5px;margin-bottom:8px">
@@ -1182,8 +1195,7 @@ function renderProgramClientsView() {
           <span>Week ${wk} / ${dur}</span>
           <div style="display:flex;gap:6px;align-items:center">
             ${deadlineBadge(c)}
-            ${c.leadAssignee ? `<span style="font-size:11px;color:var(--text2)">L: ${c.leadAssignee}</span>` : ''}
-            ${c.techAssignee ? `<span style="font-size:11px;color:var(--text2)">T: ${c.techAssignee}</span>` : ''}
+            ${lead ? `<span style="font-size:11px;color:var(--text2)">${lead}</span>` : ''}
           </div>
         </div>
       </div>`;
@@ -1553,8 +1565,9 @@ function populateModal() {
   document.getElementById('cm-tech').value    = c.techAssignee || '';
 
   // --- Programs cards ---
-  const progStatuses  = c.programStatuses  || {};
+  const progStatuses   = c.programStatuses  || {};
   const progStartDates = c.programStartDates || {};
+  const progLeads      = c.programLeads     || {};
   const clientProgs = c.programs?.length ? c.programs : (c.program ? [c.program] : []);
   const allProgs = Object.keys(programsMap).filter(k => k !== 'Old Program');
   const PROG_STATUS_OPTS = ['Active','In Progress','On Hold','Completed','Cancelled'];
@@ -1567,6 +1580,7 @@ function populateModal() {
     const color  = prog?.color || '#8A7A6E';
     const ps     = progStatuses[name]  || 'Active';
     const sd     = progStartDates[name] || '';
+    const pl     = progLeads[name] || '';
     const dur    = prog?.duration || 0;
     const wk     = modalProgramWeeks[name] || 1;
     const endLabel = (sd && dur) ? (() => {
@@ -1574,6 +1588,7 @@ function populateModal() {
       return end.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
     })() : '—';
     const statusSel = PROG_STATUS_OPTS.map(s => `<option value="${s}" ${ps===s?'selected':''}>${s}</option>`).join('');
+    const leadSel = `<option value="">— Lead —</option>${team.map(t => `<option value="${escHtml(t)}" ${pl===t?'selected':''}>${escHtml(t)}</option>`).join('')}`;
     const safeName = name.replace(/'/g,"\\'");
     return `<div class="prog-card" data-prog="${escHtml(name)}">
       <div class="prog-card-header">
@@ -1592,6 +1607,10 @@ function populateModal() {
             <label class="prog-date-label">End Date (${dur}wk)</label>
             <span class="prog-end-label" id="prog-end-${escHtml(name).replace(/\s+/g,'_')}">${endLabel}</span>
           </div>
+        </div>
+        <div class="prog-card-lead">
+          <label class="prog-date-label">Lead Assignee</label>
+          <select class="prog-lead-sel inline-select" data-prog="${escHtml(name)}" style="font-size:12px;padding:3px 6px;flex:1">${leadSel}</select>
         </div>
         <div class="prog-card-meta">
           Week ${wk} of ${dur || '?'}
@@ -2090,15 +2109,18 @@ function renderChecklist(wk) {
   const fields = (modalChecklistData[cacheKey] || {}).fields || {};
   const progNotes = modalClient?.checklistNotes?.[modalActiveProgram] || {};
   const notes  = progNotes[wk] || {};
+  const progAssignees = (modalClient?.checklistAssignees?.[modalActiveProgram] || {})[wk] || {};
 
   document.getElementById('cl-gathr').innerHTML = def.items.map(({ id, label }) => {
     const done    = !!fields[id];
     const noteObj = notes[id] || {};
     const noteText = noteObj.note || '';
     const noteStatus = noteObj.status || 'pending';
+    const itemAssignee = progAssignees[id] || '';
     const safeId   = id.replace(/'/g,"\\'");
     const statusColors = { pending: '#7A6E62', 'in-progress': '#F0813A', done: '#5AA872', blocked: '#ef4444' };
     const statusLabels = { pending: 'Pending', 'in-progress': 'In Progress', done: 'Done', blocked: 'Blocked' };
+    const assigneeSel = `<option value="">Assignee</option>${team.map(t => `<option value="${escHtml(t)}" ${itemAssignee===t?'selected':''}>${escHtml(t)}</option>`).join('')}`;
     return `<div class="checklist-item-wrap">
       <div class="checklist-item" onclick="toggleCheck(${wk},'${safeId}',${!done},'${label.replace(/'/g,"\\'")}')">
         <div class="check-box ${done ? 'checked' : ''}">
@@ -2115,6 +2137,11 @@ function renderChecklist(wk) {
           ${['pending','in-progress','done','blocked'].map(s => `
             <button class="cl-status-btn ${noteStatus===s?'active':''}" style="${noteStatus===s?`background:${statusColors[s]}20;color:${statusColors[s]};border-color:${statusColors[s]}`:''}"
               onclick="setChecklistStatus('${safeId}',${wk},'${s}')">${statusLabels[s]}</button>`).join('')}
+        </div>
+        <div class="cl-note-assignee-row">
+          <label style="font-size:11px;color:var(--text3);white-space:nowrap">Assignee:</label>
+          <select class="inline-select cl-assignee-sel" style="font-size:11px;padding:2px 6px;flex:1"
+            onchange="saveChecklistAssignee('${safeId}',${wk},this.value)" onclick="event.stopPropagation()">${assigneeSel}</select>
         </div>
         <textarea class="cl-note-textarea" id="cl-note-text-${wk}-${id}" placeholder="Add details, blockers, context…" rows="2">${escHtml(noteText)}</textarea>
         <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
@@ -2166,6 +2193,23 @@ async function saveChecklistNoteData(itemId, wk, note, status) {
     if (msgEl) msgEl.textContent = 'Error';
     console.error(e);
   }
+}
+
+async function saveChecklistAssignee(itemId, wk, assignee) {
+  if (!modalClient) return;
+  try {
+    const res = await fetch(`/api/checklist-assign/${modalClient.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ week: wk, itemId, assignee, programId: modalActiveProgram }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      modalClient.checklistAssignees = data.checklistAssignees;
+      const idx = clients.findIndex(x => x.id === modalClient.id);
+      if (idx !== -1) clients[idx].checklistAssignees = data.checklistAssignees;
+    }
+  } catch (e) { console.error('assign failed', e); }
 }
 
 async function toggleCheck(week, field, newValue, label) {
@@ -2222,6 +2266,7 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
     programs:           [...document.querySelectorAll('.prog-card')].map(el => el.dataset.prog),
     programWeeks:       { ...modalProgramWeeks },
     programStatuses:    Object.fromEntries([...document.querySelectorAll('.prog-status-sel')].map(s => [s.dataset.prog, s.value])),
+    programLeads:       Object.fromEntries([...document.querySelectorAll('.prog-lead-sel')].map(s => [s.dataset.prog, s.value])),
     programStartDates: Object.fromEntries(
       [...document.querySelectorAll('.prog-start-input')].map(i => [i.dataset.prog, i.value])
     ),

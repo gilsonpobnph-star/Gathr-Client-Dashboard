@@ -504,7 +504,9 @@ function shapeClient(c) {
     intakeSubmitted:    c.intakeSubmitted     || '',
     activityLog:        c.activityLog        || [],
     oldProgramChecklist:c.oldProgramChecklist|| {},
+    programLeads:       c.programLeads       || {},   // per-program lead assignee
     checklists,                                       // now namespaced by programId
+    checklistAssignees: c.checklistAssignees || {},   // per-program/week/item assignee
     addonChecklists:    c.addonChecklists    || {},
     checklistNotes,                                   // now namespaced by programId
     addonChecklistNotes: c.addonChecklistNotes || {},
@@ -830,6 +832,23 @@ app.patch('/api/checklist-notes/:clientId', requireAuth, (req, res) => {
   logActivity(store, req, 'Task note saved', { clientId: req.params.clientId, clientName: client.name, details: `${pId} · Week ${week} · ${status || 'pending'}${note ? ': ' + note.slice(0,80) : ''}` });
   writeStore(store);
   res.json({ checklistNotes: shaped.checklistNotes });
+});
+
+app.patch('/api/checklist-assign/:clientId', requireAuth, (req, res) => {
+  const { week, itemId, assignee, programId } = req.body;
+  if (!week || !itemId) return res.status(400).json({ error: 'week and itemId required' });
+  const store  = readStore();
+  const client = store.clients?.[req.params.clientId];
+  if (!client) return res.status(404).json({ error: 'Not found' });
+  const shaped = shapeClient(client);
+  const pId = programId || shaped.programs[0] || '';
+  shaped.checklistAssignees[pId] = shaped.checklistAssignees[pId] || {};
+  shaped.checklistAssignees[pId][week] = shaped.checklistAssignees[pId][week] || {};
+  shaped.checklistAssignees[pId][week][itemId] = assignee || '';
+  Object.assign(client, { checklistAssignees: shaped.checklistAssignees });
+  store.clients[req.params.clientId] = client;
+  writeStore(store);
+  res.json({ checklistAssignees: shaped.checklistAssignees });
 });
 
 // ── Checklists (local) ────────────────────────────────────────────────────────
