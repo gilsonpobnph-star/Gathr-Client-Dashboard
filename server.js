@@ -98,37 +98,121 @@ const DEFAULT_PROGRAMS = {
   'Personal Brand Full': {
     id: 'Personal Brand Full', name: 'Personal Brand Full', duration: 16, price: 'Custom', color: '#C4522A',
     weeks: {
-      1:{title:'Week 1 — Intake & Filming',phase:'Phase 1 · System Build',items:[
-        {id:'IF',label:'Intake form submitted'},{id:'BDC',label:'Branding direction call done'},
-        {id:'CFS',label:'Content filming session completed'},{id:'WIGM',label:'WIG meeting attended'},
-        {id:'BPCL',label:'Bio/profile content launched'},
+      1:{title:'Week 1 — Intake & Setup',phase:'Phase 1 · System Build',items:[
+        {id:'IFC',label:'Intake call / form completed'},
+        {id:'BDC',label:'Branding direction call done'},
+        {id:'BAR',label:'Brand assets received'},
+        {id:'SLR',label:'Social links received'},
+        {id:'DAR',label:'Domain access received'},
+        {id:'CQR',label:'Content questionnaire received'},
+        {id:'BPCL',label:'Bio / profile content launched'},
+        {id:'WIG1',label:'Weekly WIG meeting held'},
       ]},
       2:{title:'Week 2 — Software Build',phase:'Phase 1 · System Build',items:[
-        {id:'CRMf',label:'CRM & funnel built'},{id:'Auto',label:'Automations set up'},
-        {id:'Cal',label:'Booking calendar live'},{id:'Dom',label:'Domain connected'},
-        {id:'BPN',label:'Business phone number set up'},{id:'Offer',label:'Offer configured'},
-        {id:'FOS',label:'Funnel / offer setup complete'},
+        {id:'CRMf',label:'CRM & funnel built'},
+        {id:'FA',label:'Funnel approved by client'},
+        {id:'Auto',label:'Automations set up'},
+        {id:'Cal',label:'Booking calendar live'},
+        {id:'Dom',label:'Domain connected'},
+        {id:'SDC',label:'Sending domain connected'},
+        {id:'BPN',label:'Business phone number set up'},
+        {id:'PC',label:'Pipelines created (×2)'},
+        {id:'ETL',label:'Email templates loaded'},
+        {id:'Offer',label:'Offer configured'},
+        {id:'ICN',label:'Integrations connected'},
+        {id:'WIG2',label:'Weekly WIG meeting held'},
       ]},
       3:{title:'Week 3 — Review & Revisions',phase:'Phase 1 · System Build',items:[
-        {id:'RSB',label:'Review & sign-off on build'},{id:'ACF',label:'Attended revision call, gave feedback'},
+        {id:'RSB',label:'Review & sign-off on build'},
+        {id:'ACF',label:'Revision call — feedback given & applied'},
         {id:'FCL',label:'Final confirmation & launch approved'},
+        {id:'OBR',label:'1:1 onboarding session recorded'},
+        {id:'SOPP',label:'SOPs & playbook sent'},
+        {id:'CASG',label:'Client added to support group'},
+        {id:'WIG3',label:'Weekly WIG meeting held'},
       ]},
       4:{title:'Week 4 — Onboarding & Launch',phase:'Phase 1 · System Build',items:[
-        {id:'CRMT',label:'1:1 CRM training delivered'},{id:'SOPP',label:'SOPs & playbook sent'},
-        {id:'SMM',label:'Social media management started'},{id:'Launch',label:'System fully launched'},
+        {id:'CRMT',label:'1:1 CRM training delivered'},
+        {id:'SMM',label:'Social media management started'},
+        {id:'IQA',label:'Internal QA completed'},
+        {id:'RFL',label:'Ready for launch confirmed'},
+        {id:'Launch',label:'System fully launched'},
+        {id:'WIG4',label:'Weekly WIG meeting held'},
       ]},
-      5:{title:'Week 5',phase:'Phase 2 · Lead-Gen Activation',items:[]},
-      6:{title:'Week 6',phase:'Phase 2 · Lead-Gen Activation',items:[]},
-      7:{title:'Week 7',phase:'Phase 2 · Lead-Gen Activation',items:[]},
-      8:{title:'Week 8',phase:'Phase 2 · Lead-Gen Activation',items:[]},
-      9:{title:'Week 9',phase:'Phase 3 · Independence + Paid Ads',items:[]},
-      10:{title:'Week 10',phase:'Phase 3 · Independence + Paid Ads',items:[]},
-      11:{title:'Week 11',phase:'Phase 3 · Independence + Paid Ads',items:[]},
-      12:{title:'Week 12',phase:'Phase 3 · Independence + Paid Ads',items:[]},
-      13:{title:'Week 13',phase:'Phase 4 · Custom Branded Website',items:[]},
-      14:{title:'Week 14',phase:'Phase 4 · Custom Branded Website',items:[]},
-      15:{title:'Week 15',phase:'Phase 4 · Custom Branded Website',items:[]},
-      16:{title:'Week 16',phase:'Phase 4 · Custom Branded Website',items:[]},
+      5:{title:'Week 5 — Outreach Foundation',phase:'Phase 2 · Lead-Gen Activation',items:[
+        {id:'OSS',label:'Outreach strategy session completed'},
+        {id:'DMS',label:'DM / outreach scripts delivered'},
+        {id:'SCF',label:'Sales call framework delivered'},
+        {id:'WIG5',label:'Weekly WIG meeting held'},
+      ]},
+      6:{title:'Week 6 — Sales Coaching',phase:'Phase 2 · Lead-Gen Activation',items:[
+        {id:'PLR',label:'Pipeline review completed'},
+        {id:'CTS',label:'Conversion tracking set up'},
+        {id:'BRB',label:'Booking rate baseline noted'},
+        {id:'WIG6',label:'Weekly WIG meeting held'},
+      ]},
+      7:{title:'Week 7 — Outreach Execution',phase:'Phase 2 · Lead-Gen Activation',items:[
+        {id:'OCA',label:'Outreach cadence confirmed live'},
+        {id:'FSR',label:'Follow-up sequences reviewed'},
+        {id:'ADJ',label:'Funnel / script adjustments made'},
+        {id:'WIG7',label:'Weekly WIG meeting held'},
+      ]},
+      8:{title:'Week 8 — Lead-Gen Review',phase:'Phase 2 · Lead-Gen Activation',items:[
+        {id:'BRR',label:'Booking rate reviewed vs baseline'},
+        {id:'LFC',label:'Lead flow consistency confirmed'},
+        {id:'P2D',label:'Phase 2 debrief completed'},
+        {id:'WIG8',label:'Weekly WIG meeting held'},
+      ]},
+      9:{title:'Week 9 — Content Strategy',phase:'Phase 3 · Independence + Content',items:[
+        {id:'CSC',label:'Content strategy session completed'},
+        {id:'BO',label:'Bio optimized'},
+        {id:'CTAF',label:'CTA finalized'},
+        {id:'PPP',label:'Pinned posts planned'},
+        {id:'CCR',label:'Content calendar created'},
+        {id:'WIG9',label:'Weekly WIG meeting held'},
+      ]},
+      10:{title:'Week 10 — Content Production',phase:'Phase 3 · Independence + Content',items:[
+        {id:'FSC',label:'Filming session scheduled & completed'},
+        {id:'CES',label:'Content editing started'},
+        {id:'WIG10',label:'Weekly WIG meeting held'},
+      ]},
+      11:{title:'Week 11 — Content Delivery',phase:'Phase 3 · Independence + Content',items:[
+        {id:'FCBD',label:'First content batch delivered'},
+        {id:'RCC',label:'Revision call completed'},
+        {id:'CCH',label:'Content calendar handed over'},
+        {id:'WIG11',label:'Weekly WIG meeting held'},
+      ]},
+      12:{title:'Week 12 — Content Coaching',phase:'Phase 3 · Independence + Content',items:[
+        {id:'PCR',label:'Posting consistency reviewed'},
+        {id:'ESD',label:'Engagement strategy discussed'},
+        {id:'CPI',label:'Client posting independently confirmed'},
+        {id:'P3D',label:'Phase 3 debrief completed'},
+        {id:'WIG12',label:'Weekly WIG meeting held'},
+      ]},
+      13:{title:'Week 13 — Event Prep',phase:'Phase 4 · Live Event + Paid Ads',items:[
+        {id:'EVC',label:'Live event / seminar date confirmed'},
+        {id:'EVA',label:'Event topic & agenda finalized'},
+        {id:'EVP',label:'Event promoted to audience'},
+        {id:'WIG13',label:'Weekly WIG meeting held'},
+      ]},
+      14:{title:'Week 14 — Ads Build',phase:'Phase 4 · Live Event + Paid Ads',items:[
+        {id:'EAC',label:'Engagement ad campaign built & live'},
+        {id:'LAC',label:'Lead-gen ad campaign built & live'},
+        {id:'WIG14',label:'Weekly WIG meeting held'},
+      ]},
+      15:{title:'Week 15 — Live Event',phase:'Phase 4 · Live Event + Paid Ads',items:[
+        {id:'EVH',label:'Live event / seminar held'},
+        {id:'PED',label:'Post-event debrief completed'},
+        {id:'APR',label:'Ad performance report delivered'},
+        {id:'WIG15',label:'Weekly WIG meeting held'},
+      ]},
+      16:{title:'Week 16 — Program Wrap-up',phase:'Phase 4 · Live Event + Paid Ads',items:[
+        {id:'FPR',label:'Final performance review completed'},
+        {id:'PRC',label:'Full program recap delivered'},
+        {id:'SOC',label:'Client sign-off / completion call held'},
+        {id:'RTR',label:'Referral / testimonial requested'},
+        {id:'WIG16',label:'Weekly WIG meeting held'},
+      ]},
     },
   },
   'Old Program': {
@@ -171,6 +255,12 @@ function readStore() {
 function ensurePrograms(store) {
   if (!store.programs || !Object.keys(store.programs).length) {
     store.programs = JSON.parse(JSON.stringify(DEFAULT_PROGRAMS));
+    return;
+  }
+  // Migrate: update Personal Brand Full if it still has old empty weeks 5-16
+  const pbf = store.programs['Personal Brand Full'];
+  if (pbf && (!pbf.weeks[5]?.items?.length && !pbf.weeks[16]?.items?.length)) {
+    store.programs['Personal Brand Full'] = JSON.parse(JSON.stringify(DEFAULT_PROGRAMS['Personal Brand Full']));
   }
 }
 
