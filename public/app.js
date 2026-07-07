@@ -983,7 +983,7 @@ function programChartData() {
 function statusChartData() {
   const counts = {};
   clients.forEach(c => { const k = c.status || 'Unknown'; counts[k] = (counts[k] || 0) + 1; });
-  const colors = { 'In Progress': '#4A7C5C', Alumni: '#B07A28', Completed: '#3B6B9A', 'New Client': '#7A52A0', Onboarding: '#C4522A', 'Launch Ready': '#3B6B9A', Unknown: '#8A7A6E' };
+  const colors = { 'In Progress': '#4A7C5C', Active: '#2E7D5E', Alumni: '#B07A28', Completed: '#3B6B9A', 'New Client': '#7A52A0', Onboarding: '#C4522A', 'Launch Ready': '#3B6B9A', Unknown: '#8A7A6E' };
   const labels = Object.keys(counts);
   return { labels, datasets: [{ data: Object.values(counts), backgroundColor: labels.map(l => colors[l] || '#8A7A6E'), borderWidth: 0 }] };
 }
