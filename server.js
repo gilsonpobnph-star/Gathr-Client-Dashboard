@@ -714,6 +714,78 @@ app.delete('/api/team/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Tasks ─────────────────────────────────────────────────────────────────────
+function ensureTasks(store) { if (!store.tasks) store.tasks = {}; }
+
+function canSeeTask(task, session) {
+  if (session.role === 'admin') return true;
+  const name = session.name || '';
+  return task.createdBy === name ||
+    (task.assignedTo || []).includes(name) ||
+    (task.sharedWith || []).includes(name);
+}
+
+app.get('/api/tasks', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureTasks(store);
+  const list = Object.values(store.tasks)
+    .filter(t => canSeeTask(t, req.session))
+    .sort((a, b) => (a.deadline || '9999') < (b.deadline || '9999') ? -1 : 1);
+  res.json(list);
+});
+
+app.post('/api/tasks', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureTasks(store);
+  const id = 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  const task = {
+    id,
+    title:       req.body.title       || 'Untitled',
+    description: req.body.description || '',
+    priority:    req.body.priority     || 'Medium',
+    status:      req.body.status       || 'To Do',
+    deadline:    req.body.deadline     || '',
+    clientId:    req.body.clientId     || '',
+    assignedTo:  Array.isArray(req.body.assignedTo) ? req.body.assignedTo : [],
+    sharedWith:  Array.isArray(req.body.sharedWith) ? req.body.sharedWith : [],
+    createdBy:   req.session.name      || 'Admin',
+    createdAt:   new Date().toISOString(),
+    updatedAt:   new Date().toISOString(),
+  };
+  store.tasks[id] = task;
+  logActivity(store, req, 'Task created', { details: task.title });
+  writeStore(store);
+  res.json(task);
+});
+
+app.patch('/api/tasks/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureTasks(store);
+  const task = store.tasks[req.params.id];
+  if (!task) return res.status(404).json({ error: 'Not found' });
+  if (!canSeeTask(task, req.session)) return res.status(403).json({ error: 'Forbidden' });
+  const allowed = ['title','description','priority','status','deadline','clientId','assignedTo','sharedWith'];
+  allowed.forEach(k => { if (req.body[k] !== undefined) task[k] = req.body[k]; });
+  task.updatedAt = new Date().toISOString();
+  store.tasks[req.params.id] = task;
+  logActivity(store, req, 'Task updated', { details: task.title });
+  writeStore(store);
+  res.json(task);
+});
+
+app.delete('/api/tasks/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureTasks(store);
+  const task = store.tasks[req.params.id];
+  if (!task) return res.status(404).json({ error: 'Not found' });
+  const isAdmin = req.session.role === 'admin';
+  if (!isAdmin && task.createdBy !== (req.session.name || '')) return res.status(403).json({ error: 'Forbidden' });
+  delete store.tasks[req.params.id];
+  logActivity(store, req, 'Task deleted', { details: task.title });
+  writeStore(store);
+  res.json({ ok: true });
+});
+
 // ── Client CRUD ───────────────────────────────────────────────────────────────
 app.get('/api/clients', requireAuth, (req, res) => {
   const store = readStore();

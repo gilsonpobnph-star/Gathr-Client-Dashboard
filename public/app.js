@@ -16,6 +16,8 @@ function getPhaseLabel(program, week) {
 /* ── State ────────────────────────────────────────────────────────────────── */
 let clients = [];
 let team = [];
+let myTasks = [];
+let editingTaskId = null;
 let gathrMembers = [];
 let localStore = {};
 let activeTab = 'mydash';
@@ -249,8 +251,8 @@ async function loadAll() {
   document.getElementById('loading').classList.remove('hidden');
   document.querySelectorAll('.tab-section').forEach(s => s.classList.add('hidden'));
 
-  const [cRes, tRes, lRes, pRes, aRes] = await Promise.all([
-    fetch('/api/clients'), fetch('/api/team'), fetch('/api/local'), fetch('/api/programs'), fetch('/api/addons'),
+  const [cRes, tRes, lRes, pRes, aRes, tkRes] = await Promise.all([
+    fetch('/api/clients'), fetch('/api/team'), fetch('/api/local'), fetch('/api/programs'), fetch('/api/addons'), fetch('/api/tasks'),
   ]);
   clients    = await cRes.json();
   const teamData = await tRes.json();
@@ -260,6 +262,7 @@ async function loadAll() {
   localStore = await lRes.json();
   programsMap = await pRes.json();
   addonsMap   = await aRes.json();
+  myTasks    = await tkRes.json();
 
   populateAssigneeFilters();
   document.getElementById('loading').classList.add('hidden');
@@ -604,6 +607,7 @@ async function renderMyDash() {
   renderClientHealthBoard('my-client-health', myClients);
   await renderMyPriorities(myClients);
   await initCalendar(myClients);
+  renderMyTasks();
 }
 
 async function renderMyPriorities(myClients) {
@@ -655,6 +659,178 @@ async function renderMyPriorities(myClients) {
       <div class="priority-task-label">${t.prog ? escHtml(t.prog) + ' · ' : ''}Wk ${t.week}${t.phase ? ` · ${escHtml(t.phase)}` : ''}</div>
       <div class="priority-task-task">${escHtml(t.item.label)}</div>
     </div>`).join('');
+}
+
+/* ── My Tasks ─────────────────────────────────────────────────────────────── */
+function renderMyTasks() {
+  const el = document.getElementById('my-tasks-list');
+  if (!el) return;
+  const statusF = document.getElementById('task-filter-status')?.value || '';
+  const isAdmin = currentUser.role === 'admin';
+  const myName  = currentUser.name || '';
+
+  let list = [...myTasks];
+  if (statusF) list = list.filter(t => t.status === statusF);
+
+  if (!list.length) {
+    el.innerHTML = `<div style="color:var(--text3);font-size:13px;padding:16px 0;text-align:center">
+      ${statusF ? 'No tasks with that status.' : 'No tasks yet — create one!'}
+    </div>`;
+    return;
+  }
+
+  const priorityColor = { High: '#ef4444', Medium: '#f59e0b', Low: '#5AA872' };
+  const priorityIcon  = { High: '🔴', Medium: '🟡', Low: '🟢' };
+  const statusBadge   = { 'To Do': 'badge-intake', 'In Progress': 'badge-onboarding', 'Done': 'badge-active' };
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  el.innerHTML = list.map(t => {
+    const isOwner  = isAdmin || t.createdBy === myName;
+    const assigned = (t.assignedTo || []).join(', ');
+    const shared   = (t.sharedWith || []).join(', ');
+    const client   = t.clientId ? clients.find(c => c.id === t.clientId) : null;
+    let deadlineLabel = '', deadlineColor = 'var(--text3)';
+    if (t.deadline) {
+      const dl = new Date(t.deadline + 'T00:00:00');
+      const diff = Math.round((dl - today) / 86400000);
+      if (t.status === 'Done') { deadlineLabel = 'Done'; deadlineColor = 'var(--green)'; }
+      else if (diff < 0)  { deadlineLabel = `${Math.abs(diff)}d overdue`; deadlineColor = '#ef4444'; }
+      else if (diff === 0){ deadlineLabel = 'Due today'; deadlineColor = '#f97316'; }
+      else if (diff <= 3) { deadlineLabel = `Due in ${diff}d`; deadlineColor = '#f59e0b'; }
+      else { deadlineLabel = new Date(t.deadline + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }); }
+    }
+    return `<div class="task-card" data-id="${t.id}">
+      <div class="task-card-left">
+        <span class="task-priority-dot" style="background:${priorityColor[t.priority] || '#8A7A6E'}" title="${t.priority}"></span>
+        <div class="task-card-body">
+          <div class="task-card-title">${escHtml(t.title)}</div>
+          ${t.description ? `<div class="task-card-desc">${escHtml(t.description)}</div>` : ''}
+          <div class="task-card-meta">
+            ${client ? `<span class="task-meta-chip" onclick="event.stopPropagation();openModal('${client.id}')" title="Open client">🔗 ${escHtml(client.name)}</span>` : ''}
+            ${assigned ? `<span class="task-meta-chip">👤 ${escHtml(assigned)}</span>` : ''}
+            ${shared   ? `<span class="task-meta-chip">👁 ${escHtml(shared)}</span>` : ''}
+            ${t.createdBy && t.createdBy !== myName ? `<span class="task-meta-chip" style="color:var(--text3)">by ${escHtml(t.createdBy)}</span>` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="task-card-right">
+        ${deadlineLabel ? `<span class="task-deadline-label" style="color:${deadlineColor}">${deadlineLabel}</span>` : ''}
+        <span class="badge ${statusBadge[t.status] || 'badge-intake'}" style="font-size:10px">${t.status}</span>
+        <select class="inline-select task-status-sel" style="font-size:11px;padding:2px 6px" onchange="quickUpdateTaskStatus('${t.id}',this.value)" onclick="event.stopPropagation()">
+          ${['To Do','In Progress','Done'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
+        </select>
+        ${isOwner ? `<button class="task-edit-btn" onclick="event.stopPropagation();openTaskModal('${t.id}')" title="Edit">✏️</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('task-filter-status')?.addEventListener('change', renderMyTasks);
+
+function openTaskModal(taskId) {
+  editingTaskId = taskId || null;
+  const t = taskId ? myTasks.find(x => x.id === taskId) : null;
+  const isAdmin = currentUser.role === 'admin';
+
+  document.getElementById('task-modal-title').textContent = t ? 'Edit Task' : 'New Task';
+  document.getElementById('task-title').value    = t?.title       || '';
+  document.getElementById('task-desc').value     = t?.description || '';
+  document.getElementById('task-priority').value = t?.priority    || 'Medium';
+  document.getElementById('task-deadline').value = t?.deadline    || '';
+  document.getElementById('task-status').value   = t?.status      || 'To Do';
+
+  // Client dropdown
+  const clientSel = document.getElementById('task-client');
+  clientSel.innerHTML = '<option value="">— No client —</option>' +
+    clients.map(c => `<option value="${c.id}" ${t?.clientId===c.id?'selected':''}>${escHtml(c.name)}${c.businessName?' — '+escHtml(c.businessName):''}</option>`).join('');
+
+  // Assignees & shared — checkboxes for each team member
+  const myName = currentUser.name || '';
+  const renderMemberPicks = (containerId, selected) => {
+    const all = [...new Set([...team, myName])].filter(Boolean);
+    document.getElementById(containerId).innerHTML = all.map(m =>
+      `<label class="task-member-pick"><input type="checkbox" value="${escHtml(m)}" ${selected.includes(m)?'checked':''}> ${escHtml(m)}</label>`
+    ).join('');
+  };
+  renderMemberPicks('task-assignees', t?.assignedTo || []);
+  renderMemberPicks('task-shared',    t?.sharedWith || []);
+
+  // Admins can assign to others; members can only assign to themselves
+  document.getElementById('task-assign-wrap').style.display = isAdmin ? '' : 'none';
+
+  // Delete button — only for owner or admin
+  const canDelete = isAdmin || (t && t.createdBy === myName);
+  document.getElementById('task-delete-btn').classList.toggle('hidden', !t || !canDelete);
+
+  document.getElementById('task-modal').classList.remove('hidden');
+  document.getElementById('task-title').focus();
+}
+
+function closeTaskModal() {
+  document.getElementById('task-modal').classList.add('hidden');
+  editingTaskId = null;
+}
+
+async function saveTask() {
+  const title = document.getElementById('task-title').value.trim();
+  if (!title) { document.getElementById('task-title').focus(); return; }
+
+  const isAdmin = currentUser.role === 'admin';
+  const myName  = currentUser.name || '';
+
+  const getChecked = id => [...document.getElementById(id).querySelectorAll('input[type=checkbox]:checked')].map(cb => cb.value);
+  const assignedTo = isAdmin ? getChecked('task-assignees') : [myName];
+  const sharedWith = getChecked('task-shared');
+
+  const payload = {
+    title,
+    description: document.getElementById('task-desc').value.trim(),
+    priority:    document.getElementById('task-priority').value,
+    status:      document.getElementById('task-status').value,
+    deadline:    document.getElementById('task-deadline').value,
+    clientId:    document.getElementById('task-client').value,
+    assignedTo,
+    sharedWith,
+  };
+
+  const url    = editingTaskId ? `/api/tasks/${editingTaskId}` : '/api/tasks';
+  const method = editingTaskId ? 'PATCH' : 'POST';
+  const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  if (!res.ok) return;
+  const saved = await res.json();
+
+  if (editingTaskId) {
+    const idx = myTasks.findIndex(t => t.id === editingTaskId);
+    if (idx !== -1) myTasks[idx] = saved; else myTasks.push(saved);
+  } else {
+    myTasks.push(saved);
+  }
+  closeTaskModal();
+  renderMyTasks();
+}
+
+async function deleteTask() {
+  if (!editingTaskId) return;
+  const t = myTasks.find(x => x.id === editingTaskId);
+  if (!confirm(`Delete task "${t?.title}"?`)) return;
+  const res = await fetch(`/api/tasks/${editingTaskId}`, { method: 'DELETE' });
+  if (!res.ok) return;
+  myTasks = myTasks.filter(x => x.id !== editingTaskId);
+  closeTaskModal();
+  renderMyTasks();
+}
+
+async function quickUpdateTaskStatus(taskId, status) {
+  const res = await fetch(`/api/tasks/${taskId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+  if (!res.ok) return;
+  const saved = await res.json();
+  const idx = myTasks.findIndex(t => t.id === taskId);
+  if (idx !== -1) myTasks[idx] = saved;
+  renderMyTasks();
 }
 
 /* ── Calendar ─────────────────────────────────────────────────────────────── */

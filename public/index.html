@@ -708,6 +708,24 @@
           </div>
 
         </div>
+
+        <!-- My Tasks -->
+        <div class="dash-card" style="margin-top:18px">
+          <div class="dash-card-header">
+            <div class="dash-card-title"><span class="dash-card-dot" style="background:var(--accent)"></span>My Tasks</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <select id="task-filter-status" class="inline-select" style="font-size:12px;padding:4px 8px">
+                <option value="">All</option>
+                <option value="To Do">To Do</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Done">Done</option>
+              </select>
+              <button class="btn-primary" style="font-size:12px;padding:6px 14px" onclick="openTaskModal()">+ New Task</button>
+            </div>
+          </div>
+          <div id="my-tasks-list"></div>
+        </div>
+
       </div>
     </section>
 
@@ -768,6 +786,67 @@
     </section>
 
   </main>
+</div>
+
+<!-- Task Modal -->
+<div id="task-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeTaskModal()">
+  <div class="modal" style="max-width:520px;width:96%">
+    <div class="modal-header">
+      <h2 class="modal-title" id="task-modal-title">New Task</h2>
+      <button class="modal-close" onclick="closeTaskModal()">×</button>
+    </div>
+    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;padding:20px 24px">
+      <div>
+        <label class="field-label">Title <span style="color:var(--accent)">*</span></label>
+        <input id="task-title" class="field-input" placeholder="Task title…" style="width:100%">
+      </div>
+      <div>
+        <label class="field-label">Description</label>
+        <textarea id="task-desc" class="field-input" placeholder="Details, context, links…" rows="3" style="width:100%;resize:vertical"></textarea>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label class="field-label">Priority</label>
+          <select id="task-priority" class="field-input">
+            <option value="High">🔴 High</option>
+            <option value="Medium" selected>🟡 Medium</option>
+            <option value="Low">🟢 Low</option>
+          </select>
+        </div>
+        <div>
+          <label class="field-label">Deadline</label>
+          <input id="task-deadline" type="date" class="field-input">
+        </div>
+      </div>
+      <div>
+        <label class="field-label">Status</label>
+        <select id="task-status" class="field-input">
+          <option value="To Do">To Do</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Done">Done</option>
+        </select>
+      </div>
+      <div>
+        <label class="field-label">Link to Client <span style="color:var(--text3);font-weight:400">(optional)</span></label>
+        <select id="task-client" class="field-input">
+          <option value="">— No client —</option>
+        </select>
+      </div>
+      <div id="task-assign-wrap">
+        <label class="field-label">Assign To</label>
+        <div id="task-assignees" class="task-member-list"></div>
+      </div>
+      <div>
+        <label class="field-label">Share With <span style="color:var(--text3);font-weight:400">(read-only access)</span></label>
+        <div id="task-shared" class="task-member-list"></div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:4px">
+        <button class="btn-view" onclick="closeTaskModal()">Cancel</button>
+        <button class="btn-primary" onclick="saveTask()">Save Task</button>
+        <button id="task-delete-btn" class="btn-danger hidden" onclick="deleteTask()">Delete</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- Client Modal -->
