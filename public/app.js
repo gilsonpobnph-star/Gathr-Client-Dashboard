@@ -1081,10 +1081,6 @@ function renderClients() {
           ${teamOpts(c.techAssignee)}
         </select>
       </td>
-      <td onclick="event.stopPropagation()">
-        <input type="date" class="tbl-date" value="${c.startDate||''}"
-          onchange="quickPatch('${cid}','startDate',this.value,this)">
-      </td>
       <td><button class="btn-view" onclick="event.stopPropagation();openModal('${cid}')">Edit →</button></td>
     </tr>`;
   }).join('');
@@ -1515,7 +1511,6 @@ function populateModal() {
   // Program fields
   document.getElementById('cm-business').value = c.business    || '';
   document.getElementById('cm-status').value  = c.status      || '';
-  document.getElementById('cm-start').value   = c.startDate   || '';
   document.getElementById('cm-lead').value    = c.leadAssignee || '';
   document.getElementById('cm-tech').value    = c.techAssignee || '';
 
@@ -1597,18 +1592,8 @@ function populateModal() {
     });
   }
 
-  // Add-ons — tick dynamic checkboxes
-  const addOnStr = c.addOns || '';
-  document.querySelectorAll('.addon-cb').forEach(cb => {
-    cb.checked = addOnStr.includes(cb.dataset.addon);
-  });
-  const knownAddons = Object.keys(addonsMap);
-  const customText = addOnStr.split(',').map(s => s.trim())
-    .filter(s => s && !knownAddons.includes(s)).join(', ');
-  document.getElementById('addon-custom').value = customText;
-
-  // Render add-on checklists
-  renderAddonChecklists(c);
+  // Hourly / Out-of-scope notes
+  document.getElementById('addon-custom').value = c.addOns || '';
 
   // Content fields
   document.getElementById('cm-brand').value    = c.brandDirection || '';
@@ -2160,11 +2145,7 @@ document.getElementById('cl-next').addEventListener('click', () => {
 document.getElementById('btn-save-client').addEventListener('click', async () => {
   const c = modalClient;
 
-  // Build add-ons string from dynamic checkboxes
-  const addonParts = [];
-  document.querySelectorAll('.addon-cb:checked').forEach(cb => addonParts.push(cb.dataset.addon));
   const customAddon = document.getElementById('addon-custom').value.trim();
-  if (customAddon) addonParts.push(customAddon);
 
   const newName = document.getElementById('cm-name-input').value.trim() || c.name;
   const patch = {
@@ -2188,7 +2169,7 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
     servicesAndPricing: document.getElementById('cm-services').value,
     goals:              document.getElementById('cm-goals').value,
     filmingAvailability:document.getElementById('cm-filming').value,
-    addOns:             addonParts.join(', '),
+    addOns:             customAddon,
   };
 
   const msgEl = document.getElementById('modal-save-msg');
