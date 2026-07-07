@@ -1,144 +1,32 @@
-/* ── Program data ─────────────────────────────────────────────────────────── */
-const PROGRAMS = {
-  'Brand Basics': {
-    label: 'Brand Basics', duration: 4, price: '$1,500', color: '#3B6B9A',
-    phases: [{ name: 'Phase 1 · System Build', weeks: [1,2,3,4] }],
-  },
-  'Personal Brand Foundation': {
-    label: 'Personal Brand Foundation', duration: 12, price: '$4,500', color: '#7A52A0',
-    phases: [
-      { name: 'Phase 1 · System Build',              weeks: [1,2,3,4] },
-      { name: 'Phase 2 · Lead-Gen Activation',       weeks: [5,6,7,8] },
-      { name: 'Phase 3 · Independence + Paid Ads',   weeks: [9,10,11,12] },
-    ],
-  },
-  'Personal Brand Full': {
-    label: 'Personal Brand Full', duration: 16, price: 'Custom', color: '#C4522A',
-    phases: [
-      { name: 'Phase 1 · System Build',              weeks: [1,2,3,4] },
-      { name: 'Phase 2 · Lead-Gen Activation',       weeks: [5,6,7,8] },
-      { name: 'Phase 3 · Independence + Paid Ads',   weeks: [9,10,11,12] },
-      { name: 'Phase 4 · Custom Branded Website',    weeks: [13,14,15,16] },
-    ],
-  },
-  'Old Program': {
-    label: 'Old Program', duration: 4, price: '—', color: '#8A7A6E',
-    phases: [{ name: 'Phase 1 · System Build', weeks: [1,2,3,4] }],
-  },
-};
+/* ── Program data (loaded dynamically from server) ────────────────────────── */
+let programsMap = {};   // keyed by program name, populated in loadAll()
 
-// Add-ons are upsells on top of the main program
-const ADDONS = [
-  { id: 'Content',        label: 'Content Management', color: '#B07A28' },
-  { id: 'Ads Management', label: 'Ads Management',     color: '#C4522A' },
-  { id: 'Website',        label: 'Website',            color: '#4A7C5C' },
-];
-
-// Old Program checklist — stored locally only, never synced to Airtable
-const OLD_PROGRAM_CHECKLIST = {
-  1: {
-    title: 'Week 1 — Onboarding & Setup',
-    phase: 'Onboarding',
-    items: [
-      { field: 'ICC',  label: 'Intake Call Completed' },
-      { field: 'BAR',  label: 'Brand Assets Received' },
-      { field: 'SLR',  label: 'Social Links Received' },
-      { field: 'DAR',  label: 'Domain Access Received' },
-      { field: 'CQR',  label: 'Content Questionnaire Received' },
-    ],
-  },
-  2: {
-    title: 'Week 2 — Funnel & Tech Build',
-    phase: 'Build',
-    items: [
-      { field: 'FB',   label: 'Funnel Built' },
-      { field: 'FA',   label: 'Funnel Approved' },
-      { field: 'DC',   label: 'Domain Connected' },
-      { field: 'BNP',  label: 'Business Number Purchased' },
-      { field: 'SDC',  label: 'Sending Domain Connected' },
-      { field: 'CC',   label: 'Calendar Connected' },
-      { field: 'PC',   label: 'Pipelines Created' },
-      { field: 'AC',   label: 'Automations Created' },
-      { field: 'ETL',  label: 'Email Templates Loaded' },
-      { field: 'BCC',  label: 'Booking Calendar Created' },
-      { field: 'ICN',  label: 'Integrations Connected' },
-    ],
-  },
-  3: {
-    title: 'Week 3 — Content & Optimisation',
-    phase: 'Content',
-    items: [
-      { field: 'BO',   label: 'Bio Optimized' },
-      { field: 'CTAF', label: 'CTA Finalized' },
-      { field: 'PPP',  label: 'Pinned Posts Planned' },
-      { field: 'CSC',  label: 'Content Strategy Completed' },
-      { field: 'FSS',  label: 'Filming Session Scheduled' },
-      { field: 'FCBD', label: 'First Content Batch Delivered' },
-      { field: 'RCC',  label: 'Revision Call Completed' },
-    ],
-  },
-  4: {
-    title: 'Week 4 — Launch',
-    phase: 'Launch',
-    items: [
-      { field: 'CTC',  label: 'Client Training Completed' },
-      { field: 'PS',   label: 'Playbook Sent' },
-      { field: 'WTCA', label: 'Weekly Tech Call Assigned' },
-      { field: 'CASG', label: 'Client Added To Support Group' },
-      { field: 'IQAC', label: 'Internal QA Completed' },
-      { field: 'RFL',  label: 'Ready For Launch' },
-      { field: 'LC',   label: 'Launch Completed' },
-    ],
-  },
-};
-
-const CHECKLIST_DEFS = {
-  1: [
-    { field: 'IF',   label: 'Intake form submitted' },
-    { field: 'BDC',  label: 'Branding direction call done' },
-    { field: 'CFS',  label: 'Content filming session completed' },
-    { field: 'WIGM', label: 'WIG meeting attended' },
-    { field: 'BPCL', label: 'Bio/profile content launched' },
-  ],
-  2: [
-    { field: 'CRM&F', label: 'CRM & funnel built' },
-    { field: 'Auto',  label: 'Automations set up' },
-    { field: 'Cal',   label: 'Booking calendar live' },
-    { field: 'Dom',   label: 'Domain connected' },
-    { field: 'BPN#',  label: 'Business phone number set up' },
-    { field: 'Offer', label: 'Offer configured' },
-    { field: 'FOS',   label: 'Funnel / offer setup complete' },
-  ],
-  3: [
-    { field: 'RSB', label: 'Review & sign-off on build' },
-    { field: 'ACF', label: 'Attended revision call, gave feedback' },
-    { field: 'FCL', label: 'Final confirmation & launch approved' },
-  ],
-  4: [
-    { field: '1:1 CRMT',   label: '1:1 CRM training delivered' },
-    { field: 'SOP&P',      label: 'SOPs & playbook sent' },
-    { field: 'SMM (W4-8)', label: 'Social media management started (W4–8)' },
-    { field: 'Launch',     label: 'System fully launched' },
-  ],
-};
-
-const WEEK_TITLES = {
-  1: 'Week 1 — Intake & Filming',
-  2: 'Week 2 — Software Build',
-  3: 'Week 3 — Review & Revisions',
-  4: 'Week 4 — Onboarding & Launch',
-};
+function progColor(p)    { return (programsMap[p] || {}).color    || '#8A7A6E'; }
+function progDuration(p) { return (programsMap[p] || {}).duration || 1; }
+function getWeekDef(program, week) {
+  const prog = programsMap[program];
+  if (!prog) return null;
+  return prog.weeks?.[week] || prog.weeks?.[String(week)] || null;
+}
+function getPhaseLabel(program, week) {
+  const def = getWeekDef(program, week);
+  return def?.phase || '';
+}
 
 /* ── State ────────────────────────────────────────────────────────────────── */
 let clients = [];
 let team = [];
 let gathrMembers = [];
-let localStore = {};     // persisted on server, never goes to Airtable
+let localStore = {};
 let activeTab = 'overview';
 let modalClient = null;
 let modalViewWeek = 1;
 let modalChecklistData = {};
 let charts = {};
+// Program builder state
+let pbSelectedProgram = null;
+let pbSelectedWeek    = 1;
+let pbProgramView     = 'clients'; // 'clients' | 'builder'
 
 /* ── Utils ────────────────────────────────────────────────────────────────── */
 function initials(name) {
@@ -157,8 +45,7 @@ function statusClass(s) {
   return m[s] || 'badge-intake';
 }
 
-function progColor(p)    { return (PROGRAMS[p] || {}).color    || '#8A7A6E'; }
-function progDuration(p) { return (PROGRAMS[p] || {}).duration || 1; }
+// (progColor / progDuration defined above with programsMap)
 
 function fmtDate(d) {
   if (!d) return '—';
@@ -173,12 +60,7 @@ function fmtTs(ts) {
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) + ' · ' + d.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
 }
 
-function getPhaseLabel(program, week) {
-  const prog = PROGRAMS[program];
-  if (!prog) return '';
-  for (const phase of prog.phases) { if (phase.weeks.includes(week)) return phase.name; }
-  return '';
-}
+// (getPhaseLabel defined above with programsMap)
 
 function normalize(s) { return (s || '').toLowerCase().trim(); }
 
@@ -262,13 +144,13 @@ async function loadAll() {
   document.getElementById('loading').classList.remove('hidden');
   document.querySelectorAll('.tab-section').forEach(s => s.classList.add('hidden'));
 
-  const [cRes, tRes, lRes] = await Promise.all([fetch('/api/clients'), fetch('/api/team'), fetch('/api/local')]);
+  const [cRes, tRes, lRes, pRes] = await Promise.all([
+    fetch('/api/clients'), fetch('/api/team'), fetch('/api/local'), fetch('/api/programs'),
+  ]);
   clients    = await cRes.json();
   team       = await tRes.json();
   localStore = await lRes.json();
-
-  // Load Gathr Space members in background (non-blocking)
-  fetch('/api/gathr-members').then(r => r.json()).then(data => { gathrMembers = data; }).catch(() => {});
+  programsMap = await pRes.json();
 
   populateAssigneeFilters();
   document.getElementById('loading').classList.add('hidden');
@@ -314,6 +196,19 @@ function populateAssigneeFilters() {
     s.innerHTML = id === 'cm-note-author' ? '' : '<option value="">— Unassigned —</option>';
     team.forEach(t => {
       const o = document.createElement('option'); o.value = t; o.textContent = t;
+      s.appendChild(o);
+    });
+  });
+
+  // Populate program dropdowns from dynamic programsMap
+  const progNames = Object.keys(programsMap);
+  ['filter-program', 'cm-program'].forEach(id => {
+    const s = document.getElementById(id);
+    if (!s) return;
+    const isFilter = id === 'filter-program';
+    s.innerHTML = isFilter ? '<option value="">All Programs</option>' : '<option value="">— Select —</option>';
+    progNames.forEach(name => {
+      const o = document.createElement('option'); o.value = name; o.textContent = name;
       s.appendChild(o);
     });
   });
@@ -578,16 +473,36 @@ function renderClients() {
   document.getElementById(id)?.addEventListener('input', () => { if (activeTab === 'clients') renderClients(); });
 });
 
-/* ── By Program ───────────────────────────────────────────────────────────── */
+/* ── By Program / Builder ─────────────────────────────────────────────────── */
 function renderPrograms() {
+  if (pbProgramView === 'builder') {
+    renderProgramBuilder();
+  } else {
+    renderProgramClientsView();
+  }
+}
+
+function switchProgramView(view) {
+  pbProgramView = view;
+  document.getElementById('vt-clients').classList.toggle('active', view === 'clients');
+  document.getElementById('vt-builder').classList.toggle('active', view === 'builder');
+  document.getElementById('prog-clients-view').classList.toggle('hidden', view !== 'clients');
+  document.getElementById('prog-builder-view').classList.toggle('hidden', view !== 'builder');
+  document.getElementById('prog-filter-status').style.display = view === 'clients' ? '' : 'none';
+  if (view === 'clients') renderProgramClientsView();
+  else renderProgramBuilder();
+}
+
+function renderProgramClientsView() {
   const statusF = document.getElementById('prog-filter-status').value;
   const list    = clients.filter(c => !statusF || c.status === statusF);
   document.getElementById('programs-subtitle').textContent = `${list.length} clients`;
+  document.getElementById('programs-tab-title').textContent = 'By Program';
 
   const grouped = {};
   list.forEach(c => { const key = c.program || 'Unassigned'; if (!grouped[key]) grouped[key] = []; grouped[key].push(c); });
 
-  const order = ['Brand Basics', 'Personal Brand Foundation', 'Personal Brand Full', 'Unassigned'];
+  const order = [...Object.keys(programsMap), 'Unassigned'];
   document.getElementById('prog-view-container').innerHTML = order.filter(k => grouped[k]?.length).map(k => {
     const grp   = grouped[k];
     const color = progColor(k);
@@ -598,10 +513,7 @@ function renderPrograms() {
       const phase = getPhaseLabel(c.program, wk);
       return `<div class="prog-client-card" onclick="openModal('${c.id}')">
         <div class="prog-card-top">
-          <div>
-            <div class="prog-card-name">${c.name}</div>
-            <div class="prog-card-biz">${c.businessName || c.email}</div>
-          </div>
+          <div><div class="prog-card-name">${c.name}</div><div class="prog-card-biz">${c.businessName || c.email}</div></div>
           <span class="badge ${statusClass(c.status)}">${c.status || '—'}</span>
         </div>
         ${phase ? `<div style="font-size:11px;color:var(--text3);margin-bottom:6px">${phase}</div>` : ''}
@@ -626,10 +538,263 @@ function renderPrograms() {
       </div>
       <div class="prog-grid">${cards}</div>
     </div>`;
-  }).join('');
+  }).join('') || '<p style="color:var(--text3);padding:24px;text-align:center">No clients match.</p>';
 }
 
-document.getElementById('prog-filter-status').addEventListener('change', () => { if (activeTab === 'programs') renderPrograms(); });
+document.getElementById('prog-filter-status').addEventListener('change', () => {
+  if (activeTab === 'programs') renderProgramClientsView();
+});
+
+/* ── Program Builder ──────────────────────────────────────────────────────── */
+function renderProgramBuilder() {
+  document.getElementById('programs-tab-title').textContent = 'Manage Programs';
+  document.getElementById('programs-subtitle').textContent = `${Object.keys(programsMap).length} programs`;
+
+  // Sidebar list
+  const listEl = document.getElementById('pb-prog-list');
+  listEl.innerHTML = Object.values(programsMap).map(p => `
+    <div class="pb-prog-item ${pbSelectedProgram === p.name ? 'active' : ''}"
+         onclick="selectProgram('${p.name.replace(/'/g,"\\'")}')">
+      <span class="pb-prog-dot" style="background:${p.color}"></span>
+      <span class="pb-prog-label">${p.name}</span>
+      <span class="pb-prog-dur">${p.duration}wk</span>
+    </div>`).join('');
+
+  if (pbSelectedProgram && programsMap[pbSelectedProgram]) {
+    renderProgramEditor(programsMap[pbSelectedProgram]);
+  }
+}
+
+function selectProgram(name) {
+  pbSelectedProgram = name;
+  pbSelectedWeek    = 1;
+  renderProgramBuilder();
+}
+
+function renderProgramEditor(prog) {
+  const wk  = pbSelectedWeek;
+  const def = prog.weeks?.[wk] || prog.weeks?.[String(wk)] || { title: `Week ${wk}`, phase: '', items: [] };
+
+  document.getElementById('pb-content').innerHTML = `
+    <div class="pb-editor">
+      <div class="pb-editor-header">
+        <div class="pb-color-preview" style="background:${prog.color}"></div>
+        <div>
+          <div class="pb-editor-name">${prog.name}</div>
+          <div class="pb-editor-meta">${prog.duration} weeks · ${prog.price || 'No price set'}</div>
+        </div>
+        <button class="pb-delete-btn" onclick="deleteProgram('${prog.name.replace(/'/g,"\\'")}')">Delete Program</button>
+      </div>
+
+      <div class="pb-section">
+        <div class="pb-section-title">Program Details</div>
+        <div class="pb-form-grid">
+          <div class="pb-field">
+            <label>Name</label>
+            <input type="text" id="pb-name" value="${escHtml(prog.name)}" class="pb-input">
+          </div>
+          <div class="pb-field">
+            <label>Price</label>
+            <input type="text" id="pb-price" value="${escHtml(prog.price || '')}" placeholder="e.g. $1,500" class="pb-input">
+          </div>
+          <div class="pb-field">
+            <label>Duration (weeks)</label>
+            <input type="number" id="pb-duration" value="${prog.duration}" min="1" max="52" class="pb-input" style="width:80px">
+          </div>
+          <div class="pb-field">
+            <label>Colour</label>
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="color" id="pb-color" value="${prog.color}" class="pb-color-input">
+              <span id="pb-color-val" style="font-size:12px;color:var(--text3)">${prog.color}</span>
+            </div>
+          </div>
+        </div>
+        <button class="btn-primary pb-save-btn" onclick="saveProgramDetails()">Save Details</button>
+        <span id="pb-details-msg" class="save-msg" style="margin-left:10px"></span>
+      </div>
+
+      <div class="pb-section">
+        <div class="pb-section-title">Week Deliverables</div>
+        <div class="pb-week-nav">
+          <button class="week-nav-btn" onclick="pbChangeWeek(-1)" ${wk <= 1 ? 'disabled' : ''}>‹</button>
+          <span class="pb-week-label">Week ${wk} of ${prog.duration}</span>
+          <button class="week-nav-btn" onclick="pbChangeWeek(1)" ${wk >= prog.duration ? 'disabled' : ''}>›</button>
+        </div>
+        <div class="pb-week-form">
+          <div class="pb-field" style="flex:2">
+            <label>Week Title</label>
+            <input type="text" id="pb-week-title" value="${escHtml(def.title || '')}" placeholder="e.g. Week 1 — Onboarding" class="pb-input">
+          </div>
+          <div class="pb-field" style="flex:1">
+            <label>Phase</label>
+            <input type="text" id="pb-week-phase" value="${escHtml(def.phase || '')}" placeholder="e.g. Onboarding" class="pb-input">
+          </div>
+        </div>
+
+        <div class="pb-items-list" id="pb-items-list">
+          ${(def.items || []).map((item, i) => `
+            <div class="pb-item-row" id="pb-item-${i}">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text3);flex-shrink:0"><circle cx="9" cy="5" r="1" fill="currentColor"/><circle cx="9" cy="12" r="1" fill="currentColor"/><circle cx="9" cy="19" r="1" fill="currentColor"/><circle cx="15" cy="5" r="1" fill="currentColor"/><circle cx="15" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="19" r="1" fill="currentColor"/></svg>
+              <input type="text" class="pb-item-input" value="${escHtml(item.label)}" onchange="updateItemLabel(${i}, this.value)">
+              <button class="pb-item-remove" onclick="removeDeliverable(${i})">×</button>
+            </div>`).join('')}
+        </div>
+
+        <div class="pb-add-row">
+          <input type="text" id="pb-new-item" class="pb-input" placeholder="New deliverable…" onkeydown="if(event.key==='Enter')addDeliverable()">
+          <button class="btn-view" onclick="addDeliverable()">+ Add</button>
+        </div>
+        <div style="margin-top:10px">
+          <button class="btn-primary pb-save-btn" onclick="saveWeekDef()">Save Week ${wk}</button>
+          <span id="pb-week-msg" class="save-msg" style="margin-left:10px"></span>
+        </div>
+      </div>
+    </div>`;
+
+  // Sync color input display
+  document.getElementById('pb-color').addEventListener('input', e => {
+    document.getElementById('pb-color-val').textContent = e.target.value;
+    document.getElementById('pb-editor-header')?.querySelector('.pb-color-preview')
+      && (document.querySelector('.pb-color-preview').style.background = e.target.value);
+  });
+}
+
+function pbChangeWeek(delta) {
+  const prog = programsMap[pbSelectedProgram];
+  if (!prog) return;
+  pbSelectedWeek = Math.max(1, Math.min(prog.duration, pbSelectedWeek + delta));
+  renderProgramEditor(prog);
+}
+
+function updateItemLabel(index, label) {
+  const prog = programsMap[pbSelectedProgram];
+  if (!prog) return;
+  const wk   = String(pbSelectedWeek);
+  prog.weeks  = prog.weeks || {};
+  prog.weeks[wk] = prog.weeks[wk] || { title: '', phase: '', items: [] };
+  if (prog.weeks[wk].items[index]) prog.weeks[wk].items[index].label = label;
+}
+
+function addDeliverable() {
+  const input = document.getElementById('pb-new-item');
+  const label = input.value.trim();
+  if (!label) return;
+  const prog = programsMap[pbSelectedProgram];
+  if (!prog) return;
+  const wk = String(pbSelectedWeek);
+  prog.weeks = prog.weeks || {};
+  prog.weeks[wk] = prog.weeks[wk] || { title: `Week ${pbSelectedWeek}`, phase: '', items: [] };
+  const id = label.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) + '_' + Date.now().toString(36).slice(-4);
+  prog.weeks[wk].items.push({ id, label });
+  input.value = '';
+  renderProgramEditor(prog);
+}
+
+function removeDeliverable(index) {
+  const prog = programsMap[pbSelectedProgram];
+  if (!prog) return;
+  const wk = String(pbSelectedWeek);
+  if (prog.weeks?.[wk]?.items) {
+    prog.weeks[wk].items.splice(index, 1);
+    renderProgramEditor(prog);
+  }
+}
+
+async function saveProgramDetails() {
+  const prog = programsMap[pbSelectedProgram];
+  if (!prog) return;
+  const name     = document.getElementById('pb-name').value.trim();
+  const price    = document.getElementById('pb-price').value.trim();
+  const duration = parseInt(document.getElementById('pb-duration').value) || prog.duration;
+  const color    = document.getElementById('pb-color').value;
+  const msgEl    = document.getElementById('pb-details-msg');
+  msgEl.textContent = 'Saving…'; msgEl.style.color = 'var(--accent)';
+
+  try {
+    const res = await fetch(`/api/programs/${encodeURIComponent(pbSelectedProgram)}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, price, duration, color, weeks: prog.weeks }),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+    const updated = await res.json();
+    if (name !== pbSelectedProgram) {
+      delete programsMap[pbSelectedProgram];
+      pbSelectedProgram = name;
+    }
+    programsMap[name] = updated;
+    populateAssigneeFilters();
+    msgEl.style.color = 'var(--green)'; msgEl.textContent = '✓ Saved';
+    setTimeout(() => { msgEl.textContent = ''; }, 3000);
+    renderProgramBuilder();
+  } catch (e) {
+    msgEl.style.color = '#e53e3e'; msgEl.textContent = e.message || 'Error';
+  }
+}
+
+async function saveWeekDef() {
+  const prog = programsMap[pbSelectedProgram];
+  if (!prog) return;
+  const wk    = pbSelectedWeek;
+  const title = document.getElementById('pb-week-title').value.trim();
+  const phase = document.getElementById('pb-week-phase').value.trim();
+  const msgEl = document.getElementById('pb-week-msg');
+  msgEl.textContent = 'Saving…'; msgEl.style.color = 'var(--accent)';
+
+  prog.weeks = prog.weeks || {};
+  prog.weeks[wk] = { ...(prog.weeks[wk] || {}), title, phase, items: prog.weeks[wk]?.items || [] };
+
+  try {
+    const res = await fetch(`/api/programs/${encodeURIComponent(pbSelectedProgram)}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(prog),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+    const updated = await res.json();
+    programsMap[pbSelectedProgram] = updated;
+    msgEl.style.color = 'var(--green)'; msgEl.textContent = '✓ Saved';
+    setTimeout(() => { msgEl.textContent = ''; }, 3000);
+  } catch (e) {
+    msgEl.style.color = '#e53e3e'; msgEl.textContent = e.message || 'Error';
+  }
+}
+
+async function createNewProgram() {
+  const name = prompt('Program name:');
+  if (!name?.trim()) return;
+  if (programsMap[name.trim()]) { alert('A program with that name already exists.'); return; }
+  try {
+    const res = await fetch('/api/programs', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name.trim(), price: '', color: '#8A7A6E', duration: 4 }),
+    });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+    const prog = await res.json();
+    programsMap[prog.name] = prog;
+    pbSelectedProgram = prog.name;
+    pbSelectedWeek    = 1;
+    populateAssigneeFilters();
+    renderProgramBuilder();
+  } catch (e) {
+    alert('Error creating program: ' + e.message);
+  }
+}
+
+async function deleteProgram(name) {
+  const prog = programsMap[name || pbSelectedProgram];
+  if (!prog) return;
+  if (!confirm(`Delete program "${prog.name}"? This cannot be undone.\n\nNote: programs with active clients cannot be deleted.`)) return;
+  try {
+    const res = await fetch(`/api/programs/${encodeURIComponent(prog.name)}`, { method: 'DELETE' });
+    if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+    delete programsMap[prog.name];
+    pbSelectedProgram = null;
+    populateAssigneeFilters();
+    renderProgramBuilder();
+    document.getElementById('pb-content').innerHTML = '<div class="pb-empty-state"><p>Program deleted.</p></div>';
+  } catch (e) {
+    alert('Cannot delete: ' + e.message);
+  }
+}
 
 /* ── Analytics ────────────────────────────────────────────────────────────── */
 function renderAnalytics() {
@@ -685,10 +850,10 @@ function populateModal() {
   document.getElementById('cm-name').textContent   = c.name;
   document.getElementById('cm-biz').textContent    = c.businessName || c.email;
 
-  const prog  = PROGRAMS[c.program];
+  const prog  = programsMap[c.program];
   const badge = document.getElementById('cm-prog-badge');
   if (prog) {
-    badge.textContent  = prog.label;
+    badge.textContent  = prog.name;
     badge.style.background = prog.color + '20';
     badge.style.color  = prog.color;
     badge.style.display = 'inline-block';
@@ -911,7 +1076,7 @@ document.getElementById('btn-archive-client').addEventListener('click', async ()
 /* ── Delete client ────────────────────────────────────────────────────────── */
 document.getElementById('btn-delete-client').addEventListener('click', async () => {
   if (!modalClient) return;
-  if (!confirm(`Permanently delete ${modalClient.name}? This cannot be undone — the record will be removed from Airtable.`)) return;
+  if (!confirm(`Permanently delete ${modalClient.name}? This cannot be undone.`)) return;
   if (!confirm(`Are you sure? Deleting ${modalClient.name} is irreversible.`)) return;
 
   const msgEl = document.getElementById('modal-save-msg');
@@ -930,37 +1095,26 @@ document.getElementById('btn-delete-client').addEventListener('click', async () 
   }
 });
 
-/* ── Checklist (live Airtable OR local for Old Program) ───────────────────── */
-function isOldProgram() { return modalClient?.program === 'Old Program'; }
-
+/* ── Checklist (dynamic from programsMap) ─────────────────────────────────── */
 async function loadChecklist(week) {
   const c = modalClient;
   if (!c) return;
 
-  if (isOldProgram()) { renderOldProgramChecklist(week); return; }
+  const wk = week || 1;
+  modalViewWeek = wk;
 
-  if (modalChecklistData[week]) { renderChecklist(week); return; }
+  if (c.program === 'Old Program') { renderOldProgramChecklist(wk); return; }
 
   setChecklistLoading(true);
-
-  const defs = CHECKLIST_DEFS[week];
-  if (!defs) {
-    modalChecklistData[week] = { fields: {}, recordId: null, noTable: true };
-    setChecklistLoading(false);
-    renderChecklist(week);
-    return;
-  }
-
   try {
-    const res  = await fetch(`/api/clients/${c.id}/checklist/${week}`);
+    const res  = await fetch(`/api/clients/${c.id}/checklist/${wk}`);
     const data = await res.json();
-    modalChecklistData[week] = data;
+    modalChecklistData[wk] = data;
   } catch {
-    modalChecklistData[week] = { fields: {}, recordId: null };
+    modalChecklistData[wk] = { fields: {}, recordId: null };
   }
-
   setChecklistLoading(false);
-  renderChecklist(week);
+  renderChecklist(wk);
 }
 
 function setChecklistLoading(on) {
@@ -968,14 +1122,14 @@ function setChecklistLoading(on) {
   document.getElementById('cl-client').innerHTML = '';
 }
 
-/* Old Program — renders from hardcoded defs + local store state */
-function renderOldProgramChecklist(week) {
-  const wk  = week || modalViewWeek;
-  const def = OLD_PROGRAM_CHECKLIST[wk];
+function renderOldProgramChecklist(wk) {
+  const prog = programsMap['Old Program'];
+  const def  = prog?.weeks?.[wk] || prog?.weeks?.[String(wk)];
+  const maxWeek = prog?.duration || 4;
 
   document.getElementById('cl-week-display').textContent = `Week ${wk}`;
   document.getElementById('cl-prev').disabled = wk <= 1;
-  document.getElementById('cl-next').disabled = wk >= 4;
+  document.getElementById('cl-next').disabled = wk >= maxWeek;
   document.getElementById('checklist-section-client').style.display = 'none';
 
   if (!def) {
@@ -986,15 +1140,67 @@ function renderOldProgramChecklist(week) {
     return;
   }
 
-  document.getElementById('cl-week-title').textContent = def.title;
-  document.getElementById('cl-phase-label').textContent = def.phase;
-  document.getElementById('checklist-section-gathr').style.display = '';
+  document.getElementById('cl-week-title').textContent = def.title || `Week ${wk}`;
+  document.getElementById('cl-phase-label').textContent = def.phase || '';
+  document.getElementById('checklist-section-gathr').style.display = def.items?.length ? '' : 'none';
 
   const state = (localStore[modalClient.id] || {}).oldProgramChecklist || {};
+  document.getElementById('cl-gathr').innerHTML = (def.items || []).map(({ id, label }) => {
+    const done = !!state[id];
+    return `<div class="checklist-item" onclick="toggleOldProgramCheck('${id}',${!done})">
+      <div class="check-box ${done ? 'checked' : ''}">
+        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
+      </div>
+      <span class="check-label ${done ? 'done' : ''}">${label}</span>
+    </div>`;
+  }).join('') || '<p style="color:var(--text3);font-size:12px;padding:8px 0">No deliverables for this week yet.</p>';
+}
 
-  document.getElementById('cl-gathr').innerHTML = def.items.map(({ field, label }) => {
-    const done = !!state[field];
-    return `<div class="checklist-item" onclick="toggleOldProgramCheck('${field}',${!done})">
+async function toggleOldProgramCheck(field, newValue) {
+  const id = modalClient?.id;
+  if (!id) return;
+  localStore[id] = localStore[id] || {};
+  localStore[id].oldProgramChecklist = localStore[id].oldProgramChecklist || {};
+  localStore[id].oldProgramChecklist[field] = newValue;
+  renderOldProgramChecklist(modalViewWeek);
+  try {
+    const res = await fetch(`/api/local/${id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ oldProgramChecklist: localStore[id].oldProgramChecklist }),
+    });
+    const stored = await res.json();
+    localStore[id] = stored;
+  } catch (e) {
+    localStore[id].oldProgramChecklist[field] = !newValue;
+    renderOldProgramChecklist(modalViewWeek);
+    console.error('toggleOldProgramCheck failed', e);
+  }
+}
+
+function renderChecklist(wk) {
+  const prog = programsMap[modalClient?.program];
+  const def  = prog?.weeks?.[wk] || prog?.weeks?.[String(wk)];
+  const maxWeek = prog?.duration || 1;
+
+  document.getElementById('cl-week-title').textContent   = def?.title || `Week ${wk}`;
+  document.getElementById('cl-week-display').textContent = `Week ${wk}`;
+  document.getElementById('cl-prev').disabled = wk <= 1;
+  document.getElementById('cl-next').disabled = wk >= maxWeek;
+  document.getElementById('cl-phase-label').textContent  = def?.phase || '';
+  document.getElementById('checklist-section-client').style.display = 'none';
+
+  if (!def || !def.items?.length) {
+    document.getElementById('checklist-section-gathr').style.display = 'none';
+    document.getElementById('cl-gathr').innerHTML = '<p style="color:var(--text3);font-size:12px;padding:8px 0">No deliverables defined for this week yet. Add them in Manage Programs.</p>';
+    return;
+  }
+
+  document.getElementById('checklist-section-gathr').style.display = '';
+  const fields = (modalChecklistData[wk] || {}).fields || {};
+
+  document.getElementById('cl-gathr').innerHTML = def.items.map(({ id, label }) => {
+    const done = !!fields[id];
+    return `<div class="checklist-item" onclick="toggleCheck(${wk},'${id.replace(/'/g,"\\'")}',${!done})">
       <div class="check-box ${done ? 'checked' : ''}">
         <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
       </div>
@@ -1003,90 +1209,17 @@ function renderOldProgramChecklist(week) {
   }).join('');
 }
 
-async function toggleOldProgramCheck(field, newValue) {
-  const id = modalClient?.id;
-  if (!id) return;
-
-  // Optimistic update
-  localStore[id] = localStore[id] || {};
-  localStore[id].oldProgramChecklist = localStore[id].oldProgramChecklist || {};
-  localStore[id].oldProgramChecklist[field] = newValue;
-  renderOldProgramChecklist(modalViewWeek);
-
-  try {
-    const res = await fetch(`/api/local/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ oldProgramChecklist: localStore[id].oldProgramChecklist }),
-    });
-    if (!res.ok) throw new Error(await res.text());
-    const stored = await res.json();
-    localStore[id] = stored;
-  } catch (e) {
-    // Revert on failure
-    localStore[id].oldProgramChecklist[field] = !newValue;
-    renderOldProgramChecklist(modalViewWeek);
-    console.error('toggleOldProgramCheck failed', e);
-  }
-}
-
-function renderChecklist(week) {
-  const wk    = week || modalViewWeek;
-  const title = WEEK_TITLES[wk] || `Week ${wk}`;
-  document.getElementById('cl-week-title').textContent   = title;
-  document.getElementById('cl-week-display').textContent = `Week ${wk}`;
-
-  const maxWeek = progDuration(modalClient?.program);
-  document.getElementById('cl-prev').disabled = wk <= 1;
-  document.getElementById('cl-next').disabled = wk >= maxWeek;
-
-  const phase = getPhaseLabel(modalClient?.program, wk);
-  document.getElementById('cl-phase-label').textContent = phase || '';
-
-  const defs = CHECKLIST_DEFS[wk];
-  const data = modalChecklistData[wk] || {};
-
-  if (!defs || data.noTable) {
-    document.getElementById('cl-gathr').innerHTML = '<p style="color:var(--text3);font-size:12px;padding:8px 0">No Airtable checklist table for this week yet.</p>';
-    document.getElementById('cl-client').innerHTML = '';
-    document.getElementById('checklist-section-gathr').style.display = 'none';
-    document.getElementById('checklist-section-client').style.display = 'none';
-    return;
-  }
-
-  document.getElementById('checklist-section-gathr').style.display = '';
-  document.getElementById('checklist-section-client').style.display = 'none';
-
-  const fields   = data.fields   || {};
-  const recordId = data.recordId || null;
-
-  if (!recordId) {
-    document.getElementById('cl-gathr').innerHTML = '<p style="color:var(--text3);font-size:12px;padding:8px 0">No checklist row found for this client in Airtable. Add a row with their name in the P1 W' + wk + ' table.</p>';
-    return;
-  }
-
-  document.getElementById('cl-gathr').innerHTML = defs.map(({ field, label }) => {
-    const done = !!fields[field];
-    return `<div class="checklist-item" onclick="toggleCheck(${wk},'${field.replace(/'/g,"\\'")}',${!done})">
-      <div class="check-box ${done ? 'checked' : ''}">
-        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
-      </div>
-      <span class="check-label ${done ? 'done' : ''}">${label} <span class="field-abbr">(${field})</span></span>
-    </div>`;
-  }).join('');
-
-  document.getElementById('cl-client').innerHTML = '';
-}
-
 async function toggleCheck(week, field, newValue) {
-  const data = modalChecklistData[week];
-  if (!data?.recordId) return;
+  const data = modalChecklistData[week] || {};
+  data.fields = data.fields || {};
+  data.recordId = data.recordId || modalClient?.id;
+  modalChecklistData[week] = data;
 
   data.fields[field] = newValue;
   renderChecklist(week);
 
   try {
-    const res = await fetch(`/api/checklist/${week}/${data.recordId}`, {
+    const res = await fetch(`/api/checklist/${week}/${modalClient.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ field, value: newValue }),
@@ -1160,9 +1293,9 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
     sBadge.textContent = updated.status || '—';
     sBadge.className = `badge ${statusClass(updated.status)}`;
 
-    const prog  = PROGRAMS[updated.program];
+    const prog  = programsMap[updated.program];
     const badge = document.getElementById('cm-prog-badge');
-    if (prog) { badge.textContent = prog.label; badge.style.background = prog.color + '20'; badge.style.color = prog.color; badge.style.display = 'inline-block'; }
+    if (prog) { badge.textContent = prog.name; badge.style.background = prog.color + '20'; badge.style.color = prog.color; badge.style.display = 'inline-block'; }
 
     msgEl.style.color = 'var(--green)';
     msgEl.textContent = '✓ Saved';
@@ -1177,9 +1310,10 @@ document.getElementById('cm-program').addEventListener('change', () => {
   if (!modalClient) return;
   modalClient.program = document.getElementById('cm-program').value;
   modalViewWeek = 1;
-  const prog  = PROGRAMS[modalClient.program];
+  modalChecklistData = {};
+  const prog  = programsMap[modalClient.program];
   const badge = document.getElementById('cm-prog-badge');
-  if (prog) { badge.textContent = prog.label; badge.style.background = prog.color + '20'; badge.style.color = prog.color; badge.style.display = 'inline-block'; }
+  if (prog) { badge.textContent = prog.name; badge.style.background = prog.color + '20'; badge.style.color = prog.color; badge.style.display = 'inline-block'; }
   else badge.style.display = 'none';
   loadChecklist(modalViewWeek);
 });

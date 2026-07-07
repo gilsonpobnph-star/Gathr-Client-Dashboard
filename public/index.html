@@ -210,10 +210,6 @@
           </select>
           <select id="filter-program" class="filter-select">
             <option value="">All Programs</option>
-            <option>Brand Basics</option>
-            <option>Personal Brand Foundation</option>
-            <option>Personal Brand Full</option>
-            <option>Old Program</option>
           </select>
           <select id="filter-assignee" class="filter-select">
             <option value="">All Assignees</option>
@@ -245,14 +241,18 @@
       </div>
     </section>
 
-    <!-- By Program -->
+    <!-- By Program / Program Builder -->
     <section id="tab-programs" class="tab-section hidden">
       <div class="page-header">
         <div>
-          <h1>By Program</h1>
+          <h1 id="programs-tab-title">By Program</h1>
           <p class="subtitle" id="programs-subtitle">—</p>
         </div>
         <div class="header-actions">
+          <div class="view-toggle">
+            <button class="vt-btn active" id="vt-clients" onclick="switchProgramView('clients')">Clients</button>
+            <button class="vt-btn" id="vt-builder" onclick="switchProgramView('builder')">Manage Programs</button>
+          </div>
           <select id="prog-filter-status" class="filter-select">
             <option value="">All Statuses</option>
             <option>New Client</option>
@@ -264,8 +264,28 @@
           </select>
         </div>
       </div>
-      <div class="prog-view-scroll">
+
+      <!-- Clients view -->
+      <div id="prog-clients-view" class="prog-view-scroll">
         <div id="prog-view-container"></div>
+      </div>
+
+      <!-- Program Builder -->
+      <div id="prog-builder-view" class="hidden pb-layout">
+        <div class="pb-sidebar">
+          <div class="pb-sidebar-title">Programs</div>
+          <div id="pb-prog-list"></div>
+          <button class="pb-new-btn" onclick="createNewProgram()">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+            New Program
+          </button>
+        </div>
+        <div class="pb-content" id="pb-content">
+          <div class="pb-empty-state">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>
+            <p>Select a program to edit, or create a new one.</p>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -406,10 +426,6 @@
             <span class="detail-label">Program</span>
             <select id="cm-program" class="inline-select">
               <option value="">— Select —</option>
-              <option>Brand Basics</option>
-              <option>Personal Brand Foundation</option>
-              <option>Personal Brand Full</option>
-              <option>Old Program</option>
             </select>
           </div>
           <div class="detail-row">

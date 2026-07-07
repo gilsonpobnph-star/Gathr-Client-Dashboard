@@ -20,9 +20,146 @@ const TEAM_MEMBERS = (process.env.TEAM_MEMBERS || 'Gil,Glaiza').split(',').map(s
 // ── Local store ───────────────────────────────────────────────────────────────
 const STORE_PATH = path.join(__dirname, 'data', 'store.json');
 
+const DEFAULT_PROGRAMS = {
+  'Brand Basics': {
+    id: 'Brand Basics', name: 'Brand Basics', duration: 4, price: '$1,500', color: '#3B6B9A',
+    weeks: {
+      1: { title: 'Week 1 — Onboarding & Setup', phase: 'Onboarding', items: [
+        {id:'ICC',label:'Intake Call Completed'},{id:'BAR',label:'Brand Assets Received'},
+        {id:'SLR',label:'Social Links Received'},{id:'DAR',label:'Domain Access Received'},
+        {id:'CQR',label:'Content Questionnaire Received'},
+      ]},
+      2: { title: 'Week 2 — Funnel & Tech Build', phase: 'Build', items: [
+        {id:'FB',label:'Funnel Built'},{id:'FA',label:'Funnel Approved'},
+        {id:'DC',label:'Domain Connected'},{id:'BNP',label:'Business Number Purchased'},
+        {id:'SDC',label:'Sending Domain Connected'},{id:'CC',label:'Calendar Connected'},
+        {id:'PC',label:'Pipelines Created'},{id:'AC',label:'Automations Created'},
+        {id:'ETL',label:'Email Templates Loaded'},{id:'BCC',label:'Booking Calendar Created'},
+        {id:'ICN',label:'Integrations Connected'},
+      ]},
+      3: { title: 'Week 3 — Content & Optimisation', phase: 'Content', items: [
+        {id:'BO',label:'Bio Optimized'},{id:'CTAF',label:'CTA Finalized'},
+        {id:'PPP',label:'Pinned Posts Planned'},{id:'CSC',label:'Content Strategy Completed'},
+        {id:'FSS',label:'Filming Session Scheduled'},{id:'FCBD',label:'First Content Batch Delivered'},
+        {id:'RCC',label:'Revision Call Completed'},
+      ]},
+      4: { title: 'Week 4 — Launch', phase: 'Launch', items: [
+        {id:'CTC',label:'Client Training Completed'},{id:'PS',label:'Playbook Sent'},
+        {id:'WTCA',label:'Weekly Tech Call Assigned'},{id:'CASG',label:'Client Added To Support Group'},
+        {id:'IQAC',label:'Internal QA Completed'},{id:'RFL',label:'Ready For Launch'},
+        {id:'LC',label:'Launch Completed'},
+      ]},
+    },
+  },
+  'Personal Brand Foundation': {
+    id: 'Personal Brand Foundation', name: 'Personal Brand Foundation', duration: 12, price: '$4,500', color: '#7A52A0',
+    weeks: {
+      1:{title:'Week 1 — Intake & Filming',phase:'Phase 1 · System Build',items:[
+        {id:'IF',label:'Intake form submitted'},{id:'BDC',label:'Branding direction call done'},
+        {id:'CFS',label:'Content filming session completed'},{id:'WIGM',label:'WIG meeting attended'},
+        {id:'BPCL',label:'Bio/profile content launched'},
+      ]},
+      2:{title:'Week 2 — Software Build',phase:'Phase 1 · System Build',items:[
+        {id:'CRMf',label:'CRM & funnel built'},{id:'Auto',label:'Automations set up'},
+        {id:'Cal',label:'Booking calendar live'},{id:'Dom',label:'Domain connected'},
+        {id:'BPN',label:'Business phone number set up'},{id:'Offer',label:'Offer configured'},
+        {id:'FOS',label:'Funnel / offer setup complete'},
+      ]},
+      3:{title:'Week 3 — Review & Revisions',phase:'Phase 1 · System Build',items:[
+        {id:'RSB',label:'Review & sign-off on build'},{id:'ACF',label:'Attended revision call, gave feedback'},
+        {id:'FCL',label:'Final confirmation & launch approved'},
+      ]},
+      4:{title:'Week 4 — Onboarding & Launch',phase:'Phase 1 · System Build',items:[
+        {id:'CRMT',label:'1:1 CRM training delivered'},{id:'SOPP',label:'SOPs & playbook sent'},
+        {id:'SMM',label:'Social media management started'},{id:'Launch',label:'System fully launched'},
+      ]},
+      5:{title:'Week 5',phase:'Phase 2 · Lead-Gen Activation',items:[]},
+      6:{title:'Week 6',phase:'Phase 2 · Lead-Gen Activation',items:[]},
+      7:{title:'Week 7',phase:'Phase 2 · Lead-Gen Activation',items:[]},
+      8:{title:'Week 8',phase:'Phase 2 · Lead-Gen Activation',items:[]},
+      9:{title:'Week 9',phase:'Phase 3 · Independence + Paid Ads',items:[]},
+      10:{title:'Week 10',phase:'Phase 3 · Independence + Paid Ads',items:[]},
+      11:{title:'Week 11',phase:'Phase 3 · Independence + Paid Ads',items:[]},
+      12:{title:'Week 12',phase:'Phase 3 · Independence + Paid Ads',items:[]},
+    },
+  },
+  'Personal Brand Full': {
+    id: 'Personal Brand Full', name: 'Personal Brand Full', duration: 16, price: 'Custom', color: '#C4522A',
+    weeks: {
+      1:{title:'Week 1 — Intake & Filming',phase:'Phase 1 · System Build',items:[
+        {id:'IF',label:'Intake form submitted'},{id:'BDC',label:'Branding direction call done'},
+        {id:'CFS',label:'Content filming session completed'},{id:'WIGM',label:'WIG meeting attended'},
+        {id:'BPCL',label:'Bio/profile content launched'},
+      ]},
+      2:{title:'Week 2 — Software Build',phase:'Phase 1 · System Build',items:[
+        {id:'CRMf',label:'CRM & funnel built'},{id:'Auto',label:'Automations set up'},
+        {id:'Cal',label:'Booking calendar live'},{id:'Dom',label:'Domain connected'},
+        {id:'BPN',label:'Business phone number set up'},{id:'Offer',label:'Offer configured'},
+        {id:'FOS',label:'Funnel / offer setup complete'},
+      ]},
+      3:{title:'Week 3 — Review & Revisions',phase:'Phase 1 · System Build',items:[
+        {id:'RSB',label:'Review & sign-off on build'},{id:'ACF',label:'Attended revision call, gave feedback'},
+        {id:'FCL',label:'Final confirmation & launch approved'},
+      ]},
+      4:{title:'Week 4 — Onboarding & Launch',phase:'Phase 1 · System Build',items:[
+        {id:'CRMT',label:'1:1 CRM training delivered'},{id:'SOPP',label:'SOPs & playbook sent'},
+        {id:'SMM',label:'Social media management started'},{id:'Launch',label:'System fully launched'},
+      ]},
+      5:{title:'Week 5',phase:'Phase 2 · Lead-Gen Activation',items:[]},
+      6:{title:'Week 6',phase:'Phase 2 · Lead-Gen Activation',items:[]},
+      7:{title:'Week 7',phase:'Phase 2 · Lead-Gen Activation',items:[]},
+      8:{title:'Week 8',phase:'Phase 2 · Lead-Gen Activation',items:[]},
+      9:{title:'Week 9',phase:'Phase 3 · Independence + Paid Ads',items:[]},
+      10:{title:'Week 10',phase:'Phase 3 · Independence + Paid Ads',items:[]},
+      11:{title:'Week 11',phase:'Phase 3 · Independence + Paid Ads',items:[]},
+      12:{title:'Week 12',phase:'Phase 3 · Independence + Paid Ads',items:[]},
+      13:{title:'Week 13',phase:'Phase 4 · Custom Branded Website',items:[]},
+      14:{title:'Week 14',phase:'Phase 4 · Custom Branded Website',items:[]},
+      15:{title:'Week 15',phase:'Phase 4 · Custom Branded Website',items:[]},
+      16:{title:'Week 16',phase:'Phase 4 · Custom Branded Website',items:[]},
+    },
+  },
+  'Old Program': {
+    id: 'Old Program', name: 'Old Program', duration: 4, price: '—', color: '#8A7A6E',
+    weeks: {
+      1:{title:'Week 1 — Onboarding & Setup',phase:'Onboarding',items:[
+        {id:'ICC',label:'Intake Call Completed'},{id:'BAR',label:'Brand Assets Received'},
+        {id:'SLR',label:'Social Links Received'},{id:'DAR',label:'Domain Access Received'},
+        {id:'CQR',label:'Content Questionnaire Received'},
+      ]},
+      2:{title:'Week 2 — Funnel & Tech Build',phase:'Build',items:[
+        {id:'FB',label:'Funnel Built'},{id:'FA',label:'Funnel Approved'},
+        {id:'DC',label:'Domain Connected'},{id:'BNP',label:'Business Number Purchased'},
+        {id:'SDC',label:'Sending Domain Connected'},{id:'CC',label:'Calendar Connected'},
+        {id:'PC',label:'Pipelines Created'},{id:'AC',label:'Automations Created'},
+        {id:'ETL',label:'Email Templates Loaded'},{id:'BCC',label:'Booking Calendar Created'},
+        {id:'ICN',label:'Integrations Connected'},
+      ]},
+      3:{title:'Week 3 — Content & Optimisation',phase:'Content',items:[
+        {id:'BO',label:'Bio Optimized'},{id:'CTAF',label:'CTA Finalized'},
+        {id:'PPP',label:'Pinned Posts Planned'},{id:'CSC',label:'Content Strategy Completed'},
+        {id:'FSS',label:'Filming Session Scheduled'},{id:'FCBD',label:'First Content Batch Delivered'},
+        {id:'RCC',label:'Revision Call Completed'},
+      ]},
+      4:{title:'Week 4 — Launch',phase:'Launch',items:[
+        {id:'CTC',label:'Client Training Completed'},{id:'PS',label:'Playbook Sent'},
+        {id:'WTCA',label:'Weekly Tech Call Assigned'},{id:'CASG',label:'Client Added To Support Group'},
+        {id:'IQAC',label:'Internal QA Completed'},{id:'RFL',label:'Ready For Launch'},
+        {id:'LC',label:'Launch Completed'},
+      ]},
+    },
+  },
+};
+
 function readStore() {
   try { return JSON.parse(fs.readFileSync(STORE_PATH, 'utf8')); }
-  catch { return { clients: {}, meta: { version: '2.0', createdAt: new Date().toISOString() } }; }
+  catch { return { clients: {}, programs: {}, meta: { version: '2.0', createdAt: new Date().toISOString() } }; }
+}
+
+function ensurePrograms(store) {
+  if (!store.programs || !Object.keys(store.programs).length) {
+    store.programs = JSON.parse(JSON.stringify(DEFAULT_PROGRAMS));
+  }
 }
 
 function writeStore(data) {
@@ -103,6 +240,7 @@ app.get('/api/team', requireAuth, (req, res) => { res.json(TEAM_MEMBERS); });
 // ── Client CRUD ───────────────────────────────────────────────────────────────
 app.get('/api/clients', requireAuth, (req, res) => {
   const store = readStore();
+  ensurePrograms(store);
   const list  = Object.values(store.clients || {})
     .map(shapeClient)
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -203,6 +341,74 @@ app.patch('/api/checklist/:week/:clientId', requireAuth, (req, res) => {
   store.clients[req.params.clientId] = client;
   writeStore(store);
   res.json({ fields: client.checklists[week], recordId: req.params.clientId });
+});
+
+// ── Programs CRUD ─────────────────────────────────────────────────────────────
+app.get('/api/programs', requireAuth, (req, res) => {
+  const store = readStore();
+  ensurePrograms(store);
+  writeStore(store);
+  res.json(store.programs);
+});
+
+app.post('/api/programs', requireAuth, (req, res) => {
+  const { name, price, color, duration } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Name required' });
+  const store = readStore();
+  ensurePrograms(store);
+  if (store.programs[name]) return res.status(409).json({ error: 'Program already exists' });
+  const prog = { id: name, name, price: price || '', color: color || '#8A7A6E', duration: parseInt(duration) || 4, weeks: {} };
+  for (let w = 1; w <= prog.duration; w++) {
+    prog.weeks[w] = { title: `Week ${w}`, phase: '', items: [] };
+  }
+  store.programs[name] = prog;
+  writeStore(store);
+  res.json(prog);
+});
+
+app.put('/api/programs/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensurePrograms(store);
+  const oldId = decodeURIComponent(req.params.id);
+  const prog  = store.programs[oldId];
+  if (!prog) return res.status(404).json({ error: 'Program not found' });
+
+  const { name, price, color, duration, weeks } = req.body;
+  const newName = name?.trim() || oldId;
+  const newDur  = parseInt(duration) || prog.duration;
+
+  // Ensure all weeks exist up to new duration
+  const existingWeeks = weeks || prog.weeks || {};
+  const merged = {};
+  for (let w = 1; w <= newDur; w++) {
+    merged[w] = existingWeeks[w] || { title: `Week ${w}`, phase: '', items: [] };
+  }
+
+  const updated = { ...prog, name: newName, id: newName, price: price ?? prog.price, color: color || prog.color, duration: newDur, weeks: merged };
+
+  // Handle rename
+  if (newName !== oldId) {
+    delete store.programs[oldId];
+    // Update all clients using this program
+    for (const c of Object.values(store.clients || {})) {
+      if (c.program === oldId) c.program = newName;
+    }
+  }
+  store.programs[newName] = updated;
+  writeStore(store);
+  res.json(updated);
+});
+
+app.delete('/api/programs/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensurePrograms(store);
+  const id = decodeURIComponent(req.params.id);
+  if (!store.programs[id]) return res.status(404).json({ error: 'Not found' });
+  const inUse = Object.values(store.clients || {}).filter(c => c.program === id).map(c => c.name);
+  if (inUse.length) return res.status(409).json({ error: `In use by: ${inUse.join(', ')}` });
+  delete store.programs[id];
+  writeStore(store);
+  res.json({ ok: true });
 });
 
 // ── Backup & Restore ──────────────────────────────────────────────────────────
