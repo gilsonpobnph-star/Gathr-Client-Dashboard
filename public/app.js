@@ -259,6 +259,8 @@ function showTab(tab) {
   document.querySelectorAll('.tab-section').forEach(s => s.classList.add('hidden'));
   const el = document.getElementById(`tab-${tab}`);
   if (el) el.classList.remove('hidden');
+  // Sync active class on nav items
+  document.querySelectorAll('.nav-item').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
 
   if      (tab === 'overview')   renderOverview();
   else if (tab === 'clients')    renderClients();
@@ -267,6 +269,7 @@ function showTab(tab) {
   else if (tab === 'intake')     renderIntakes();
   else if (tab === 'team')       renderTeam();
   else if (tab === 'mydash')     renderMyDash();
+  else if (tab === 'teamcal')    renderTeamCalendar();
 }
 
 /* ── Assignee filters ─────────────────────────────────────────────────────── */
@@ -386,7 +389,6 @@ function renderOverview() {
   renderClientHealthBoard('client-health-board', clients.filter(c => ACTIVE_STATUSES.includes(c.status)));
   renderChart('chart-programs', 'doughnut', programChartData());
   renderChart('chart-status',   'doughnut', statusChartData());
-  initAdminCalendar();
 }
 
 /* ── Deadline Health Cards ────────────────────────────────────────────────── */
@@ -545,37 +547,60 @@ async function renderMyDash() {
   document.getElementById('my-kpi-active-sub').textContent = 'as lead or tech';
 
   renderClientHealthBoard('my-client-health', myClients);
-  renderMyPriorities(myClients);
+  await renderMyPriorities(myClients);
   await initCalendar(myClients);
 }
 
-function renderMyPriorities(myClients) {
+async function renderMyPriorities(myClients) {
   const el = document.getElementById('my-priorities');
   if (!el) return;
-  const overdue  = myClients.filter(c => deadlineStatus(c)?.state === 'overdue');
-  const delayed  = myClients.filter(c => deadlineStatus(c)?.state === 'delayed');
-  const atRisk   = myClients.filter(c => deadlineStatus(c)?.state === 'at-risk');
-  const items = [];
-  if (overdue.length) items.push({ level: 'critical', icon: '🔴', title: `${overdue.length} overdue`, body: overdue.map(c => `<span class="tr-client-link" onclick="openModal('${c.id}')">${c.name}</span>`).join(', ') });
-  if (delayed.length) items.push({ level: 'warn', icon: '🟠', title: `${delayed.length} behind schedule`, body: delayed.map(c => `<span class="tr-client-link" onclick="openModal('${c.id}')">${c.name}</span>`).join(', ') });
-  if (atRisk.length)  items.push({ level: 'caution', icon: '🟡', title: `${atRisk.length} at risk`, body: atRisk.map(c => `<span class="tr-client-link" onclick="openModal('${c.id}')">${c.name}</span>`).join(', ') });
-  if (!items.length) {
-    el.innerHTML = `<div class="tr-all-good"><span>✅</span><span>All your clients are on track.</span></div>`;
+  el.innerHTML = '<div style="color:var(--text3);font-size:12.5px;padding:6px 0">Loading next tasks…</div>';
+
+  const tasks = [];
+  for (const c of myClients) {
+    if (!c.program || !programsMap[c.program]) continue;
+    const week = c.currentWeek || 1;
+    const def  = getWeekDef(c.program, week);
+    if (!def || !def.items?.length) continue;
+    let fields = {};
+    try {
+      const r = await fetch(`/api/clients/${c.id}/checklist/${week}`);
+      if (r.ok) { const d = await r.json(); fields = d.fields || {}; }
+    } catch {}
+    const ds = deadlineStatus(c);
+    const urgency = { overdue: 0, delayed: 1, 'at-risk': 2, 'on-track': 3 }[ds?.state || 'on-track'];
+    for (const item of def.items) {
+      if (!fields[item.id]) {
+        tasks.push({ client: c, week, item, phase: def.phase, urgency, ds });
+      }
+    }
+  }
+
+  if (!tasks.length) {
+    el.innerHTML = `<div class="tr-all-good"><span>✅</span><span>All checklist tasks for your clients are complete!</span></div>`;
     return;
   }
-  const levelBorder = { critical: '#fca5a5', warn: '#fdba74', caution: '#fcd34d' };
-  const levelBg     = { critical: 'rgba(239,68,68,.1)', warn: 'rgba(249,115,22,.1)', caution: 'rgba(245,158,11,.1)' };
-  const levelColor  = { critical: '#ef4444', warn: '#f97316', caution: '#f59e0b' };
-  el.innerHTML = items.map(item => `
-    <div class="tr-item" style="border-left-color:${levelBorder[item.level]};background:${levelBg[item.level]}">
-      <div class="tr-item-header"><span class="tr-icon">${item.icon}</span><strong style="color:${levelColor[item.level]}">${item.title}</strong></div>
-      <div class="tr-item-body">${item.body}</div>
+
+  tasks.sort((a, b) => a.urgency - b.urgency);
+  const top5 = tasks.slice(0, 5);
+
+  const urgencyColor = { 0: '#ef4444', 1: '#f97316', 2: '#f59e0b', 3: 'var(--text3)' };
+  const urgencyIcon  = { 0: '🔴', 1: '🟠', 2: '🟡', 3: '⬜' };
+
+  el.innerHTML = top5.map(t => `
+    <div class="priority-task-item" onclick="openModal('${t.client.id}')">
+      <div class="priority-task-top">
+        <span class="priority-task-icon">${urgencyIcon[t.urgency]}</span>
+        <span class="priority-task-client">${escHtml(t.client.name)}</span>
+        <span class="priority-task-badge" style="color:${urgencyColor[t.urgency]}">${t.ds?.state === 'overdue' ? 'Overdue' : t.ds?.state === 'delayed' ? 'Behind' : t.ds?.state === 'at-risk' ? 'At Risk' : 'On Track'}</span>
+      </div>
+      <div class="priority-task-label">Wk ${t.week}${t.phase ? ` · ${escHtml(t.phase)}` : ''}</div>
+      <div class="priority-task-task">${escHtml(t.item.label)}</div>
     </div>`).join('');
 }
 
 /* ── Calendar ─────────────────────────────────────────────────────────────── */
 let calYear, calMonth, calEntries = [], calSelectedDate = null, calMyClients = [];
-let adminCalYear, adminCalMonth, adminCalEntries = [], adminCalSelectedDate = null;
 
 function toYMD(d) { return d.toISOString().slice(0,10); }
 
@@ -721,68 +746,89 @@ async function deleteCalEntry(id) {
   }
 }
 
-/* ── Admin calendar (Overview) ────────────────────────────────────────────── */
-async function initAdminCalendar() {
+/* ── Team Calendar (admin-only tab) ───────────────────────────────────────── */
+let teamCalYear, teamCalMonth, teamCalEntries = [];
+
+async function renderTeamCalendar() {
   const now = new Date();
-  if (!adminCalYear) { adminCalYear = now.getFullYear(); adminCalMonth = now.getMonth(); }
-  adminCalEntries = await fetchAdminCalendarEntries(adminCalYear, adminCalMonth);
-  renderAdminCalendar();
+  if (!teamCalYear) { teamCalYear = now.getFullYear(); teamCalMonth = now.getMonth(); }
+  teamCalEntries = await fetchTeamCalEntries(teamCalYear, teamCalMonth);
+  paintTeamCal();
 }
 
-async function fetchAdminCalendarEntries(year, month) {
+async function fetchTeamCalEntries(year, month) {
   const from = `${year}-${String(month+1).padStart(2,'0')}-01`;
   const to   = toYMD(new Date(year, month+1, 0));
   const res  = await fetch(`/api/calendar?from=${from}&to=${to}`);
   return res.ok ? res.json() : [];
 }
 
-function adminCalNav(dir) {
-  adminCalMonth += dir;
-  if (adminCalMonth > 11) { adminCalMonth = 0; adminCalYear++; }
-  if (adminCalMonth < 0)  { adminCalMonth = 11; adminCalYear--; }
-  fetchAdminCalendarEntries(adminCalYear, adminCalMonth).then(e => { adminCalEntries = e; renderAdminCalendar(); });
+function teamCalNav(dir) {
+  teamCalMonth += dir;
+  if (teamCalMonth > 11) { teamCalMonth = 0; teamCalYear++; }
+  if (teamCalMonth < 0)  { teamCalMonth = 11; teamCalYear--; }
+  fetchTeamCalEntries(teamCalYear, teamCalMonth).then(e => { teamCalEntries = e; paintTeamCal(); });
 }
 
-function renderAdminCalendar() {
-  const label = new Date(adminCalYear, adminCalMonth, 1).toLocaleDateString('en-AU', { month:'long', year:'numeric' });
-  document.getElementById('admin-cal-month-label').textContent = label;
-  const firstDay = new Date(adminCalYear, adminCalMonth, 1).getDay();
-  const daysInMonth = new Date(adminCalYear, adminCalMonth+1, 0).getDate();
-  const todayStr = toYMD(new Date());
+function paintTeamCal() {
+  const label = new Date(teamCalYear, teamCalMonth, 1).toLocaleDateString('en-AU', { month:'long', year:'numeric' });
+  document.getElementById('teamcal-month-label').textContent = label;
+  const firstDay    = new Date(teamCalYear, teamCalMonth, 1).getDay();
+  const daysInMonth = new Date(teamCalYear, teamCalMonth+1, 0).getDate();
+  const todayStr    = toYMD(new Date());
+
   const entryMap = {};
-  adminCalEntries.forEach(e => { if (!entryMap[e.date]) entryMap[e.date] = []; entryMap[e.date].push(e); });
+  teamCalEntries.forEach(e => { if (!entryMap[e.date]) entryMap[e.date] = []; entryMap[e.date].push(e); });
 
   let html = '';
   for (let i = 0; i < firstDay; i++) html += '<div class="cal-cell cal-cell-empty"></div>';
   for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${adminCalYear}-${String(adminCalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const isToday    = dateStr === todayStr;
-    const isSelected = dateStr === adminCalSelectedDate;
+    const dateStr = `${teamCalYear}-${String(teamCalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday  = dateStr === todayStr;
     const dayEntries = entryMap[dateStr] || [];
-    const dots = [...new Set(dayEntries.map(e => e.userId))].slice(0,4)
-      .map(() => '<span class="cal-dot cal-dot-log"></span>').join('');
-    html += `<div class="cal-cell${isToday?' cal-today':''}${isSelected?' cal-selected':''}" onclick="selectAdminCalDay('${dateStr}')">
+    const memberSet  = [...new Set(dayEntries.map(e => e.userName))];
+    const dots = memberSet.slice(0, 4).map(() => '<span class="cal-dot cal-dot-log"></span>').join('');
+    const countBadge = dayEntries.length ? `<span class="cal-entry-count">${dayEntries.length}</span>` : '';
+    html += `<div class="cal-cell${isToday?' cal-today':''}${dayEntries.length?' cal-has-entries':''}" onclick="openTeamCalDay('${dateStr}')">
       <span class="cal-day-num">${d}</span>
-      <div class="cal-dots">${dots}</div>
+      <div class="cal-dots">${dots}${countBadge}</div>
     </div>`;
   }
-  document.getElementById('admin-cal-grid').innerHTML = html;
+  document.getElementById('teamcal-grid').innerHTML = html;
+
+  const total = teamCalEntries.length;
+  document.getElementById('teamcal-subtitle').textContent = `${total} entr${total === 1 ? 'y' : 'ies'} this month`;
 }
 
-function selectAdminCalDay(dateStr) {
-  adminCalSelectedDate = dateStr;
-  renderAdminCalendar();
-  const titleEl   = document.getElementById('admin-cal-day-panel-title');
-  const entriesEl = document.getElementById('admin-cal-day-entries');
+function openTeamCalDay(dateStr) {
+  const dayEntries = teamCalEntries.filter(e => e.date === dateStr);
   const d = new Date(dateStr + 'T00:00:00');
-  titleEl.textContent = d.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long' });
-  const dayEntries = adminCalEntries.filter(e => e.date === dateStr);
-  if (!dayEntries.length) { entriesEl.innerHTML = '<div class="cal-no-entries">No team entries for this day.</div>'; return; }
-  entriesEl.innerHTML = dayEntries.map(e => `
-    <div class="cal-entry-item">
-      <span class="cal-entry-author">${escHtml(e.userName)}</span>
-      <div class="cal-entry-text">${escHtml(e.text)}</div>
-    </div>`).join('');
+  const title = d.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  document.getElementById('teamcal-popup-title').textContent = title;
+  document.getElementById('teamcal-popup-count').textContent =
+    dayEntries.length ? `${dayEntries.length} entr${dayEntries.length === 1 ? 'y' : 'ies'}` : 'No entries';
+
+  if (!dayEntries.length) {
+    document.getElementById('teamcal-popup-entries').innerHTML =
+      '<div class="cal-no-entries">No team entries logged for this day.</div>';
+  } else {
+    // Group by team member
+    const byMember = {};
+    dayEntries.forEach(e => {
+      if (!byMember[e.userName]) byMember[e.userName] = [];
+      byMember[e.userName].push(e);
+    });
+    document.getElementById('teamcal-popup-entries').innerHTML = Object.entries(byMember).map(([name, entries]) => `
+      <div class="teamcal-member-group">
+        <div class="teamcal-member-name">${escHtml(name)}</div>
+        ${entries.map(e => `
+          <div class="cal-entry-item" style="margin-left:0">
+            <div class="cal-entry-text">${escHtml(e.text)}</div>
+            <span style="font-size:10.5px;color:var(--text3)">${fmtTs(e.createdAt)}</span>
+          </div>`).join('')}
+      </div>`).join('');
+  }
+  document.getElementById('teamcal-popup').classList.remove('hidden');
 }
 
 /* ── Charts ───────────────────────────────────────────────────────────────── */
@@ -1619,16 +1665,83 @@ function renderChecklist(wk) {
 
   document.getElementById('checklist-section-gathr').style.display = '';
   const fields = (modalChecklistData[wk] || {}).fields || {};
+  const notes  = (modalClient?.checklistNotes?.[wk]) || {};
 
   document.getElementById('cl-gathr').innerHTML = def.items.map(({ id, label }) => {
-    const done = !!fields[id];
-    return `<div class="checklist-item" onclick="toggleCheck(${wk},'${id.replace(/'/g,"\\'")}',${!done})">
-      <div class="check-box ${done ? 'checked' : ''}">
-        <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
+    const done    = !!fields[id];
+    const noteObj = notes[id] || {};
+    const noteText = noteObj.note || '';
+    const noteStatus = noteObj.status || 'pending';
+    const safeId   = id.replace(/'/g,"\\'");
+    const statusColors = { pending: '#7A6E62', 'in-progress': '#F0813A', done: '#5AA872', blocked: '#ef4444' };
+    const statusLabels = { pending: 'Pending', 'in-progress': 'In Progress', done: 'Done', blocked: 'Blocked' };
+    return `<div class="checklist-item-wrap">
+      <div class="checklist-item" onclick="toggleCheck(${wk},'${safeId}',${!done})">
+        <div class="check-box ${done ? 'checked' : ''}">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
+        </div>
+        <span class="check-label ${done ? 'done' : ''}">${label}</span>
+        <button class="cl-note-btn" onclick="event.stopPropagation();toggleChecklistNote('${safeId}',${wk})" title="Add note">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          ${noteText ? '<span class="cl-note-dot"></span>' : ''}
+        </button>
       </div>
-      <span class="check-label ${done ? 'done' : ''}">${label}</span>
+      <div class="cl-note-area hidden" id="cl-note-${wk}-${id}">
+        <div class="cl-note-status-row">
+          ${['pending','in-progress','done','blocked'].map(s => `
+            <button class="cl-status-btn ${noteStatus===s?'active':''}" style="${noteStatus===s?`background:${statusColors[s]}20;color:${statusColors[s]};border-color:${statusColors[s]}`:''}"
+              onclick="setChecklistStatus('${safeId}',${wk},'${s}')">${statusLabels[s]}</button>`).join('')}
+        </div>
+        <textarea class="cl-note-textarea" id="cl-note-text-${wk}-${id}" placeholder="Add details, blockers, context…" rows="2">${escHtml(noteText)}</textarea>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+          <button class="btn-view" style="font-size:11px;padding:4px 10px" onclick="saveChecklistNote('${safeId}',${wk})">Save Note</button>
+          <span class="cl-note-msg" id="cl-note-msg-${wk}-${id}" style="font-size:11px;color:var(--green)"></span>
+        </div>
+      </div>
     </div>`;
   }).join('');
+}
+
+function toggleChecklistNote(itemId, wk) {
+  const area = document.getElementById(`cl-note-${wk}-${itemId}`);
+  if (area) area.classList.toggle('hidden');
+}
+
+async function setChecklistStatus(itemId, wk, status) {
+  const noteEl = document.getElementById(`cl-note-text-${wk}-${itemId}`);
+  const note   = noteEl?.value || '';
+  await saveChecklistNoteData(itemId, wk, note, status);
+}
+
+async function saveChecklistNote(itemId, wk) {
+  const noteEl = document.getElementById(`cl-note-text-${wk}-${itemId}`);
+  const note   = noteEl?.value || '';
+  const existing = (modalClient?.checklistNotes?.[wk]?.[itemId]) || {};
+  await saveChecklistNoteData(itemId, wk, note, existing.status || 'pending');
+}
+
+async function saveChecklistNoteData(itemId, wk, note, status) {
+  const msgEl = document.getElementById(`cl-note-msg-${wk}-${itemId}`);
+  if (msgEl) msgEl.textContent = 'Saving…';
+  try {
+    const res = await fetch(`/api/checklist-notes/${modalClient.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ week: wk, itemId, note, status }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      modalClient.checklistNotes = data.checklistNotes;
+      // Update client in global list
+      const idx = clients.findIndex(x => x.id === modalClient.id);
+      if (idx !== -1) clients[idx].checklistNotes = data.checklistNotes;
+      if (msgEl) { msgEl.textContent = '✓ Saved'; setTimeout(() => { if (msgEl) msgEl.textContent = ''; }, 2000); }
+      renderChecklist(wk);
+    }
+  } catch (e) {
+    if (msgEl) msgEl.textContent = 'Error';
+    console.error(e);
+  }
 }
 
 async function toggleCheck(week, field, newValue) {

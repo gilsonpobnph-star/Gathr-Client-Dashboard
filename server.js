@@ -286,6 +286,7 @@ function shapeClient(c) {
     oldProgramChecklist:c.oldProgramChecklist|| {},
     checklists:         c.checklists         || {},
     addonChecklists:    c.addonChecklists    || {},
+    checklistNotes:     c.checklistNotes     || {},
     createdAt:          c.createdAt          || new Date().toISOString(),
   };
 }
@@ -525,6 +526,26 @@ app.put('/api/local/:clientId', requireAuth, (req, res) => {
   store.clients[req.params.clientId] = client;
   writeStore(store);
   res.json({ activityLog: client.activityLog || [], oldProgramChecklist: client.oldProgramChecklist || {} });
+});
+
+// ── Checklist Notes ───────────────────────────────────────────────────────────
+app.patch('/api/checklist-notes/:clientId', requireAuth, (req, res) => {
+  const { week, itemId, note, status } = req.body;
+  if (!week || !itemId) return res.status(400).json({ error: 'week and itemId required' });
+  const store  = readStore();
+  const client = store.clients?.[req.params.clientId];
+  if (!client) return res.status(404).json({ error: 'Not found' });
+  client.checklistNotes = client.checklistNotes || {};
+  client.checklistNotes[week] = client.checklistNotes[week] || {};
+  client.checklistNotes[week][itemId] = {
+    note:      note      || '',
+    status:    status    || 'pending',
+    updatedAt: new Date().toISOString(),
+    author:    req.session.name || 'Team',
+  };
+  store.clients[req.params.clientId] = client;
+  writeStore(store);
+  res.json({ checklistNotes: client.checklistNotes });
 });
 
 // ── Checklists (local) ────────────────────────────────────────────────────────
