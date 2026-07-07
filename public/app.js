@@ -1032,16 +1032,35 @@ function renderClients() {
   empty.classList.add('hidden');
 
   tbody.innerHTML = list.map(c => {
-    const dur   = progDuration(c.program);
-    const week  = Math.min(c.currentWeek || 1, dur);
-    const pct   = Math.round((week / dur) * 100);
-    const color = progColor(c.program);
     const cid   = c.id;
+    const progs = c.programs?.length ? c.programs : (c.program ? [c.program] : []);
 
     const statusOpts = ['New','Onboarding','Active','On New Program','Completed','Alumni','Closed']
       .map(s => `<option value="${s}" ${c.status===s?'selected':''}>${s}</option>`).join('');
     const teamOpts = (sel) => `<option value="">—</option>` +
       team.map(t => `<option value="${t}" ${sel===t?'selected':''}>${t}</option>`).join('');
+
+    const programBadges = progs.length
+      ? progs.map(p => { const pc = progColor(p); return `<span class="prog-badge" style="background:${pc}20;color:${pc};margin-right:3px">${p}</span>`; }).join('')
+      : '<span class="text-muted text-sm">—</span>';
+
+    const progressBars = progs.length
+      ? progs.map(p => {
+          const dur   = progDuration(p) || 1;
+          const week  = Math.min((c.programWeeks?.[p]) || (p === progs[0] ? c.currentWeek || 1 : 1), dur);
+          const pct   = Math.round((week / dur) * 100);
+          const color = progColor(p);
+          const ps    = (c.programStatuses?.[p]) || '';
+          const psLabel = ps ? `<span style="font-size:10px;color:var(--text3);margin-left:2px">${ps}</span>` : '';
+          return `<div class="week-progress" style="margin-bottom:3px">
+            <span class="week-label" style="min-width:38px">Wk ${week}/${dur}</span>
+            <div class="progress-bar-wrap" style="width:70px">
+              <div class="progress-bar-fill" style="width:${pct}%;background:${color}"></div>
+            </div>
+            ${psLabel}
+          </div>`;
+        }).join('')
+      : '<span class="text-muted text-sm">—</span>';
 
     return `<tr class="client-row" onclick="openModal('${cid}')">
       <td>
@@ -1050,22 +1069,8 @@ function renderClients() {
           <div><strong>${c.name}</strong><small>${c.businessName || c.email}</small></div>
         </div>
       </td>
-      <td>${(() => {
-        const progs = c.programs?.length ? c.programs : (c.program ? [c.program] : []);
-        if (!progs.length) return '<span class="text-muted text-sm">—</span>';
-        return progs.map(p => {
-          const pc = progColor(p);
-          return `<span class="prog-badge" style="background:${pc}20;color:${pc};margin-right:3px">${p}</span>`;
-        }).join('');
-      })()}</td>
-      <td style="min-width:140px">
-        <div class="week-progress">
-          <span class="week-label">Wk ${week}/${dur}</span>
-          <div class="progress-bar-wrap" style="width:80px">
-            <div class="progress-bar-fill" style="width:${pct}%;background:${color}"></div>
-          </div>
-        </div>
-      </td>
+      <td>${programBadges}</td>
+      <td style="min-width:150px">${progressBars}</td>
       <td onclick="event.stopPropagation()">
         <select class="tbl-select tbl-status" onchange="quickPatch('${cid}','status',this.value,this)">
           ${statusOpts}
