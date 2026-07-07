@@ -270,6 +270,7 @@ function showTab(tab) {
   else if (tab === 'team')       renderTeam();
   else if (tab === 'mydash')     renderMyDash();
   else if (tab === 'teamcal')    renderTeamCalendar();
+  else if (tab === 'activitylog') renderActivityLog();
 }
 
 /* ── Assignee filters ─────────────────────────────────────────────────────── */
@@ -834,6 +835,122 @@ function openTeamCalDay(dateStr) {
     </div>`).join('');
 }
 
+/* ── Activity Log ─────────────────────────────────────────────────────────── */
+let actlogData = [];
+let actlogUserFilter = '';
+let actlogActionFilter = '';
+
+async function renderActivityLog() {
+  const listEl = document.getElementById('actlog-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<div class="note-empty">Loading…</div>';
+
+  try {
+    const res = await fetch('/api/activity');
+    actlogData = res.ok ? await res.json() : [];
+  } catch { actlogData = []; }
+
+  // Populate user filter
+  const userSel = document.getElementById('actlog-filter-user');
+  const seen = new Set();
+  actlogData.forEach(e => {
+    if (!seen.has(e.userId)) {
+      seen.add(e.userId);
+      if (!userSel.querySelector(`option[value="${e.userId}"]`)) {
+        const opt = document.createElement('option');
+        opt.value = e.userId; opt.textContent = e.userName;
+        userSel.appendChild(opt);
+      }
+    }
+  });
+
+  userSel.onchange = () => { actlogUserFilter = userSel.value; paintActivityLog(); };
+  document.getElementById('actlog-filter-action').onchange = function() { actlogActionFilter = this.value; paintActivityLog(); };
+
+  paintActivityLog();
+}
+
+function paintActivityLog() {
+  const listEl = document.getElementById('actlog-list');
+  let data = actlogData;
+  if (actlogUserFilter)   data = data.filter(e => e.userId === actlogUserFilter);
+  if (actlogActionFilter) data = data.filter(e => e.action.includes(actlogActionFilter));
+
+  document.getElementById('actlog-subtitle').textContent = `${data.length} event${data.length !== 1 ? 's' : ''} logged`;
+
+  if (!data.length) { listEl.innerHTML = '<div class="note-empty">No activity logged yet.</div>'; return; }
+
+  const ACTION_ICON = {
+    'Client created': '🟢', 'Client updated': '✏️', 'Client deleted': '🗑️',
+    'Task checked': '✅', 'Task unchecked': '⬜', 'Task note saved': '📝',
+    'Add-on task checked': '✅', 'Add-on task unchecked': '⬜', 'Add-on task note saved': '📝',
+    'Note added': '💬', 'Calendar entry added': '📅',
+    'Team member added': '👤', 'Team member removed': '❌', 'Team role changed': '🔄',
+  };
+
+  listEl.innerHTML = data.map(e => `
+    <div class="actlog-row" ${e.clientId ? `onclick="openClientById('${e.clientId}')" style="cursor:pointer"` : ''}>
+      <div class="actlog-icon">${ACTION_ICON[e.action] || '📋'}</div>
+      <div class="actlog-body">
+        <div class="actlog-top">
+          <span class="actlog-action">${escHtml(e.action)}</span>
+          ${e.clientName ? `<span class="actlog-client">· ${escHtml(e.clientName)}</span>` : ''}
+          <span class="actlog-time">${fmtTs(e.ts)}</span>
+        </div>
+        <div class="actlog-who">by <strong>${escHtml(e.userName)}</strong></div>
+        ${e.details ? `<div class="actlog-details">${escHtml(e.details)}</div>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+function renderClientActivityLog(clientId) {
+  const el = document.getElementById('client-actlog-list');
+  if (!el) return;
+  const log = (clients.find(c => c.id === clientId)?.activityLog) || [];
+  if (!log.length) { el.innerHTML = '<div class="note-empty">No activity logged yet.</div>'; return; }
+  const ACTION_ICON = {
+    'Client created': '🟢', 'Client updated': '✏️', 'Task checked': '✅',
+    'Task unchecked': '⬜', 'Task note saved': '📝', 'Add-on task checked': '✅',
+    'Add-on task unchecked': '⬜', 'Add-on task note saved': '📝', 'Note added': '💬',
+  };
+  el.innerHTML = log.map(e => `
+    <div class="actlog-row">
+      <div class="actlog-icon">${ACTION_ICON[e.action] || '📋'}</div>
+      <div class="actlog-body">
+        <div class="actlog-top">
+          <span class="actlog-action">${escHtml(e.action)}</span>
+          <span class="actlog-time">${fmtTs(e.ts)}</span>
+        </div>
+        <div class="actlog-who">by <strong>${escHtml(e.userName)}</strong></div>
+        ${e.details ? `<div class="actlog-details">${escHtml(e.details)}</div>` : ''}
+      </div>
+    </div>`).join('');
+}
+
+async function renderUserActivityLog(userId, containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  el.innerHTML = '<div class="note-empty">Loading…</div>';
+  try {
+    const res = await fetch(`/api/activity/user/${userId}`);
+    const log = res.ok ? await res.json() : [];
+    if (!log.length) { el.innerHTML = '<div class="note-empty">No activity yet.</div>'; return; }
+    const ACTION_ICON = { 'Client created':'🟢','Client updated':'✏️','Task checked':'✅','Task unchecked':'⬜','Task note saved':'📝','Add-on task checked':'✅','Add-on task unchecked':'⬜','Add-on task note saved':'📝','Note added':'💬','Calendar entry added':'📅','Team member added':'👤','Team member removed':'❌','Team role changed':'🔄' };
+    el.innerHTML = log.map(e => `
+      <div class="actlog-row" ${e.clientId ? `onclick="openClientById('${e.clientId}')" style="cursor:pointer"` : ''}>
+        <div class="actlog-icon">${ACTION_ICON[e.action] || '📋'}</div>
+        <div class="actlog-body">
+          <div class="actlog-top">
+            <span class="actlog-action">${escHtml(e.action)}</span>
+            ${e.clientName ? `<span class="actlog-client">· ${escHtml(e.clientName)}</span>` : ''}
+            <span class="actlog-time">${fmtTs(e.ts)}</span>
+          </div>
+          ${e.details ? `<div class="actlog-details">${escHtml(e.details)}</div>` : ''}
+        </div>
+      </div>`).join('');
+  } catch { el.innerHTML = '<div class="note-empty">Could not load.</div>'; }
+}
+
 /* ── Charts ───────────────────────────────────────────────────────────────── */
 function renderChart(id, type, data) {
   if (charts[id]) charts[id].destroy();
@@ -1311,6 +1428,11 @@ function renderIntakes() {
 }
 
 /* ── Modal ────────────────────────────────────────────────────────────────── */
+function openClientById(id) {
+  showTab('clients');
+  setTimeout(() => openModal(id), 100);
+}
+
 function openModal(id) {
   modalClient = clients.find(c => c.id === id);
   if (!modalClient) return;
@@ -1383,8 +1505,10 @@ function populateModal() {
   // Notes log
   renderNotesLog(c.notesLog || []);
 
-  // Activity log (local store only)
+  // Legacy manual activity feed (kept for backward compat)
   renderActivityFeed((localStore[c.id] || {}).activityLog || []);
+  // Auto-tracked activity log from server
+  renderClientActivityLog(c.id);
 
   document.getElementById('modal-save-msg').textContent = '';
   document.getElementById('cm-note-msg').textContent    = '';
@@ -1679,7 +1803,7 @@ function renderChecklist(wk) {
     const statusColors = { pending: '#7A6E62', 'in-progress': '#F0813A', done: '#5AA872', blocked: '#ef4444' };
     const statusLabels = { pending: 'Pending', 'in-progress': 'In Progress', done: 'Done', blocked: 'Blocked' };
     return `<div class="checklist-item-wrap">
-      <div class="checklist-item" onclick="toggleCheck(${wk},'${safeId}',${!done})">
+      <div class="checklist-item" onclick="toggleCheck(${wk},'${safeId}',${!done},'${label.replace(/'/g,"\\'")}')">
         <div class="check-box ${done ? 'checked' : ''}">
           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
         </div>
@@ -1747,7 +1871,7 @@ async function saveChecklistNoteData(itemId, wk, note, status) {
   }
 }
 
-async function toggleCheck(week, field, newValue) {
+async function toggleCheck(week, field, newValue, label) {
   const data = modalChecklistData[week] || {};
   data.fields = data.fields || {};
   data.recordId = data.recordId || modalClient?.id;
@@ -1760,7 +1884,7 @@ async function toggleCheck(week, field, newValue) {
     const res = await fetch(`/api/checklist/${week}/${modalClient.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ field, value: newValue }),
+      body: JSON.stringify({ field, value: newValue, label: label || field }),
     });
     const updated = await res.json();
     if (updated.fields) { modalChecklistData[week].fields = updated.fields; renderChecklist(week); }
@@ -2044,12 +2168,19 @@ async function renderUsers() {
           </select>
         </td>
         <td class="text-sm text-muted">${fmtDate(u.createdAt)}</td>
-        <td style="display:flex;gap:6px;align-items:center">
+        <td style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button class="btn-view" style="padding:4px 10px;font-size:11px" onclick="openUserActivityPanel('${u.id}','${escHtml(u.name)}')">Activity</button>
           <button class="btn-view" style="padding:4px 10px;font-size:11px" onclick="showResetPassword('${u.id}','${escHtml(u.name)}')">Reset PW</button>
           <button class="btn-danger" style="padding:4px 10px;font-size:11px" onclick="removeUser('${u.id}','${escHtml(u.name)}')">Remove</button>
         </td>
       </tr>`).join('');
   } catch { tbody.innerHTML = ''; }
+}
+
+function openUserActivityPanel(userId, userName) {
+  document.getElementById('user-actlog-name').textContent = userName + '\'s Activity';
+  document.getElementById('user-actlog-modal').classList.remove('hidden');
+  renderUserActivityLog(userId, 'user-actlog-list');
 }
 
 async function setUserTeamRole(id, teamRole) {
@@ -2220,7 +2351,7 @@ function renderAddonChecklists(c) {
       const noteStatus = noteObj.status || 'pending';
       const safeId     = d.id.replace(/'/g,"\\'");
       return `<div class="checklist-item-wrap">
-        <div class="checklist-item" onclick="toggleAddonCheck('${safeAddon}','${safeId}',${!isChecked})">
+        <div class="checklist-item" onclick="toggleAddonCheck('${safeAddon}','${safeId}',${!isChecked},'${d.label.replace(/'/g,"\\'")}')">
           <div class="check-box ${isChecked ? 'checked' : ''}">
             <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
           </div>
@@ -2298,12 +2429,12 @@ async function saveAddonNoteData(addonName, itemId, note, status) {
   }
 }
 
-async function toggleAddonCheck(addonName, itemId, value) {
+async function toggleAddonCheck(addonName, itemId, value, label) {
   if (!modalClient) return;
   const res = await fetch(`/api/addon-checklist/${modalClient.id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ addonName, itemId, value }),
+    body: JSON.stringify({ addonName, itemId, value, label: label || itemId }),
   });
   if (res.ok) {
     const data = await res.json();

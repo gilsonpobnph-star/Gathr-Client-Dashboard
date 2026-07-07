@@ -303,6 +303,31 @@ function parseNotesLog(val) {
   }
 }
 
+// ── Activity Logging ──────────────────────────────────────────────────────────
+function logActivity(store, req, action, { clientId, clientName, details } = {}) {
+  store.activityLog = store.activityLog || [];
+  const entry = {
+    id:         'al_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+    ts:         new Date().toISOString(),
+    userId:     req.session.userId || 'admin',
+    userName:   req.session.name   || 'Admin',
+    action,
+    clientId:   clientId   || null,
+    clientName: clientName || null,
+    details:    details    || null,
+  };
+  store.activityLog.unshift(entry);
+  if (store.activityLog.length > 3000) store.activityLog = store.activityLog.slice(0, 3000);
+  // Also push to per-client log
+  if (clientId && store.clients?.[clientId]) {
+    const c = store.clients[clientId];
+    c.activityLog = c.activityLog || [];
+    c.activityLog.unshift(entry);
+    if (c.activityLog.length > 500) c.activityLog = c.activityLog.slice(0, 500);
+  }
+  return entry;
+}
+
 // ── Auth ──────────────────────────────────────────────────────────────────────
 function requireAuth(req, res, next) {
   if (req.session.authenticated) return next();
@@ -386,7 +411,9 @@ app.put('/api/users/:id/teamrole', requireAdmin, (req, res) => {
   if (!['lead', 'tech', 'admin'].includes(teamRole)) return res.status(400).json({ error: 'Invalid role' });
   const store = readStore();
   if (!store.users?.[req.params.id]) return res.status(404).json({ error: 'User not found' });
-  store.users[req.params.id].teamRole = teamRole;
+  const u = store.users[req.params.id];
+  logActivity(store, req, 'Team role changed', { details: `${u.name}: ${u.teamRole || 'lead'} → ${teamRole}` });
+  u.teamRole = teamRole;
   writeStore(store);
   res.json({ ok: true });
 });
@@ -440,6 +467,7 @@ app.post('/api/team', requireAuth, (req, res) => {
     return res.status(409).json({ error: 'Team member already exists' });
   const member = { id: 'tm_' + Date.now(), name: name.trim(), email: email?.trim() || '', role: role || 'lead', createdAt: new Date().toISOString() };
   store.team.push(member);
+  logActivity(store, req, 'Team member added', { details: `${member.name} as ${member.role}` });
   writeStore(store);
   res.json(member);
 });
@@ -457,7 +485,9 @@ app.put('/api/team/:id', requireAuth, (req, res) => {
 app.delete('/api/team/:id', requireAuth, (req, res) => {
   const store = readStore();
   ensureTeam(store);
+  const member = store.team.find(m => m.id === req.params.id);
   store.team = store.team.filter(m => m.id !== req.params.id);
+  if (member) logActivity(store, req, 'Team member removed', { details: member.name });
   writeStore(store);
   res.json({ ok: true });
 });
@@ -479,6 +509,7 @@ app.post('/api/clients', requireAuth, (req, res) => {
   const client = shapeClient({ ...req.body, id: genId(), createdAt: new Date().toISOString() });
   store.clients         = store.clients || {};
   store.clients[client.id] = client;
+  logActivity(store, req, 'Client created', { clientId: client.id, clientName: client.name, details: `Program: ${client.program || '—'}` });
   writeStore(store);
   res.json(client);
 });
@@ -487,15 +518,24 @@ app.put('/api/clients/:id', requireAuth, (req, res) => {
   const store    = readStore();
   const existing = store.clients?.[req.params.id];
   if (!existing) return res.status(404).json({ error: 'Client not found' });
+  const changes = [];
+  const fields = { name:'Name', program:'Program', leadCoach:'Lead Coach', techSupport:'Tech', status:'Status', currentWeek:'Week', addOns:'Add-ons' };
+  for (const [key, label] of Object.entries(fields)) {
+    if (req.body[key] !== undefined && String(req.body[key]) !== String(existing[key] || ''))
+      changes.push(`${label}: "${existing[key] || '—'}" → "${req.body[key]}"`);
+  }
   const updated  = shapeClient({ ...existing, ...req.body, id: req.params.id });
   store.clients[req.params.id] = updated;
+  if (changes.length) logActivity(store, req, 'Client updated', { clientId: req.params.id, clientName: updated.name, details: changes.join(' | ') });
   writeStore(store);
   res.json(updated);
 });
 
 app.delete('/api/clients/:id', requireAuth, (req, res) => {
   const store = readStore();
-  if (!store.clients?.[req.params.id]) return res.status(404).json({ error: 'Not found' });
+  const client = store.clients?.[req.params.id];
+  if (!client) return res.status(404).json({ error: 'Not found' });
+  logActivity(store, req, 'Client deleted', { clientName: client.name, details: `Program: ${client.program || '—'}` });
   delete store.clients[req.params.id];
   writeStore(store);
   res.json({ ok: true });
@@ -514,6 +554,7 @@ app.post('/api/clients/:id/notes', requireAuth, (req, res) => {
     ts:     new Date().toISOString(),
   }];
   store.clients[req.params.id] = client;
+  logActivity(store, req, 'Note added', { clientId: req.params.id, clientName: client.name, details: text.trim().slice(0, 120) });
   writeStore(store);
   res.json(shapeClient(client));
 });
@@ -561,6 +602,7 @@ app.patch('/api/checklist-notes/:clientId', requireAuth, (req, res) => {
     author:    req.session.name || 'Team',
   };
   store.clients[req.params.clientId] = client;
+  logActivity(store, req, 'Task note saved', { clientId: req.params.clientId, clientName: client.name, details: `Week ${week} · ${itemId} · ${status || 'pending'}${note ? ': ' + note.slice(0,80) : ''}` });
   writeStore(store);
   res.json({ checklistNotes: client.checklistNotes });
 });
@@ -577,7 +619,7 @@ app.get('/api/clients/:id/checklist/:week', requireAuth, (req, res) => {
 });
 
 app.patch('/api/checklist/:week/:clientId', requireAuth, (req, res) => {
-  const { field, value } = req.body;
+  const { field, value, label } = req.body;
   const week   = parseInt(req.params.week);
   const store  = readStore();
   const client = store.clients?.[req.params.clientId];
@@ -586,6 +628,7 @@ app.patch('/api/checklist/:week/:clientId', requireAuth, (req, res) => {
   client.checklists[week]   = client.checklists[week] || {};
   client.checklists[week][field] = !!value;
   store.clients[req.params.clientId] = client;
+  logActivity(store, req, value ? 'Task checked' : 'Task unchecked', { clientId: req.params.clientId, clientName: client.name, details: `Week ${week} — ${label || field}` });
   writeStore(store);
   res.json({ fields: client.checklists[week], recordId: req.params.clientId });
 });
@@ -655,12 +698,13 @@ app.patch('/api/addon-checklist-notes/:clientId', requireAuth, (req, res) => {
     author:    req.session.name || 'Team',
   };
   store.clients[req.params.clientId] = client;
+  logActivity(store, req, 'Add-on task note saved', { clientId: req.params.clientId, clientName: client.name, details: `${addonName} · ${itemId} · ${status || 'pending'}${note ? ': ' + note.slice(0,80) : ''}` });
   writeStore(store);
   res.json({ addonChecklistNotes: client.addonChecklistNotes });
 });
 
 app.patch('/api/addon-checklist/:clientId', requireAuth, (req, res) => {
-  const { addonName, itemId, value } = req.body;
+  const { addonName, itemId, value, label } = req.body;
   const store  = readStore();
   const client = store.clients?.[req.params.clientId];
   if (!client) return res.status(404).json({ error: 'Not found' });
@@ -668,6 +712,7 @@ app.patch('/api/addon-checklist/:clientId', requireAuth, (req, res) => {
   client.addonChecklists[addonName] = client.addonChecklists[addonName] || {};
   client.addonChecklists[addonName][itemId] = !!value;
   store.clients[req.params.clientId] = client;
+  logActivity(store, req, value ? 'Add-on task checked' : 'Add-on task unchecked', { clientId: req.params.clientId, clientName: client.name, details: `${addonName} — ${label || itemId}` });
   writeStore(store);
   res.json({ addonChecklists: client.addonChecklists });
 });
@@ -768,6 +813,7 @@ app.post('/api/calendar', requireAuth, (req, res) => {
     createdAt: new Date().toISOString(),
   };
   store.calendarEntries[id] = entry;
+  logActivity(store, req, 'Calendar entry added', { details: `${date}: ${text.trim().slice(0,100)}` });
   writeStore(store);
   res.json(entry);
 });
@@ -781,6 +827,26 @@ app.delete('/api/calendar/:id', requireAuth, (req, res) => {
   delete store.calendarEntries[req.params.id];
   writeStore(store);
   res.json({ ok: true });
+});
+
+// ── Activity Log ─────────────────────────────────────────────────────────────
+app.get('/api/activity', requireAuth, (req, res) => {
+  const store = readStore();
+  const log = (store.activityLog || []).slice(0, 500);
+  res.json(log);
+});
+
+app.get('/api/activity/user/:userId', requireAuth, (req, res) => {
+  const store = readStore();
+  const log = (store.activityLog || []).filter(e => e.userId === req.params.userId).slice(0, 300);
+  res.json(log);
+});
+
+app.get('/api/activity/client/:clientId', requireAuth, (req, res) => {
+  const store  = readStore();
+  const client = store.clients?.[req.params.clientId];
+  if (!client) return res.json([]);
+  res.json((client.activityLog || []).slice(0, 300));
 });
 
 // ── Backup & Restore ──────────────────────────────────────────────────────────
