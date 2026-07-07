@@ -287,6 +287,7 @@ function shapeClient(c) {
     checklists:         c.checklists         || {},
     addonChecklists:    c.addonChecklists    || {},
     checklistNotes:     c.checklistNotes     || {},
+    addonChecklistNotes: c.addonChecklistNotes || {},
     createdAt:          c.createdAt          || new Date().toISOString(),
   };
 }
@@ -380,6 +381,16 @@ app.put('/api/users/:id/role', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+app.put('/api/users/:id/teamrole', requireAdmin, (req, res) => {
+  const { teamRole } = req.body;
+  if (!['lead', 'tech', 'admin'].includes(teamRole)) return res.status(400).json({ error: 'Invalid role' });
+  const store = readStore();
+  if (!store.users?.[req.params.id]) return res.status(404).json({ error: 'User not found' });
+  store.users[req.params.id].teamRole = teamRole;
+  writeStore(store);
+  res.json({ ok: true });
+});
+
 app.put('/api/users/:id/password', requireAdmin, (req, res) => {
   const { password } = req.body;
   if (!password?.trim()) return res.status(400).json({ error: 'Password required' });
@@ -402,16 +413,22 @@ app.delete('/api/users/:id', requireAdmin, (req, res) => {
 app.get('/api/team', requireAuth, (req, res) => {
   const store = readStore();
   ensureTeam(store);
-  // Sync any registered users who aren't already in store.team
-  const users = Object.values(store.users || {});
-  for (const u of users) {
-    const alreadyIn = store.team.some(m => m.email && m.email.toLowerCase() === u.email.toLowerCase());
-    if (!alreadyIn) {
-      store.team.push({ id: 'tm_u_' + u.id, name: u.name, email: u.email, role: 'lead', createdAt: u.createdAt });
-    }
-  }
-  writeStore(store);
-  res.json(store.team || []);
+
+  // Remove any previously auto-synced duplicates (tm_u_ entries)
+  const userEmails = new Set(Object.values(store.users || {}).map(u => u.email.toLowerCase()));
+  const before = store.team.length;
+  store.team = store.team.filter(m => !m.id.startsWith('tm_u_'));
+  if (store.team.length !== before) writeStore(store); // save cleanup once
+
+  // Registered users appear in dropdowns via their teamRole field
+  const registeredTeam = Object.values(store.users || {}).map(u => ({
+    id: u.id, name: u.name, email: u.email,
+    role: u.teamRole || 'lead',
+    createdAt: u.createdAt, isRegistered: true,
+  }));
+  // Manual roster only — exclude any manually added entries that duplicate a registered email
+  const manualOnly = store.team.filter(m => !m.email || !userEmails.has(m.email.toLowerCase()));
+  res.json([...registeredTeam, ...manualOnly]);
 });
 
 app.post('/api/team', requireAuth, (req, res) => {
@@ -621,6 +638,25 @@ app.delete('/api/addons/:id', requireAuth, (req, res) => {
   delete store.addons[id];
   writeStore(store);
   res.json({ ok: true });
+});
+
+app.patch('/api/addon-checklist-notes/:clientId', requireAuth, (req, res) => {
+  const { addonName, itemId, note, status } = req.body;
+  if (!addonName || !itemId) return res.status(400).json({ error: 'addonName and itemId required' });
+  const store  = readStore();
+  const client = store.clients?.[req.params.clientId];
+  if (!client) return res.status(404).json({ error: 'Not found' });
+  client.addonChecklistNotes = client.addonChecklistNotes || {};
+  client.addonChecklistNotes[addonName] = client.addonChecklistNotes[addonName] || {};
+  client.addonChecklistNotes[addonName][itemId] = {
+    note:      note   || '',
+    status:    status || 'pending',
+    updatedAt: new Date().toISOString(),
+    author:    req.session.name || 'Team',
+  };
+  store.clients[req.params.clientId] = client;
+  writeStore(store);
+  res.json({ addonChecklistNotes: client.addonChecklistNotes });
 });
 
 app.patch('/api/addon-checklist/:clientId', requireAuth, (req, res) => {

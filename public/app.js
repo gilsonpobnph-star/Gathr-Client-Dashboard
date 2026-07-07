@@ -784,12 +784,13 @@ function paintTeamCal() {
   for (let i = 0; i < firstDay; i++) html += '<div class="cal-cell cal-cell-empty"></div>';
   for (let d = 1; d <= daysInMonth; d++) {
     const dateStr = `${teamCalYear}-${String(teamCalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const isToday  = dateStr === todayStr;
+    const isToday    = dateStr === todayStr;
+    const isSelected = dateStr === teamCalSelectedDate;
     const dayEntries = entryMap[dateStr] || [];
     const memberSet  = [...new Set(dayEntries.map(e => e.userName))];
     const dots = memberSet.slice(0, 4).map(() => '<span class="cal-dot cal-dot-log"></span>').join('');
     const countBadge = dayEntries.length ? `<span class="cal-entry-count">${dayEntries.length}</span>` : '';
-    html += `<div class="cal-cell${isToday?' cal-today':''}${dayEntries.length?' cal-has-entries':''}" onclick="openTeamCalDay('${dateStr}')">
+    html += `<div class="cal-cell${isToday?' cal-today':''}${isSelected?' cal-selected':''}${dayEntries.length?' cal-has-entries':''}" onclick="openTeamCalDay('${dateStr}')">
       <span class="cal-day-num">${d}</span>
       <div class="cal-dots">${dots}${countBadge}</div>
     </div>`;
@@ -800,35 +801,37 @@ function paintTeamCal() {
   document.getElementById('teamcal-subtitle').textContent = `${total} entr${total === 1 ? 'y' : 'ies'} this month`;
 }
 
+let teamCalSelectedDate = null;
+
 function openTeamCalDay(dateStr) {
+  teamCalSelectedDate = dateStr;
+  paintTeamCal(); // re-render to show selected state
   const dayEntries = teamCalEntries.filter(e => e.date === dateStr);
   const d = new Date(dateStr + 'T00:00:00');
   const title = d.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
-  document.getElementById('teamcal-popup-title').textContent = title;
-  document.getElementById('teamcal-popup-count').textContent =
-    dayEntries.length ? `${dayEntries.length} entr${dayEntries.length === 1 ? 'y' : 'ies'}` : 'No entries';
+  document.getElementById('teamcal-day-title').textContent = title;
+  document.getElementById('teamcal-day-count').textContent =
+    dayEntries.length ? `${dayEntries.length} entr${dayEntries.length === 1 ? 'y' : 'ies'} from ${[...new Set(dayEntries.map(e => e.userName))].length} team member${[...new Set(dayEntries.map(e => e.userName))].length === 1 ? '' : 's'}` : '';
 
+  const entriesEl = document.getElementById('teamcal-day-entries');
   if (!dayEntries.length) {
-    document.getElementById('teamcal-popup-entries').innerHTML =
-      '<div class="cal-no-entries">No team entries logged for this day.</div>';
-  } else {
-    // Group by team member
-    const byMember = {};
-    dayEntries.forEach(e => {
-      if (!byMember[e.userName]) byMember[e.userName] = [];
-      byMember[e.userName].push(e);
-    });
-    document.getElementById('teamcal-popup-entries').innerHTML = Object.entries(byMember).map(([name, entries]) => `
-      <div class="teamcal-member-group">
-        <div class="teamcal-member-name">${escHtml(name)}</div>
-        ${entries.map(e => `
-          <div class="cal-entry-item" style="margin-left:0">
-            <div class="cal-entry-text">${escHtml(e.text)}</div>
-            <span style="font-size:10.5px;color:var(--text3)">${fmtTs(e.createdAt)}</span>
-          </div>`).join('')}
-      </div>`).join('');
+    entriesEl.innerHTML = '<div class="cal-no-entries">No team entries logged for this day.</div>';
+    return;
   }
-  document.getElementById('teamcal-popup').classList.remove('hidden');
+  const byMember = {};
+  dayEntries.forEach(e => {
+    if (!byMember[e.userName]) byMember[e.userName] = [];
+    byMember[e.userName].push(e);
+  });
+  entriesEl.innerHTML = Object.entries(byMember).map(([name, entries]) => `
+    <div class="teamcal-member-group">
+      <div class="teamcal-member-name">${escHtml(name)}</div>
+      ${entries.map(e => `
+        <div class="teamcal-entry-row">
+          <div class="teamcal-entry-text">${escHtml(e.text)}</div>
+          <div class="teamcal-entry-time">${fmtTs(e.createdAt)}</div>
+        </div>`).join('')}
+    </div>`).join('');
 }
 
 /* ── Charts ───────────────────────────────────────────────────────────────── */
@@ -2020,8 +2023,6 @@ async function renderUsers() {
     const users = await res.json();
     if (!users.length) { tbody.innerHTML = ''; empty?.classList.remove('hidden'); return; }
     empty?.classList.add('hidden');
-    const roleBg = { admin: 'var(--accent-dim)', member: 'var(--blue-dim)' };
-    const roleColor = { admin: 'var(--accent2)', member: 'var(--blue)' };
     tbody.innerHTML = users.map(u => `
       <tr>
         <td><div class="name-cell">
@@ -2030,9 +2031,16 @@ async function renderUsers() {
         </div></td>
         <td class="text-sm text-muted">${escHtml(u.email)}</td>
         <td>
-          <select class="tbl-select" onchange="setUserRole('${u.id}',this.value)" style="max-width:110px">
+          <select class="tbl-select" onchange="setUserRole('${u.id}',this.value)" style="max-width:110px" title="App role">
             <option value="member" ${u.role==='member'?'selected':''}>Member</option>
             <option value="admin"  ${u.role==='admin'?'selected':''}>Admin</option>
+          </select>
+        </td>
+        <td>
+          <select class="tbl-select" onchange="setUserTeamRole('${u.id}',this.value)" style="max-width:130px" title="Dropdown role (Lead/Tech)">
+            <option value="lead"  ${(u.teamRole||'lead')==='lead'?'selected':''}>Lead Coach</option>
+            <option value="tech"  ${u.teamRole==='tech'?'selected':''}>Tech</option>
+            <option value="admin" ${u.teamRole==='admin'?'selected':''}>Admin</option>
           </select>
         </td>
         <td class="text-sm text-muted">${fmtDate(u.createdAt)}</td>
@@ -2042,6 +2050,15 @@ async function renderUsers() {
         </td>
       </tr>`).join('');
   } catch { tbody.innerHTML = ''; }
+}
+
+async function setUserTeamRole(id, teamRole) {
+  await fetch(`/api/users/${id}/teamrole`, { method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ teamRole }) });
+  const tRes = await fetch('/api/team');
+  const teamData = await tRes.json();
+  team = teamData.map(m => m.name);
+  window._teamFull = teamData;
+  populateAssigneeFilters();
 }
 
 function showResetPassword(id, name) {
@@ -2077,8 +2094,11 @@ async function removeUser(id, name) {
 }
 
 function renderTeam() {
-  const members = window._teamFull || [];
-  document.getElementById('team-subtitle').textContent = `${members.length} member${members.length !== 1 ? 's' : ''}`;
+  const allMembers = window._teamFull || [];
+  // Manual roster = entries without isRegistered flag
+  const members = allMembers.filter(m => !m.isRegistered);
+  const total = allMembers.length;
+  document.getElementById('team-subtitle').textContent = `${total} member${total !== 1 ? 's' : ''}`;
   const tbody = document.getElementById('team-tbody');
   const empty = document.getElementById('team-empty');
   renderUsers();
@@ -2181,20 +2201,49 @@ function renderAddonChecklists(c) {
   const activeAddons = (c.addOns || '').split(',').map(s => s.trim()).filter(Boolean);
   if (!activeAddons.length) { section.innerHTML = ''; return; }
 
+  const statusColors = { pending: '#7A6E62', 'in-progress': '#F0813A', done: '#5AA872', blocked: '#ef4444' };
+  const statusLabels = { pending: 'Pending', 'in-progress': 'In Progress', done: 'Done', blocked: 'Blocked' };
+
   section.innerHTML = activeAddons.map(addonName => {
     const addon = Object.values(addonsMap).find(a => a.name === addonName);
     if (!addon || !addon.deliverables?.length) return '';
     const checks = (c.addonChecklists?.[addonName]) || {};
+    const notes  = (c.addonChecklistNotes?.[addonName]) || {};
     const done  = addon.deliverables.filter(d => checks[d.id]).length;
     const total = addon.deliverables.length;
     const pct   = total ? Math.round((done / total) * 100) : 0;
-    const items = addon.deliverables.map(d => `
-      <label class="checklist-item ${checks[d.id] ? 'checked' : ''}" style="cursor:pointer">
-        <input type="checkbox" ${checks[d.id] ? 'checked' : ''}
-          onchange="toggleAddonCheck('${escHtml(addonName)}','${d.id}',this.checked)"
-          style="accent-color:var(--accent);width:14px;height:14px;flex-shrink:0">
-        <span style="${checks[d.id] ? 'text-decoration:line-through;color:var(--text3)' : ''}">${escHtml(d.label)}</span>
-      </label>`).join('');
+    const safeAddon = addonName.replace(/'/g,"\\'");
+    const items = addon.deliverables.map(d => {
+      const isChecked  = !!checks[d.id];
+      const noteObj    = notes[d.id] || {};
+      const noteText   = noteObj.note || '';
+      const noteStatus = noteObj.status || 'pending';
+      const safeId     = d.id.replace(/'/g,"\\'");
+      return `<div class="checklist-item-wrap">
+        <div class="checklist-item" onclick="toggleAddonCheck('${safeAddon}','${safeId}',${!isChecked})">
+          <div class="check-box ${isChecked ? 'checked' : ''}">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
+          </div>
+          <span class="check-label ${isChecked ? 'done' : ''}">${escHtml(d.label)}</span>
+          <button class="cl-note-btn" onclick="event.stopPropagation();toggleAddonNote('${safeAddon}','${safeId}')" title="Add note">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            ${noteText ? '<span class="cl-note-dot"></span>' : ''}
+          </button>
+        </div>
+        <div class="cl-note-area hidden" id="addon-note-${addonName}-${d.id}">
+          <div class="cl-note-status-row">
+            ${['pending','in-progress','done','blocked'].map(s => `
+              <button class="cl-status-btn ${noteStatus===s?'active':''}" style="${noteStatus===s?`background:${statusColors[s]}20;color:${statusColors[s]};border-color:${statusColors[s]}`:''}"
+                onclick="setAddonNoteStatus('${safeAddon}','${safeId}','${s}')">${statusLabels[s]}</button>`).join('')}
+          </div>
+          <textarea class="cl-note-textarea" id="addon-note-text-${addonName}-${d.id}" placeholder="Add details, blockers, context…" rows="2">${escHtml(noteText)}</textarea>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
+            <button class="btn-view" style="font-size:11px;padding:4px 10px" onclick="saveAddonNote('${safeAddon}','${safeId}')">Save Note</button>
+            <span class="cl-note-msg" id="addon-note-msg-${addonName}-${d.id}" style="font-size:11px;color:var(--green)"></span>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
     return `<div class="addon-checklist-card">
       <div class="addon-checklist-header">
         <span class="addon-checklist-title">${escHtml(addonName)}</span>
@@ -2208,6 +2257,45 @@ function renderAddonChecklists(c) {
       <div class="checklist-items">${items}</div>
     </div>`;
   }).join('');
+}
+
+function toggleAddonNote(addonName, itemId) {
+  const area = document.getElementById(`addon-note-${addonName}-${itemId}`);
+  if (area) area.classList.toggle('hidden');
+}
+
+async function setAddonNoteStatus(addonName, itemId, status) {
+  const noteEl = document.getElementById(`addon-note-text-${addonName}-${itemId}`);
+  await saveAddonNoteData(addonName, itemId, noteEl?.value || '', status);
+}
+
+async function saveAddonNote(addonName, itemId) {
+  const noteEl = document.getElementById(`addon-note-text-${addonName}-${itemId}`);
+  const existing = (modalClient?.addonChecklistNotes?.[addonName]?.[itemId]) || {};
+  await saveAddonNoteData(addonName, itemId, noteEl?.value || '', existing.status || 'pending');
+}
+
+async function saveAddonNoteData(addonName, itemId, note, status) {
+  const msgEl = document.getElementById(`addon-note-msg-${addonName}-${itemId}`);
+  if (msgEl) msgEl.textContent = 'Saving…';
+  try {
+    const res = await fetch(`/api/addon-checklist-notes/${modalClient.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ addonName, itemId, note, status }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      modalClient.addonChecklistNotes = data.addonChecklistNotes;
+      const idx = clients.findIndex(x => x.id === modalClient.id);
+      if (idx !== -1) clients[idx].addonChecklistNotes = data.addonChecklistNotes;
+      if (msgEl) { msgEl.textContent = '✓ Saved'; setTimeout(() => { if (msgEl) msgEl.textContent = ''; }, 2000); }
+      renderAddonChecklists(modalClient);
+    }
+  } catch (e) {
+    if (msgEl) msgEl.textContent = 'Error';
+    console.error(e);
+  }
 }
 
 async function toggleAddonCheck(addonName, itemId, value) {

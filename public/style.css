@@ -1097,16 +1097,39 @@ body::before {
 .cl-note-textarea:focus { outline: none; border-color: var(--accent2); }
 
 /* ── Team Calendar tab ───────────────────────────────────────────────────── */
-.teamcal-wrap { padding: 0 32px 24px; }
+.teamcal-layout {
+  display: grid;
+  grid-template-columns: 360px 1fr;
+  gap: 16px;
+  padding: 0 32px 24px;
+  align-items: start;
+}
+.teamcal-detail-panel { min-height: 340px; }
+.teamcal-detail-title {
+  font-size: 14px; font-weight: 600; color: var(--text);
+  margin-bottom: 4px;
+}
+.teamcal-detail-count {
+  font-size: 11.5px; color: var(--text3); margin-bottom: 14px;
+}
+.teamcal-entries-list { display: flex; flex-direction: column; gap: 14px; }
+.teamcal-member-group { }
+.teamcal-member-name {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--accent2); margin-bottom: 6px;
+  padding-bottom: 4px; border-bottom: 1px solid var(--border);
+}
+.teamcal-entry-row {
+  padding: 8px 10px; border-radius: 7px;
+  background: var(--surface); border: 1px solid var(--border);
+  margin-bottom: 5px;
+}
+.teamcal-entry-text { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 3px; }
+.teamcal-entry-time { font-size: 10.5px; color: var(--text3); }
 .cal-has-entries { background: rgba(224,91,46,.07); }
 .cal-entry-count {
   font-size: 9px; font-weight: 700;
   background: var(--accent); color: #fff;
   border-radius: 8px; padding: 0 4px; margin-left: 2px;
   line-height: 14px;
-}
-.teamcal-member-group { margin-bottom: 14px; }
-.teamcal-member-name {
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: var(--accent2); margin-bottom: 6px;
 }
