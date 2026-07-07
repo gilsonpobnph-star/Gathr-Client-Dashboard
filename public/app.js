@@ -111,10 +111,12 @@ function endDateLabel(c) {
 }
 
 /* ── Auth ─────────────────────────────────────────────────────────────────── */
+let currentUser = { authenticated: false, role: 'member', name: '', userId: '' };
+
 async function checkAuth() {
-  const res = await fetch('/api/me');
+  const res  = await fetch('/api/me');
   const data = await res.json();
-  if (data.authenticated) showApp();
+  if (data.authenticated) { currentUser = data; showApp(); }
   else showLogin();
 }
 
@@ -123,23 +125,86 @@ function showLogin() {
   document.getElementById('app').classList.add('hidden');
 }
 
+function showSignup() {
+  document.getElementById('login-form-wrap').classList.add('hidden');
+  document.getElementById('signup-form-wrap').classList.remove('hidden');
+  document.getElementById('login-mode-label').textContent = 'Create your account';
+}
+
+function showLogin() {
+  document.getElementById('signup-form-wrap').classList.add('hidden');
+  document.getElementById('login-form-wrap').classList.remove('hidden');
+  document.getElementById('login-mode-label').textContent = 'Internal Client Dashboard';
+}
+
 function showApp() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
+  applyRoleUI();
   loadAll();
+}
+
+function applyRoleUI() {
+  const isAdmin = currentUser.role === 'admin';
+  // Show/hide admin-only elements
+  document.querySelectorAll('.nav-admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin));
+  // Show My Dashboard for non-admin logged-in users (named users)
+  const hasMydash = currentUser.userId && currentUser.userId !== 'admin';
+  document.querySelectorAll('.nav-my-dash').forEach(el => el.classList.toggle('hidden', !hasMydash));
+  // User chip
+  const name = currentUser.name || 'Admin';
+  document.getElementById('sidebar-user-name').textContent = name;
+  document.getElementById('sidebar-user-role').textContent = isAdmin ? 'Admin' : 'Team Member';
+  document.getElementById('sidebar-user-avatar').textContent = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+  if (document.getElementById('nav-my-dash-label')) {
+    document.getElementById('nav-my-dash-label').textContent = `My Dashboard`;
+  }
 }
 
 document.getElementById('btn-login').addEventListener('click', doLogin);
 document.getElementById('login-pw').addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+document.getElementById('btn-signup').addEventListener('click', doSignup);
 
 async function doLogin() {
-  const pw  = document.getElementById('login-pw').value;
-  const err = document.getElementById('login-error');
+  const email = document.getElementById('login-email').value.trim();
+  const pw    = document.getElementById('login-pw').value;
+  const err   = document.getElementById('login-error');
   err.textContent = '';
-  const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) });
-  if (res.ok) showApp();
-  else err.textContent = 'Incorrect password. Try again.';
+  const body = email ? { email, password: pw } : { password: pw };
+  const res  = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (res.ok) {
+    const data = await res.json();
+    currentUser = { authenticated: true, role: data.role || 'admin', name: data.name || 'Admin', userId: data.userId || (email ? '' : 'admin') };
+    showApp();
+  } else {
+    const d = await res.json().catch(() => ({}));
+    err.textContent = d.error || 'Incorrect credentials.';
+  }
 }
+
+async function doSignup() {
+  const name  = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const pw    = document.getElementById('signup-pw').value;
+  const err   = document.getElementById('signup-error');
+  err.textContent = '';
+  if (!name || !email || !pw) { err.textContent = 'All fields required.'; return; }
+  const res = await fetch('/api/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, password: pw }) });
+  if (res.ok) {
+    err.style.color = 'var(--green)';
+    err.textContent = 'Account created! You can now sign in.';
+    setTimeout(() => { err.textContent = ''; err.style.color = ''; showLogin(); }, 1800);
+  } else {
+    const d = await res.json().catch(() => ({}));
+    err.textContent = d.error || 'Signup failed.';
+  }
+}
+
+document.getElementById('btn-logout').addEventListener('click', async () => {
+  await fetch('/api/logout', { method: 'POST' });
+  currentUser = { authenticated: false, role: 'member', name: '', userId: '' };
+  showLogin();
+});
 
 /* ── Data Loading ─────────────────────────────────────────────────────────── */
 async function loadAll() {
@@ -186,6 +251,7 @@ function showTab(tab) {
   else if (tab === 'analytics')  renderAnalytics();
   else if (tab === 'intake')     renderIntakes();
   else if (tab === 'team')       renderTeam();
+  else if (tab === 'mydash')     renderMyDash();
 }
 
 /* ── Assignee filters ─────────────────────────────────────────────────────── */
@@ -279,25 +345,30 @@ function renderSpaceInfo(member) {
 }
 
 /* ── Overview ─────────────────────────────────────────────────────────────── */
+const ACTIVE_STATUSES    = ['In Progress', 'Active', 'Onboarding', 'Launch Ready'];
+const COMPLETED_STATUSES = ['Completed'];
+const INTAKE_STATUSES    = ['New Client'];
+const HOLD_STATUSES      = ['Alumni', 'Paused'];
+
 function renderOverview() {
-  const active    = clients.filter(c => c.status === 'In Progress').length;
-  const intake    = clients.filter(c => c.status === 'New Client').length;
-  const paused    = clients.filter(c => c.status === 'Alumni').length;
-  const completed = clients.filter(c => c.status === 'Completed' || c.status === 'Launch Ready').length;
+  const active    = clients.filter(c => ACTIVE_STATUSES.includes(c.status)).length;
+  const intake    = clients.filter(c => INTAKE_STATUSES.includes(c.status)).length;
+  const onHold    = clients.filter(c => HOLD_STATUSES.includes(c.status)).length;
+  const completed = clients.filter(c => COMPLETED_STATUSES.includes(c.status)).length;
 
   document.getElementById('kpi-active').textContent     = active;
   document.getElementById('kpi-intake').textContent     = intake;
-  document.getElementById('kpi-paused').textContent     = paused;
+  document.getElementById('kpi-paused').textContent     = onHold;
   document.getElementById('kpi-completed').textContent  = completed;
   document.getElementById('kpi-active-sub').textContent = `${clients.length} total clients`;
   document.getElementById('overview-subtitle').textContent =
-    `${clients.filter(c => ['In Progress','Active','Onboarding'].includes(c.status)).length} active · refreshed ${new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}`;
+    `${active} active · refreshed ${new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}`;
   const ovDate = document.getElementById('ov-date-label');
   if (ovDate) ovDate.textContent = new Date().toLocaleDateString('en-AU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   renderTodaysRead();
   renderDeadlineHealth();
-  renderWeekTimeline('week-timeline-container', clients.filter(c => c.status === 'In Progress' || c.status === 'Onboarding' || c.status === 'Launch Ready'));
+  renderClientHealthBoard('client-health-board', clients.filter(c => ACTIVE_STATUSES.includes(c.status)));
   renderChart('chart-programs', 'doughnut', programChartData());
   renderChart('chart-status',   'doughnut', statusChartData());
 }
@@ -375,29 +446,111 @@ function renderTodaysRead() {
     </div>`).join('');
 }
 
-/* ── Week timeline ────────────────────────────────────────────────────────── */
-function renderWeekTimeline(containerId, list) {
+/* ── Client Health Board ──────────────────────────────────────────────────── */
+function renderClientHealthBoard(containerId, list) {
   const wrap = document.getElementById(containerId);
+  if (!wrap) return;
   if (!list.length) {
     wrap.innerHTML = '<p style="color:var(--text3);font-size:13px;text-align:center;padding:20px 0">No active clients yet.</p>';
     return;
   }
-  wrap.innerHTML = list.map(c => {
-    const dur   = progDuration(c.program) || 1;
-    const week  = Math.min(c.currentWeek || 1, dur);
-    const pct   = (week / dur) * 100;
-    const color = progColor(c.program);
+
+  const stateOrder = { overdue: 0, delayed: 1, 'at-risk': 2, 'on-track': 3, null: 4 };
+  const sorted = [...list].sort((a, b) => {
+    const sa = deadlineStatus(a)?.state || null;
+    const sb = deadlineStatus(b)?.state || null;
+    return (stateOrder[sa] ?? 4) - (stateOrder[sb] ?? 4);
+  });
+
+  const healthColor = { overdue: '#ef4444', delayed: '#f97316', 'at-risk': '#f59e0b', 'on-track': '#4ade80' };
+  const healthLabel = { overdue: 'Overdue', delayed: 'Behind', 'at-risk': 'At Risk', 'on-track': 'On Track' };
+  const healthBg    = { overdue: 'rgba(239,68,68,.15)', delayed: 'rgba(249,115,22,.15)', 'at-risk': 'rgba(245,158,11,.15)', 'on-track': 'rgba(74,222,128,.12)' };
+
+  wrap.innerHTML = sorted.map(c => {
+    const dur    = progDuration(c.program) || 1;
+    const week   = Math.min(c.currentWeek || 1, dur);
+    const pct    = Math.round((week / dur) * 100);
+    const color  = progColor(c.program);
+    const ds     = deadlineStatus(c);
+    const state  = ds?.state || 'on-track';
+    const hColor = healthColor[state] || '#4ade80';
+    const hLabel = healthLabel[state] || 'On Track';
+    const hBg    = healthBg[state]    || 'rgba(74,222,128,.12)';
+    const lead   = c.leadAssignee ? `<span style="font-size:11px;color:var(--text3)">Lead: <span style="color:var(--text2)">${escHtml(c.leadAssignee)}</span></span>` : '';
+    const daysInfo = ds && ds.daysLeft !== undefined
+      ? (ds.daysLeft < 0 ? `<span style="color:#ef4444;font-size:11px">${Math.abs(ds.daysLeft)}d overdue</span>` : `<span style="font-size:11px;color:var(--text3)">${ds.daysLeft}d left</span>`)
+      : '';
     const phase = getPhaseLabel(c.program, week);
-    return `<div class="wt-row">
-      <div class="wt-name" title="${c.name}">${c.name}</div>
-      <div class="wt-track" onclick="openModal('${c.id}')">
-        <div style="width:${pct}%;height:100%;background:${color};opacity:.8;border-radius:5px;display:flex;align-items:center;padding-left:8px">
-          ${pct > 15 ? `<span style="font-size:11px;font-weight:600;color:rgba(255,255,255,.9)">${phase || c.program || 'Active'}</span>` : ''}
+
+    return `<div class="chb-row" onclick="openModal('${c.id}')">
+      <div class="chb-left">
+        <div class="chb-avatar">${initials(c.name)}</div>
+        <div class="chb-info">
+          <div class="chb-name">${escHtml(c.name)}${c.businessName ? `<span class="chb-biz"> · ${escHtml(c.businessName)}</span>` : ''}</div>
+          <div class="chb-meta">${escHtml(c.program || 'No program')}${phase ? ` · <span style="color:var(--text3)">${escHtml(phase)}</span>` : ''}${lead ? ' · ' + lead : ''}</div>
         </div>
       </div>
-      <div class="wt-week-label">Wk ${week}/${dur}</div>
+      <div class="chb-progress-wrap">
+        <div class="chb-bar-track">
+          <div class="chb-bar-fill" style="width:${pct}%;background:${color}"></div>
+        </div>
+        <div class="chb-bar-meta">
+          <span style="font-size:11px;color:var(--text3)">Wk ${week}/${dur} · ${pct}%</span>
+          ${daysInfo}
+        </div>
+      </div>
+      <div class="chb-status" style="background:${hBg};color:${hColor}">
+        <span class="chb-dot" style="background:${hColor}"></span>${hLabel}
+      </div>
     </div>`;
   }).join('');
+}
+
+/* ── My Dashboard ─────────────────────────────────────────────────────────── */
+function renderMyDash() {
+  const name = currentUser.name || '';
+  const myClients = clients.filter(c =>
+    ACTIVE_STATUSES.includes(c.status) &&
+    (c.leadAssignee === name || c.techAssignee === name)
+  );
+
+  document.getElementById('mydash-title').textContent = `My Dashboard`;
+  document.getElementById('mydash-date').textContent  = new Date().toLocaleDateString('en-AU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  const warn = myClients.filter(c => { const d = deadlineStatus(c); return d && ['overdue','delayed','at-risk'].includes(d.state); }).length;
+  const ok   = myClients.filter(c => { const d = deadlineStatus(c); return !d || d.state === 'on-track'; }).length;
+
+  document.getElementById('my-kpi-active').textContent    = myClients.length;
+  document.getElementById('my-kpi-warn').textContent      = warn;
+  document.getElementById('my-kpi-ok').textContent        = ok;
+  document.getElementById('my-kpi-active-sub').textContent = `as lead or tech`;
+
+  renderClientHealthBoard('my-client-health', myClients);
+  renderMyPriorities(myClients);
+}
+
+function renderMyPriorities(myClients) {
+  const el = document.getElementById('my-priorities');
+  if (!el) return;
+  const overdue  = myClients.filter(c => deadlineStatus(c)?.state === 'overdue');
+  const delayed  = myClients.filter(c => deadlineStatus(c)?.state === 'delayed');
+  const atRisk   = myClients.filter(c => deadlineStatus(c)?.state === 'at-risk');
+  const items = [];
+  if (overdue.length) items.push({ level: 'critical', icon: '🔴', title: `${overdue.length} overdue`, body: overdue.map(c => `<span class="tr-client-link" onclick="openModal('${c.id}')">${c.name}</span>`).join(', ') });
+  if (delayed.length) items.push({ level: 'warn', icon: '🟠', title: `${delayed.length} behind schedule`, body: delayed.map(c => `<span class="tr-client-link" onclick="openModal('${c.id}')">${c.name}</span>`).join(', ') });
+  if (atRisk.length)  items.push({ level: 'caution', icon: '🟡', title: `${atRisk.length} at risk`, body: atRisk.map(c => `<span class="tr-client-link" onclick="openModal('${c.id}')">${c.name}</span>`).join(', ') });
+  if (!items.length) {
+    el.innerHTML = `<div class="tr-all-good"><span>✅</span><span>All your clients are on track.</span></div>`;
+    return;
+  }
+  const levelBorder = { critical: '#fca5a5', warn: '#fdba74', caution: '#fcd34d' };
+  const levelBg     = { critical: 'rgba(239,68,68,.1)', warn: 'rgba(249,115,22,.1)', caution: 'rgba(245,158,11,.1)' };
+  const levelColor  = { critical: '#ef4444', warn: '#f97316', caution: '#f59e0b' };
+  el.innerHTML = items.map(item => `
+    <div class="tr-item" style="border-left-color:${levelBorder[item.level]};background:${levelBg[item.level]}">
+      <div class="tr-item-header"><span class="tr-icon">${item.icon}</span><strong style="color:${levelColor[item.level]}">${item.title}</strong></div>
+      <div class="tr-item-body">${item.body}</div>
+    </div>`).join('');
 }
 
 /* ── Charts ───────────────────────────────────────────────────────────────── */
@@ -1512,11 +1665,53 @@ async function runMigrateOldProgram() {
 }
 
 /* ── Team Management ─────────────────────────────────────────────────────── */
+async function renderUsers() {
+  const tbody = document.getElementById('users-tbody');
+  const empty = document.getElementById('users-empty');
+  if (!tbody) return;
+  try {
+    const res   = await fetch('/api/users');
+    if (!res.ok) { tbody.innerHTML = ''; empty?.classList.remove('hidden'); return; }
+    const users = await res.json();
+    if (!users.length) { tbody.innerHTML = ''; empty?.classList.remove('hidden'); return; }
+    empty?.classList.add('hidden');
+    const roleBg = { admin: 'var(--accent-dim)', member: 'var(--blue-dim)' };
+    const roleColor = { admin: 'var(--accent2)', member: 'var(--blue)' };
+    tbody.innerHTML = users.map(u => `
+      <tr>
+        <td><div class="name-cell">
+          <div class="avatar" style="background:var(--accent-dim);color:var(--accent)">${initials(u.name)}</div>
+          <strong>${escHtml(u.name)}</strong>
+        </div></td>
+        <td class="text-sm text-muted">${escHtml(u.email)}</td>
+        <td>
+          <select class="tbl-select" onchange="setUserRole('${u.id}',this.value)" style="max-width:110px">
+            <option value="member" ${u.role==='member'?'selected':''}>Member</option>
+            <option value="admin"  ${u.role==='admin'?'selected':''}>Admin</option>
+          </select>
+        </td>
+        <td class="text-sm text-muted">${fmtDate(u.createdAt)}</td>
+        <td><button class="btn-danger" style="padding:4px 10px;font-size:11px" onclick="removeUser('${u.id}','${escHtml(u.name)}')">Remove</button></td>
+      </tr>`).join('');
+  } catch { tbody.innerHTML = ''; }
+}
+
+async function setUserRole(id, role) {
+  await fetch(`/api/users/${id}/role`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ role }) });
+}
+
+async function removeUser(id, name) {
+  if (!confirm(`Remove ${name}?`)) return;
+  await fetch(`/api/users/${id}`, { method: 'DELETE' });
+  renderUsers();
+}
+
 function renderTeam() {
   const members = window._teamFull || [];
   document.getElementById('team-subtitle').textContent = `${members.length} member${members.length !== 1 ? 's' : ''}`;
   const tbody = document.getElementById('team-tbody');
   const empty = document.getElementById('team-empty');
+  renderUsers();
 
   if (!members.length) {
     tbody.innerHTML = '';

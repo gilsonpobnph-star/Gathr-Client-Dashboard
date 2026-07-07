@@ -3,6 +3,18 @@ const express = require('express');
 const session = require('express-session');
 const path    = require('path');
 const fs      = require('fs');
+const crypto  = require('crypto');
+
+function hashPassword(pass) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(pass, salt, 100000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+}
+function verifyPassword(pass, stored) {
+  const [salt, hash] = (stored || '').split(':');
+  if (!salt || !hash) return false;
+  return crypto.pbkdf2Sync(pass, salt, 100000, 64, 'sha512').toString('hex') === hash;
+}
 
 const app = express();
 app.use(express.json({ limit: '50mb' }));
@@ -280,14 +292,86 @@ function requireAuth(req, res, next) {
   if (req.session.authenticated) return next();
   res.status(401).json({ error: 'Unauthorized' });
 }
+function requireAdmin(req, res, next) {
+  if (req.session.authenticated && req.session.role === 'admin') return next();
+  res.status(403).json({ error: 'Admin only' });
+}
 
+// Admin login (password only) OR team member login (email + password)
 app.post('/api/login', (req, res) => {
-  if (req.body.password === PASS) { req.session.authenticated = true; res.json({ ok: true }); }
-  else res.status(401).json({ error: 'Invalid password' });
+  const { email, password } = req.body;
+  if (email && email.trim()) {
+    // Team member login
+    const store = readStore();
+    const users = store.users || {};
+    const user  = Object.values(users).find(u => u.email.toLowerCase() === email.trim().toLowerCase());
+    if (!user || !verifyPassword(password, user.passwordHash)) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+    req.session.authenticated = true;
+    req.session.userId = user.id;
+    req.session.role   = user.role || 'member';
+    req.session.name   = user.name;
+    return res.json({ ok: true, role: user.role || 'member', name: user.name });
+  }
+  // Admin fallback — password only
+  if (password === PASS) {
+    req.session.authenticated = true;
+    req.session.userId = 'admin';
+    req.session.role   = 'admin';
+    req.session.name   = 'Admin';
+    return res.json({ ok: true, role: 'admin', name: 'Admin' });
+  }
+  res.status(401).json({ error: 'Invalid password' });
+});
+
+// Team member self-registration
+app.post('/api/signup', (req, res) => {
+  const { name, email, password } = req.body;
+  if (!name?.trim() || !email?.trim() || !password?.trim()) {
+    return res.status(400).json({ error: 'Name, email and password are required' });
+  }
+  const store = readStore();
+  if (!store.users) store.users = {};
+  const existing = Object.values(store.users).find(u => u.email.toLowerCase() === email.trim().toLowerCase());
+  if (existing) return res.status(409).json({ error: 'Email already registered' });
+  const id   = 'u_' + Date.now();
+  const user = { id, name: name.trim(), email: email.trim().toLowerCase(), passwordHash: hashPassword(password), role: 'member', createdAt: new Date().toISOString() };
+  store.users[id] = user;
+  writeStore(store);
+  res.json({ ok: true, id, name: user.name, role: user.role });
 });
 
 app.post('/api/logout', (req, res) => { req.session.destroy(() => res.json({ ok: true })); });
-app.get('/api/me', (req, res) => { res.json({ authenticated: !!req.session.authenticated }); });
+app.get('/api/me', (req, res) => {
+  if (!req.session.authenticated) return res.json({ authenticated: false });
+  res.json({ authenticated: true, userId: req.session.userId, role: req.session.role || 'admin', name: req.session.name || 'Admin' });
+});
+
+// ── Users (registered team members) — admin only ─────────────────────────────
+app.get('/api/users', requireAdmin, (req, res) => {
+  const store = readStore();
+  const users = Object.values(store.users || {}).map(({ passwordHash, ...u }) => u);
+  res.json(users);
+});
+
+app.put('/api/users/:id/role', requireAdmin, (req, res) => {
+  const { role } = req.body;
+  if (!['admin', 'member'].includes(role)) return res.status(400).json({ error: 'Invalid role' });
+  const store = readStore();
+  if (!store.users?.[req.params.id]) return res.status(404).json({ error: 'User not found' });
+  store.users[req.params.id].role = role;
+  writeStore(store);
+  res.json({ ok: true });
+});
+
+app.delete('/api/users/:id', requireAdmin, (req, res) => {
+  const store = readStore();
+  if (!store.users?.[req.params.id]) return res.status(404).json({ error: 'User not found' });
+  delete store.users[req.params.id];
+  writeStore(store);
+  res.json({ ok: true });
+});
 
 // Team CRUD — names only for dropdowns
 app.get('/api/team', requireAuth, (req, res) => {
