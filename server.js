@@ -773,6 +773,28 @@ app.patch('/api/tasks/:id', requireAuth, (req, res) => {
   res.json(task);
 });
 
+app.post('/api/tasks/:id/comments', requireAuth, (req, res) => {
+  const { text } = req.body;
+  if (!text?.trim()) return res.status(400).json({ error: 'text required' });
+  const store = readStore();
+  ensureTasks(store);
+  const task = store.tasks[req.params.id];
+  if (!task) return res.status(404).json({ error: 'Not found' });
+  if (!canSeeTask(task, req.session)) return res.status(403).json({ error: 'Forbidden' });
+  task.comments = task.comments || [];
+  const comment = {
+    id: 'cmt_' + Date.now(),
+    text: text.trim(),
+    author: req.session.name || 'Team',
+    ts: new Date().toISOString(),
+  };
+  task.comments.push(comment);
+  task.updatedAt = new Date().toISOString();
+  store.tasks[req.params.id] = task;
+  writeStore(store);
+  res.json({ comment, task });
+});
+
 app.delete('/api/tasks/:id', requireAuth, (req, res) => {
   const store = readStore();
   ensureTasks(store);

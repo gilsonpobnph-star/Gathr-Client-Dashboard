@@ -662,108 +662,147 @@ async function renderMyPriorities(myClients) {
 }
 
 /* ── My Tasks ─────────────────────────────────────────────────────────────── */
+const PRIORITY_COLOR = { High: '#ef4444', Medium: '#f59e0b', Low: '#4ade80' };
+const PRIORITY_LABEL = { High: 'High', Medium: 'Medium', Low: 'Low' };
+const STATUS_CLASS   = { 'To Do': 'ts-todo', 'In Progress': 'ts-inprog', 'Done': 'ts-done' };
+
+function taskDeadlineInfo(t) {
+  if (!t.deadline) return { label: '', color: 'var(--text3)' };
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dl    = new Date(t.deadline + 'T00:00:00');
+  const diff  = Math.round((dl - today) / 86400000);
+  if (t.status === 'Done') return { label: '✓ Done', color: 'var(--green)' };
+  if (diff < 0)   return { label: `${Math.abs(diff)}d overdue`, color: '#ef4444' };
+  if (diff === 0) return { label: 'Due today',   color: '#f97316' };
+  if (diff <= 3)  return { label: `${diff}d left`, color: '#f59e0b' };
+  return { label: dl.toLocaleDateString('en-GB', { day:'numeric', month:'short' }), color: 'var(--text3)' };
+}
+
+function initials(name) {
+  return (name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
+}
+
 function renderMyTasks() {
   const el = document.getElementById('my-tasks-list');
   if (!el) return;
-  const statusF = document.getElementById('task-filter-status')?.value || '';
-  const isAdmin = currentUser.role === 'admin';
-  const myName  = currentUser.name || '';
+  const statusF   = document.getElementById('task-filter-status')?.value   || '';
+  const priorityF = document.getElementById('task-filter-priority')?.value || '';
 
   let list = [...myTasks];
-  if (statusF) list = list.filter(t => t.status === statusF);
+  if (statusF)   list = list.filter(t => t.status   === statusF);
+  if (priorityF) list = list.filter(t => t.priority === priorityF);
 
   if (!list.length) {
-    el.innerHTML = `<div style="color:var(--text3);font-size:13px;padding:16px 0;text-align:center">
-      ${statusF ? 'No tasks with that status.' : 'No tasks yet — create one!'}
-    </div>`;
+    el.innerHTML = `<div class="task-empty">No tasks yet — hit <strong>+ New Task</strong> to get started.</div>`;
     return;
   }
 
-  const priorityColor = { High: '#ef4444', Medium: '#f59e0b', Low: '#5AA872' };
-  const priorityIcon  = { High: '🔴', Medium: '🟡', Low: '🟢' };
-  const statusBadge   = { 'To Do': 'badge-intake', 'In Progress': 'badge-onboarding', 'Done': 'badge-active' };
-
-  const today = new Date(); today.setHours(0,0,0,0);
   el.innerHTML = list.map(t => {
-    const isOwner  = isAdmin || t.createdBy === myName;
-    const assigned = (t.assignedTo || []).join(', ');
-    const shared   = (t.sharedWith || []).join(', ');
-    const client   = t.clientId ? clients.find(c => c.id === t.clientId) : null;
-    let deadlineLabel = '', deadlineColor = 'var(--text3)';
-    if (t.deadline) {
-      const dl = new Date(t.deadline + 'T00:00:00');
-      const diff = Math.round((dl - today) / 86400000);
-      if (t.status === 'Done') { deadlineLabel = 'Done'; deadlineColor = 'var(--green)'; }
-      else if (diff < 0)  { deadlineLabel = `${Math.abs(diff)}d overdue`; deadlineColor = '#ef4444'; }
-      else if (diff === 0){ deadlineLabel = 'Due today'; deadlineColor = '#f97316'; }
-      else if (diff <= 3) { deadlineLabel = `Due in ${diff}d`; deadlineColor = '#f59e0b'; }
-      else { deadlineLabel = new Date(t.deadline + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' }); }
-    }
-    return `<div class="task-card" data-id="${t.id}">
-      <div class="task-card-left">
-        <span class="task-priority-dot" style="background:${priorityColor[t.priority] || '#8A7A6E'}" title="${t.priority}"></span>
-        <div class="task-card-body">
-          <div class="task-card-title">${escHtml(t.title)}</div>
-          ${t.description ? `<div class="task-card-desc">${escHtml(t.description)}</div>` : ''}
-          <div class="task-card-meta">
-            ${client ? `<span class="task-meta-chip" onclick="event.stopPropagation();openModal('${client.id}')" title="Open client">🔗 ${escHtml(client.name)}</span>` : ''}
-            ${assigned ? `<span class="task-meta-chip">👤 ${escHtml(assigned)}</span>` : ''}
-            ${shared   ? `<span class="task-meta-chip">👁 ${escHtml(shared)}</span>` : ''}
-            ${t.createdBy && t.createdBy !== myName ? `<span class="task-meta-chip" style="color:var(--text3)">by ${escHtml(t.createdBy)}</span>` : ''}
-          </div>
+    const client = t.clientId ? clients.find(c => c.id === t.clientId) : null;
+    const dl     = taskDeadlineInfo(t);
+    const avatars = (t.assignedTo || []).slice(0,3).map(n =>
+      `<span class="task-avatar" title="${escHtml(n)}" style="background:${stringToColor(n)}">${initials(n)}</span>`
+    ).join('');
+    return `<div class="task-row" onclick="openTaskModal('${t.id}')">
+      <div class="task-row-name">
+        <span class="task-row-stripe" style="background:${PRIORITY_COLOR[t.priority]||'#8A7A6E'}"></span>
+        <div class="task-row-info">
+          <span class="task-row-title">${escHtml(t.title)}</span>
+          ${client ? `<span class="task-row-client">🔗 ${escHtml(client.name)}</span>` : ''}
         </div>
       </div>
-      <div class="task-card-right">
-        ${deadlineLabel ? `<span class="task-deadline-label" style="color:${deadlineColor}">${deadlineLabel}</span>` : ''}
-        <span class="badge ${statusBadge[t.status] || 'badge-intake'}" style="font-size:10px">${t.status}</span>
-        <select class="inline-select task-status-sel" style="font-size:11px;padding:2px 6px" onchange="quickUpdateTaskStatus('${t.id}',this.value)" onclick="event.stopPropagation()">
-          ${['To Do','In Progress','Done'].map(s => `<option value="${s}" ${t.status===s?'selected':''}>${s}</option>`).join('')}
-        </select>
-        ${isOwner ? `<button class="task-edit-btn" onclick="event.stopPropagation();openTaskModal('${t.id}')" title="Edit">✏️</button>` : ''}
+      <div class="task-row-col task-avatars">${avatars || '<span style="color:var(--text3);font-size:11px">—</span>'}</div>
+      <div class="task-row-col">
+        <span class="task-priority-pill" style="color:${PRIORITY_COLOR[t.priority]||'#8A7A6E'};background:${PRIORITY_COLOR[t.priority]||'#8A7A6E'}18">
+          ${PRIORITY_LABEL[t.priority]||t.priority}
+        </span>
       </div>
+      <div class="task-row-col" style="color:${dl.color};font-size:12px;font-weight:${dl.color!=='var(--text3)'?'600':'400'}">${dl.label||'—'}</div>
+      <div class="task-row-col"><span class="task-status-pill ${STATUS_CLASS[t.status]||''}">${t.status}</span></div>
     </div>`;
   }).join('');
 }
 
+function stringToColor(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  const h = Math.abs(hash) % 360;
+  return `hsl(${h},45%,35%)`;
+}
+
 document.getElementById('task-filter-status')?.addEventListener('change', renderMyTasks);
+document.getElementById('task-filter-priority')?.addEventListener('change', renderMyTasks);
 
 function openTaskModal(taskId) {
   editingTaskId = taskId || null;
-  const t = taskId ? myTasks.find(x => x.id === taskId) : null;
+  const t       = taskId ? myTasks.find(x => x.id === taskId) : null;
   const isAdmin = currentUser.role === 'admin';
+  const myName  = currentUser.name || '';
 
-  document.getElementById('task-modal-title').textContent = t ? 'Edit Task' : 'New Task';
   document.getElementById('task-title').value    = t?.title       || '';
   document.getElementById('task-desc').value     = t?.description || '';
   document.getElementById('task-priority').value = t?.priority    || 'Medium';
   document.getElementById('task-deadline').value = t?.deadline    || '';
   document.getElementById('task-status').value   = t?.status      || 'To Do';
 
-  // Client dropdown
   const clientSel = document.getElementById('task-client');
   clientSel.innerHTML = '<option value="">— No client —</option>' +
-    clients.map(c => `<option value="${c.id}" ${t?.clientId===c.id?'selected':''}>${escHtml(c.name)}${c.businessName?' — '+escHtml(c.businessName):''}</option>`).join('');
+    clients.map(c => `<option value="${c.id}" ${t?.clientId===c.id?'selected':''}>${escHtml(c.name)}${c.businessName?' – '+escHtml(c.businessName):''}</option>`).join('');
 
-  // Assignees & shared — checkboxes for each team member
-  const myName = currentUser.name || '';
   const renderMemberPicks = (containerId, selected) => {
     const all = [...new Set([...team, myName])].filter(Boolean);
-    document.getElementById(containerId).innerHTML = all.map(m =>
-      `<label class="task-member-pick"><input type="checkbox" value="${escHtml(m)}" ${selected.includes(m)?'checked':''}> ${escHtml(m)}</label>`
-    ).join('');
+    document.getElementById(containerId).innerHTML = all.map(m => {
+      const checked = selected.includes(m);
+      return `<label class="tdp-member-chip ${checked?'checked':''}">
+        <input type="checkbox" value="${escHtml(m)}" ${checked?'checked':''} onchange="this.closest('label').classList.toggle('checked',this.checked)">
+        <span class="tdp-member-av" style="background:${stringToColor(m)}">${initials(m)}</span>
+        <span>${escHtml(m)}</span>
+      </label>`;
+    }).join('');
   };
-  renderMemberPicks('task-assignees', t?.assignedTo || []);
+  renderMemberPicks('task-assignees', t?.assignedTo || [myName]);
   renderMemberPicks('task-shared',    t?.sharedWith || []);
 
-  // Admins can assign to others; members can only assign to themselves
   document.getElementById('task-assign-wrap').style.display = isAdmin ? '' : 'none';
 
-  // Delete button — only for owner or admin
   const canDelete = isAdmin || (t && t.createdBy === myName);
   document.getElementById('task-delete-btn').classList.toggle('hidden', !t || !canDelete);
 
+  renderTaskActivity(t);
+
   document.getElementById('task-modal').classList.remove('hidden');
   document.getElementById('task-title').focus();
+}
+
+function renderTaskActivity(t) {
+  const feed = document.getElementById('task-activity-feed');
+  if (!feed) return;
+  const comments = t?.comments || [];
+  const created  = t?.createdAt;
+
+  let items = [];
+  if (created) items.push({ ts: created, type: 'system', text: `Task created by <strong>${escHtml(t.createdBy||'Team')}</strong>` });
+  comments.forEach(c => items.push({ ts: c.ts, type: 'comment', text: escHtml(c.text), author: c.author }));
+  items.sort((a,b) => new Date(b.ts) - new Date(a.ts));
+
+  if (!items.length) {
+    feed.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px 0">No activity yet.</div>';
+    return;
+  }
+  feed.innerHTML = items.map(item => {
+    const time = new Date(item.ts).toLocaleDateString('en-GB', { day:'numeric', month:'short' }) +
+                 ' ' + new Date(item.ts).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+    if (item.type === 'system') {
+      return `<div class="tda-system"><span>${item.text}</span><span class="tda-time">${time}</span></div>`;
+    }
+    return `<div class="tda-comment">
+      <span class="tda-av" style="background:${stringToColor(item.author)}">${initials(item.author)}</span>
+      <div class="tda-body">
+        <div class="tda-author">${escHtml(item.author)} <span class="tda-time">${time}</span></div>
+        <div class="tda-text">${item.text.replace(/\n/g,'<br>')}</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function closeTaskModal() {
@@ -777,7 +816,6 @@ async function saveTask() {
 
   const isAdmin = currentUser.role === 'admin';
   const myName  = currentUser.name || '';
-
   const getChecked = id => [...document.getElementById(id).querySelectorAll('input[type=checkbox]:checked')].map(cb => cb.value);
   const assignedTo = isAdmin ? getChecked('task-assignees') : [myName];
   const sharedWith = getChecked('task-shared');
@@ -812,7 +850,7 @@ async function saveTask() {
 async function deleteTask() {
   if (!editingTaskId) return;
   const t = myTasks.find(x => x.id === editingTaskId);
-  if (!confirm(`Delete task "${t?.title}"?`)) return;
+  if (!confirm(`Delete "${t?.title}"? This cannot be undone.`)) return;
   const res = await fetch(`/api/tasks/${editingTaskId}`, { method: 'DELETE' });
   if (!res.ok) return;
   myTasks = myTasks.filter(x => x.id !== editingTaskId);
@@ -820,16 +858,22 @@ async function deleteTask() {
   renderMyTasks();
 }
 
-async function quickUpdateTaskStatus(taskId, status) {
-  const res = await fetch(`/api/tasks/${taskId}`, {
-    method: 'PATCH',
+async function postTaskComment() {
+  if (!editingTaskId) return;
+  const input = document.getElementById('task-comment-input');
+  const text  = input?.value.trim();
+  if (!text) return;
+  const res = await fetch(`/api/tasks/${editingTaskId}/comments`, {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ text }),
   });
   if (!res.ok) return;
-  const saved = await res.json();
-  const idx = myTasks.findIndex(t => t.id === taskId);
-  if (idx !== -1) myTasks[idx] = saved;
+  const data = await res.json();
+  const idx  = myTasks.findIndex(t => t.id === editingTaskId);
+  if (idx !== -1) myTasks[idx] = data.task;
+  if (input) input.value = '';
+  renderTaskActivity(data.task);
   renderMyTasks();
 }
 

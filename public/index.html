@@ -661,17 +661,42 @@
           </div>
         </div>
 
-        <!-- Main 2-col -->
+        <!-- Main 2-col: Tasks left, Priorities+Calendar right -->
         <div class="ov-layout">
 
-          <!-- Left: priorities + client health -->
+          <!-- Left: My Tasks (Asana-style) -->
           <div class="ov-main">
-            <div class="dash-card">
+            <div class="dash-card tasks-panel">
               <div class="dash-card-header">
-                <div class="dash-card-title"><span class="dash-card-dot" style="background:var(--accent)"></span>Today's Priorities</div>
+                <div class="dash-card-title"><span class="dash-card-dot" style="background:var(--accent)"></span>My Tasks</div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <select id="task-filter-status" class="inline-select" style="font-size:12px;padding:4px 8px">
+                    <option value="">All statuses</option>
+                    <option value="To Do">To Do</option>
+                    <option value="In Progress">In Progress</option>
+                    <option value="Done">Done</option>
+                  </select>
+                  <select id="task-filter-priority" class="inline-select" style="font-size:12px;padding:4px 8px">
+                    <option value="">All priorities</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
+                  </select>
+                  <button class="btn-primary" style="font-size:12px;padding:6px 14px" onclick="openTaskModal()">+ New Task</button>
+                </div>
               </div>
-              <div id="my-priorities" class="todays-read-wrap"></div>
+              <!-- Table header -->
+              <div class="task-table-header">
+                <div class="tth-name">Task</div>
+                <div class="tth-col">Assignee</div>
+                <div class="tth-col">Priority</div>
+                <div class="tth-col">Due</div>
+                <div class="tth-col">Status</div>
+              </div>
+              <div id="my-tasks-list"></div>
             </div>
+
+            <!-- My Clients health -->
             <div class="dash-card">
               <div class="dash-card-header">
                 <div class="dash-card-title"><span class="dash-card-dot" style="background:var(--blue)"></span>My Clients</div>
@@ -680,22 +705,25 @@
             </div>
           </div>
 
-          <!-- Right: calendar -->
+          <!-- Right: Today's Priorities + Calendar -->
           <div class="ov-sidebar">
+            <div class="dash-card">
+              <div class="dash-card-header">
+                <div class="dash-card-title"><span class="dash-card-dot" style="background:var(--accent)"></span>Today's Priorities</div>
+              </div>
+              <div id="my-priorities" class="todays-read-wrap"></div>
+            </div>
+
             <div class="dash-card" style="padding:0;overflow:hidden">
-              <!-- Calendar header -->
               <div class="cal-header">
                 <button class="cal-nav-btn" onclick="calNav(-1)">&#8249;</button>
                 <span class="cal-month-label" id="cal-month-label">—</span>
                 <button class="cal-nav-btn" onclick="calNav(1)">&#8250;</button>
               </div>
-              <!-- Day-of-week labels -->
               <div class="cal-dow-row">
                 <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
               </div>
-              <!-- Day grid -->
               <div class="cal-grid" id="cal-grid"></div>
-              <!-- Selected day panel -->
               <div class="cal-day-panel" id="cal-day-panel">
                 <div class="cal-day-panel-title" id="cal-day-panel-title">Select a day</div>
                 <div id="cal-day-entries" class="cal-entries-list"></div>
@@ -707,23 +735,6 @@
             </div>
           </div>
 
-        </div>
-
-        <!-- My Tasks -->
-        <div class="dash-card" style="margin-top:18px">
-          <div class="dash-card-header">
-            <div class="dash-card-title"><span class="dash-card-dot" style="background:var(--accent)"></span>My Tasks</div>
-            <div style="display:flex;gap:8px;align-items:center">
-              <select id="task-filter-status" class="inline-select" style="font-size:12px;padding:4px 8px">
-                <option value="">All</option>
-                <option value="To Do">To Do</option>
-                <option value="In Progress">In Progress</option>
-                <option value="Done">Done</option>
-              </select>
-              <button class="btn-primary" style="font-size:12px;padding:6px 14px" onclick="openTaskModal()">+ New Task</button>
-            </div>
-          </div>
-          <div id="my-tasks-list"></div>
         </div>
 
       </div>
@@ -788,64 +799,83 @@
   </main>
 </div>
 
-<!-- Task Modal -->
+<!-- Task Detail Modal -->
 <div id="task-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeTaskModal()">
-  <div class="modal" style="max-width:520px;width:96%">
-    <div class="modal-header">
-      <h2 class="modal-title" id="task-modal-title">New Task</h2>
-      <button class="modal-close" onclick="closeTaskModal()">×</button>
-    </div>
-    <div class="modal-body" style="display:flex;flex-direction:column;gap:14px;padding:20px 24px">
-      <div>
-        <label class="field-label">Title <span style="color:var(--accent)">*</span></label>
-        <input id="task-title" class="field-input" placeholder="Task title…" style="width:100%">
+  <div class="task-detail-panel">
+
+    <!-- Left: task fields -->
+    <div class="tdp-left">
+      <div class="tdp-header">
+        <input id="task-title" class="tdp-title-input" placeholder="Task title…" autocomplete="off">
+        <button class="tdp-close-btn" onclick="closeTaskModal()">×</button>
       </div>
-      <div>
-        <label class="field-label">Description</label>
-        <textarea id="task-desc" class="field-input" placeholder="Details, context, links…" rows="3" style="width:100%;resize:vertical"></textarea>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div>
-          <label class="field-label">Priority</label>
-          <select id="task-priority" class="field-input">
+
+      <div class="tdp-pills-row">
+        <div class="tdp-field-group">
+          <span class="tdp-field-label">Status</span>
+          <select id="task-status" class="tdp-pill-select">
+            <option value="To Do">To Do</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Done">Done</option>
+          </select>
+        </div>
+        <div class="tdp-field-group">
+          <span class="tdp-field-label">Priority</span>
+          <select id="task-priority" class="tdp-pill-select">
             <option value="High">🔴 High</option>
-            <option value="Medium" selected>🟡 Medium</option>
+            <option value="Medium">🟡 Medium</option>
             <option value="Low">🟢 Low</option>
           </select>
         </div>
-        <div>
-          <label class="field-label">Deadline</label>
-          <input id="task-deadline" type="date" class="field-input">
+        <div class="tdp-field-group">
+          <span class="tdp-field-label">Due Date</span>
+          <input id="task-deadline" type="date" class="tdp-pill-select">
         </div>
       </div>
-      <div>
-        <label class="field-label">Status</label>
-        <select id="task-status" class="field-input">
-          <option value="To Do">To Do</option>
-          <option value="In Progress">In Progress</option>
-          <option value="Done">Done</option>
-        </select>
-      </div>
-      <div>
-        <label class="field-label">Link to Client <span style="color:var(--text3);font-weight:400">(optional)</span></label>
-        <select id="task-client" class="field-input">
+
+      <div class="tdp-field-row">
+        <span class="tdp-field-label">Client</span>
+        <select id="task-client" class="tdp-inline-select">
           <option value="">— No client —</option>
         </select>
       </div>
-      <div id="task-assign-wrap">
-        <label class="field-label">Assign To</label>
-        <div id="task-assignees" class="task-member-list"></div>
+
+      <div class="tdp-field-row" id="task-assign-wrap">
+        <span class="tdp-field-label">Assign To</span>
+        <div id="task-assignees" class="tdp-member-picks"></div>
       </div>
-      <div>
-        <label class="field-label">Share With <span style="color:var(--text3);font-weight:400">(read-only access)</span></label>
-        <div id="task-shared" class="task-member-list"></div>
+
+      <div class="tdp-field-row">
+        <span class="tdp-field-label">Share With</span>
+        <div id="task-shared" class="tdp-member-picks"></div>
       </div>
-      <div style="display:flex;justify-content:flex-end;gap:10px;padding-top:4px">
-        <button class="btn-view" onclick="closeTaskModal()">Cancel</button>
-        <button class="btn-primary" onclick="saveTask()">Save Task</button>
-        <button id="task-delete-btn" class="btn-danger hidden" onclick="deleteTask()">Delete</button>
+
+      <div class="tdp-desc-wrap">
+        <span class="tdp-field-label">Description</span>
+        <textarea id="task-desc" class="tdp-desc" placeholder="Add details, links, context…" rows="4"></textarea>
+      </div>
+
+      <div class="tdp-footer">
+        <div style="display:flex;gap:10px">
+          <button class="btn-primary" onclick="saveTask()">Save</button>
+          <button class="btn-view" onclick="closeTaskModal()">Cancel</button>
+        </div>
+        <button id="task-delete-btn" class="tdp-delete-btn hidden" onclick="deleteTask()">Delete task</button>
       </div>
     </div>
+
+    <!-- Right: activity + comments -->
+    <div class="tdp-right">
+      <div class="tdp-activity-header">Activity</div>
+      <div id="task-activity-feed" class="tdp-feed"></div>
+      <div class="tdp-comment-box">
+        <textarea id="task-comment-input" class="tdp-comment-textarea" placeholder="Post an update…" rows="2"></textarea>
+        <div style="display:flex;justify-content:flex-end;margin-top:8px">
+          <button class="btn-primary" style="font-size:12px;padding:6px 16px" onclick="postTaskComment()">Post</button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </div>
 
