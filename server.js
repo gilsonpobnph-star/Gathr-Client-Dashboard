@@ -162,6 +162,44 @@ function ensurePrograms(store) {
   }
 }
 
+const DEFAULT_ADDONS = {
+  'Content Management': {
+    id: 'Content Management', name: 'Content Management', color: '#B07A28',
+    deliverables: [
+      {id:'cm_plan',label:'Monthly content plan created'},
+      {id:'cm_film',label:'Filming session completed'},
+      {id:'cm_edit',label:'Reels edited & delivered'},
+      {id:'cm_post',label:'Content scheduled & posted'},
+    ],
+  },
+  'Ads Management': {
+    id: 'Ads Management', name: 'Ads Management', color: '#C4522A',
+    deliverables: [
+      {id:'ads_build',label:'Ad campaigns built'},
+      {id:'ads_live', label:'Campaigns live'},
+      {id:'ads_wig',  label:'Weekly WIG meeting held'},
+      {id:'ads_report',label:'Performance report sent'},
+      {id:'ads_optim',label:'Campaign optimised'},
+    ],
+  },
+  'Website': {
+    id: 'Website', name: 'Website', color: '#4A7C5C',
+    deliverables: [
+      {id:'web_brief', label:'Discovery call & brief completed'},
+      {id:'web_design',label:'Design mockup approved'},
+      {id:'web_build', label:'Website built'},
+      {id:'web_review',label:'Client review & revisions done'},
+      {id:'web_launch',label:'Website launched'},
+    ],
+  },
+};
+
+function ensureAddons(store) {
+  if (!store.addons || !Object.keys(store.addons).length) {
+    store.addons = JSON.parse(JSON.stringify(DEFAULT_ADDONS));
+  }
+}
+
 function writeStore(data) {
   data.meta = data.meta || {};
   data.meta.lastModified = new Date().toISOString();
@@ -207,6 +245,7 @@ function shapeClient(c) {
     activityLog:        c.activityLog        || [],
     oldProgramChecklist:c.oldProgramChecklist|| {},
     checklists:         c.checklists         || {},
+    addonChecklists:    c.addonChecklists    || {},
     createdAt:          c.createdAt          || new Date().toISOString(),
   };
 }
@@ -241,6 +280,7 @@ app.get('/api/team', requireAuth, (req, res) => { res.json(TEAM_MEMBERS); });
 app.get('/api/clients', requireAuth, (req, res) => {
   const store = readStore();
   ensurePrograms(store);
+  ensureAddons(store);
   const list  = Object.values(store.clients || {})
     .map(shapeClient)
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -341,6 +381,69 @@ app.patch('/api/checklist/:week/:clientId', requireAuth, (req, res) => {
   store.clients[req.params.clientId] = client;
   writeStore(store);
   res.json({ fields: client.checklists[week], recordId: req.params.clientId });
+});
+
+// ── Add-ons CRUD ──────────────────────────────────────────────────────────────
+app.get('/api/addons', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureAddons(store);
+  writeStore(store);
+  res.json(store.addons);
+});
+
+app.post('/api/addons', requireAuth, (req, res) => {
+  const { name, color } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Name required' });
+  const store = readStore();
+  ensureAddons(store);
+  if (store.addons[name]) return res.status(409).json({ error: 'Add-on already exists' });
+  const addon = { id: name, name, color: color || '#8A7A6E', deliverables: [] };
+  store.addons[name] = addon;
+  writeStore(store);
+  res.json(addon);
+});
+
+app.put('/api/addons/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureAddons(store);
+  const oldId = decodeURIComponent(req.params.id);
+  const addon = store.addons[oldId];
+  if (!addon) return res.status(404).json({ error: 'Add-on not found' });
+  const { name, color, deliverables } = req.body;
+  const newName = name?.trim() || oldId;
+  const updated = { ...addon, id: newName, name: newName, color: color || addon.color, deliverables: deliverables || addon.deliverables };
+  if (newName !== oldId) {
+    delete store.addons[oldId];
+    for (const c of Object.values(store.clients || {})) {
+      if (c.addOns?.includes(oldId)) c.addOns = c.addOns.replace(oldId, newName);
+    }
+  }
+  store.addons[newName] = updated;
+  writeStore(store);
+  res.json(updated);
+});
+
+app.delete('/api/addons/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureAddons(store);
+  const id = decodeURIComponent(req.params.id);
+  if (!store.addons[id]) return res.status(404).json({ error: 'Not found' });
+  delete store.addons[id];
+  writeStore(store);
+  res.json({ ok: true });
+});
+
+app.patch('/api/addon-checklist/:clientId', requireAuth, (req, res) => {
+  const { addonName, itemId, value } = req.body;
+  const store  = readStore();
+  const client = store.clients?.[req.params.clientId];
+  if (!client) return res.status(404).json({ error: 'Not found' });
+  client.addonChecklists = client.addonChecklists || {};
+  client.addonChecklists[addonName] = client.addonChecklists[addonName] || {};
+  client.addonChecklists[addonName][itemId] = !!value;
+  store.clients[req.params.clientId] = client;
+  writeStore(store);
+  res.json({ addonChecklists: client.addonChecklists });
 });
 
 // ── Programs CRUD ─────────────────────────────────────────────────────────────

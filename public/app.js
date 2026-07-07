@@ -23,10 +23,12 @@ let modalClient = null;
 let modalViewWeek = 1;
 let modalChecklistData = {};
 let charts = {};
+let addonsMap = {};
 // Program builder state
 let pbSelectedProgram = null;
 let pbSelectedWeek    = 1;
-let pbProgramView     = 'clients'; // 'clients' | 'builder'
+let pbProgramView     = 'clients'; // 'clients' | 'builder' | 'addons'
+let pbSelectedAddon   = null;
 
 /* ── Utils ────────────────────────────────────────────────────────────────── */
 function initials(name) {
@@ -144,13 +146,14 @@ async function loadAll() {
   document.getElementById('loading').classList.remove('hidden');
   document.querySelectorAll('.tab-section').forEach(s => s.classList.add('hidden'));
 
-  const [cRes, tRes, lRes, pRes] = await Promise.all([
-    fetch('/api/clients'), fetch('/api/team'), fetch('/api/local'), fetch('/api/programs'),
+  const [cRes, tRes, lRes, pRes, aRes] = await Promise.all([
+    fetch('/api/clients'), fetch('/api/team'), fetch('/api/local'), fetch('/api/programs'), fetch('/api/addons'),
   ]);
   clients    = await cRes.json();
   team       = await tRes.json();
   localStore = await lRes.json();
   programsMap = await pRes.json();
+  addonsMap   = await aRes.json();
 
   populateAssigneeFilters();
   document.getElementById('loading').classList.add('hidden');
@@ -212,6 +215,16 @@ function populateAssigneeFilters() {
       s.appendChild(o);
     });
   });
+
+  // Populate addon checkboxes dynamically
+  const addonBox = document.getElementById('addon-checkboxes');
+  if (addonBox) {
+    addonBox.innerHTML = Object.values(addonsMap).map(a => `
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+        <input type="checkbox" class="addon-cb" data-addon="${escHtml(a.name)}"
+          style="accent-color:var(--accent);width:15px;height:15px"> ${escHtml(a.name)}
+      </label>`).join('');
+  }
 }
 
 /* ── Gathr Space member lookup ────────────────────────────────────────────── */
@@ -486,11 +499,14 @@ function switchProgramView(view) {
   pbProgramView = view;
   document.getElementById('vt-clients').classList.toggle('active', view === 'clients');
   document.getElementById('vt-builder').classList.toggle('active', view === 'builder');
+  document.getElementById('vt-addons').classList.toggle('active', view === 'addons');
   document.getElementById('prog-clients-view').classList.toggle('hidden', view !== 'clients');
   document.getElementById('prog-builder-view').classList.toggle('hidden', view !== 'builder');
+  document.getElementById('addon-builder-view').classList.toggle('hidden', view !== 'addons');
   document.getElementById('prog-filter-status').style.display = view === 'clients' ? '' : 'none';
   if (view === 'clients') renderProgramClientsView();
-  else renderProgramBuilder();
+  else if (view === 'builder') renderProgramBuilder();
+  else renderAddonBuilder();
 }
 
 function renderProgramClientsView() {
@@ -846,9 +862,15 @@ function openModal(id) {
 function populateModal() {
   const c = modalClient;
 
-  document.getElementById('cm-avatar').textContent = initials(c.name);
-  document.getElementById('cm-name').textContent   = c.name;
-  document.getElementById('cm-biz').textContent    = c.businessName || c.email;
+  document.getElementById('cm-avatar').textContent       = initials(c.name);
+  document.getElementById('cm-name').textContent         = c.name;
+  document.getElementById('cm-biz').textContent          = c.businessName || c.email;
+  document.getElementById('cm-name-input').value         = c.name || '';
+  document.getElementById('cm-bizname-input').value      = c.businessName || '';
+  document.getElementById('cm-email').value              = c.email || '';
+  document.getElementById('cm-phone').value              = c.phone || '';
+  document.getElementById('cm-insta').value              = c.instagram || '';
+  document.getElementById('cm-website').value            = c.website || '';
 
   const prog  = programsMap[c.program];
   const badge = document.getElementById('cm-prog-badge');
@@ -893,15 +915,18 @@ function populateModal() {
   document.getElementById('cm-lead').value    = c.leadAssignee || '';
   document.getElementById('cm-tech').value    = c.techAssignee || '';
 
-  // Add-ons
+  // Add-ons — tick dynamic checkboxes
   const addOnStr = c.addOns || '';
-  document.getElementById('addon-content').checked = addOnStr.includes('Content');
-  document.getElementById('addon-ads').checked     = addOnStr.includes('Ads Management');
-  document.getElementById('addon-website').checked = addOnStr.includes('Website');
-  // Extract custom text (anything after known keywords)
+  document.querySelectorAll('.addon-cb').forEach(cb => {
+    cb.checked = addOnStr.includes(cb.dataset.addon);
+  });
+  const knownAddons = Object.keys(addonsMap);
   const customText = addOnStr.split(',').map(s => s.trim())
-    .filter(s => !['Content', 'Ads Management', 'Website'].includes(s)).join(', ');
+    .filter(s => s && !knownAddons.includes(s)).join(', ');
   document.getElementById('addon-custom').value = customText;
+
+  // Render add-on checklists
+  renderAddonChecklists(c);
 
   // Content fields
   document.getElementById('cm-brand').value    = c.brandDirection || '';
@@ -1238,16 +1263,22 @@ document.getElementById('cl-next').addEventListener('click', () => { modalViewWe
 
 /* ── Save client ──────────────────────────────────────────────────────────── */
 document.getElementById('btn-save-client').addEventListener('click', async () => {
-  const c     = modalClient;
-  // Build add-ons string
+  const c = modalClient;
+
+  // Build add-ons string from dynamic checkboxes
   const addonParts = [];
-  if (document.getElementById('addon-content').checked)  addonParts.push('Content');
-  if (document.getElementById('addon-ads').checked)      addonParts.push('Ads Management');
-  if (document.getElementById('addon-website').checked)  addonParts.push('Website');
+  document.querySelectorAll('.addon-cb:checked').forEach(cb => addonParts.push(cb.dataset.addon));
   const customAddon = document.getElementById('addon-custom').value.trim();
   if (customAddon) addonParts.push(customAddon);
 
+  const newName = document.getElementById('cm-name-input').value.trim() || c.name;
   const patch = {
+    name:               newName,
+    businessName:       document.getElementById('cm-bizname-input').value.trim(),
+    email:              document.getElementById('cm-email').value.trim(),
+    phone:              document.getElementById('cm-phone').value.trim(),
+    instagram:          document.getElementById('cm-insta').value.trim(),
+    website:            document.getElementById('cm-website').value.trim(),
     business:           document.getElementById('cm-business').value,
     program:            document.getElementById('cm-program').value,
     status:             document.getElementById('cm-status').value,
@@ -1288,6 +1319,8 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
     Object.assign(c, updated);
     const idx = clients.findIndex(x => x.id === c.id);
     if (idx !== -1) clients[idx] = updated;
+
+    document.getElementById('cm-name').textContent = updated.name || '';
 
     const sBadge = document.getElementById('cm-status-badge');
     sBadge.textContent = updated.status || '—';
@@ -1446,6 +1479,197 @@ async function runMigrateOldProgram() {
     resultEl.textContent = 'Error: ' + e.message;
   } finally {
     btn.disabled = false; btn.textContent = 'Run Migration';
+  }
+}
+
+/* ── Add-on Checklist (client modal) ─────────────────────────────────────── */
+function renderAddonChecklists(c) {
+  const section = document.getElementById('addon-checklist-section');
+  if (!section) return;
+  const activeAddons = (c.addOns || '').split(',').map(s => s.trim()).filter(Boolean);
+  if (!activeAddons.length) { section.innerHTML = ''; return; }
+
+  section.innerHTML = activeAddons.map(addonName => {
+    const addon = Object.values(addonsMap).find(a => a.name === addonName);
+    if (!addon || !addon.deliverables?.length) return '';
+    const checks = (c.addonChecklists?.[addonName]) || {};
+    const done  = addon.deliverables.filter(d => checks[d.id]).length;
+    const total = addon.deliverables.length;
+    const pct   = total ? Math.round((done / total) * 100) : 0;
+    const items = addon.deliverables.map(d => `
+      <label class="checklist-item ${checks[d.id] ? 'checked' : ''}" style="cursor:pointer">
+        <input type="checkbox" ${checks[d.id] ? 'checked' : ''}
+          onchange="toggleAddonCheck('${escHtml(addonName)}','${d.id}',this.checked)"
+          style="accent-color:var(--accent);width:14px;height:14px;flex-shrink:0">
+        <span style="${checks[d.id] ? 'text-decoration:line-through;color:var(--text3)' : ''}">${escHtml(d.label)}</span>
+      </label>`).join('');
+    return `<div class="addon-checklist-card">
+      <div class="addon-checklist-header">
+        <span class="addon-checklist-title">${escHtml(addonName)}</span>
+        <span class="addon-checklist-prog">${done}/${total} · ${pct}%</span>
+      </div>
+      <div class="checklist-progress" style="margin-bottom:10px">
+        <div style="height:4px;background:var(--surface3);border-radius:4px">
+          <div style="width:${pct}%;height:100%;border-radius:4px;background:var(--accent)"></div>
+        </div>
+      </div>
+      <div class="checklist-items">${items}</div>
+    </div>`;
+  }).join('');
+}
+
+async function toggleAddonCheck(addonName, itemId, value) {
+  if (!modalClient) return;
+  const res = await fetch(`/api/addon-checklist/${modalClient.id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ addonName, itemId, value }),
+  });
+  if (res.ok) {
+    const data = await res.json();
+    modalClient.addonChecklists = data.addonChecklists;
+    renderAddonChecklists(modalClient);
+  }
+}
+
+/* ── Add-on Builder ───────────────────────────────────────────────────────── */
+function renderAddonBuilder() {
+  document.getElementById('programs-tab-title').textContent = 'Manage Add-ons';
+  document.getElementById('programs-subtitle').textContent = `${Object.keys(addonsMap).length} add-ons`;
+
+  const listEl = document.getElementById('pb-addon-list');
+  listEl.innerHTML = Object.values(addonsMap).map(a => `
+    <div class="pb-prog-item ${pbSelectedAddon === a.name ? 'active' : ''}"
+         onclick="selectAddon('${a.name.replace(/'/g,"\\'")}')">
+      <span class="pb-prog-label">${escHtml(a.name)}</span>
+      <span class="pb-prog-dur">${(a.deliverables||[]).length}d</span>
+    </div>`).join('');
+
+  if (pbSelectedAddon && addonsMap[pbSelectedAddon]) {
+    renderAddonEditor(addonsMap[pbSelectedAddon]);
+  }
+}
+
+function selectAddon(name) {
+  pbSelectedAddon = name;
+  renderAddonBuilder();
+}
+
+function renderAddonEditor(addon) {
+  const deliverables = addon.deliverables || [];
+  document.getElementById('pb-addon-content').innerHTML = `
+    <div class="pb-editor-header">
+      <div class="pb-editor-title">${escHtml(addon.name)}</div>
+      <button class="pb-delete-btn" onclick="deleteAddon('${escHtml(addon.id)}')">Delete Add-on</button>
+    </div>
+    <div class="pb-form-section">
+      <label class="pb-label">Add-on Name</label>
+      <input id="pa-name" class="pb-input" value="${escHtml(addon.name)}">
+    </div>
+    <div class="pb-form-section" style="margin-top:20px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <label class="pb-label" style="margin:0">Deliverables</label>
+        <button class="pb-add-item-btn" onclick="addAddonDeliverable()">+ Add</button>
+      </div>
+      <div id="pa-deliverables">
+        ${deliverables.map((d,i) => `
+          <div class="pb-item-row" id="pa-row-${i}">
+            <input class="pb-item-input" value="${escHtml(d.label)}"
+              oninput="updateAddonItemLabel(${i}, this.value)">
+            <button class="pb-item-del" onclick="removeAddonDeliverable(${i})">✕</button>
+          </div>`).join('')}
+      </div>
+    </div>
+    <div style="margin-top:20px;display:flex;gap:10px">
+      <button class="btn-primary pb-save-btn" onclick="saveAddonDetails()">Save Add-on</button>
+    </div>
+    <div id="pa-save-msg" style="margin-top:8px;font-size:13px"></div>`;
+}
+
+let paEdits = {};
+
+function updateAddonItemLabel(idx, val) {
+  paEdits[idx] = val;
+}
+
+function addAddonDeliverable() {
+  if (!pbSelectedAddon || !addonsMap[pbSelectedAddon]) return;
+  const addon = addonsMap[pbSelectedAddon];
+  addon.deliverables = addon.deliverables || [];
+  addon.deliverables.push({ id: 'item_' + Date.now(), label: 'New deliverable' });
+  renderAddonEditor(addon);
+}
+
+function removeAddonDeliverable(idx) {
+  if (!pbSelectedAddon || !addonsMap[pbSelectedAddon]) return;
+  const addon = addonsMap[pbSelectedAddon];
+  addon.deliverables.splice(idx, 1);
+  renderAddonEditor(addon);
+}
+
+async function saveAddonDetails() {
+  if (!pbSelectedAddon || !addonsMap[pbSelectedAddon]) return;
+  const addon    = addonsMap[pbSelectedAddon];
+  const msgEl    = document.getElementById('pa-save-msg');
+  const newName  = document.getElementById('pa-name').value.trim() || addon.name;
+
+  // Apply any inline edits
+  document.querySelectorAll('#pa-deliverables .pb-item-row').forEach((row, i) => {
+    const val = row.querySelector('.pb-item-input')?.value.trim();
+    if (val && addon.deliverables[i]) addon.deliverables[i].label = val;
+  });
+
+  const payload = { name: newName, deliverables: addon.deliverables };
+  msgEl.textContent = 'Saving…'; msgEl.style.color = 'var(--accent)';
+
+  const res = await fetch(`/api/addons/${addon.id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (res.ok) {
+    const updated = await res.json();
+    delete addonsMap[pbSelectedAddon];
+    addonsMap[updated.name] = updated;
+    pbSelectedAddon = updated.name;
+    await loadAll();
+    renderAddonBuilder();
+    msgEl.style.color = 'var(--green)';
+    msgEl.textContent = '✓ Saved';
+    setTimeout(() => { msgEl.textContent = ''; }, 2500);
+  } else {
+    msgEl.style.color = '#e53e3e'; msgEl.textContent = 'Error saving.';
+  }
+}
+
+async function createNewAddon() {
+  const name = prompt('New add-on name:');
+  if (!name?.trim()) return;
+  const res = await fetch('/api/addons', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name.trim(), deliverables: [] }),
+  });
+  if (res.ok) {
+    const addon = await res.json();
+    await loadAll();
+    pbSelectedAddon = addon.name;
+    renderAddonBuilder();
+  }
+}
+
+async function deleteAddon(id) {
+  const addon = Object.values(addonsMap).find(a => a.id === id);
+  if (!addon) return;
+  if (!confirm(`Delete add-on "${addon.name}"? This cannot be undone.`)) return;
+  const res = await fetch(`/api/addons/${id}`, { method: 'DELETE' });
+  if (res.ok) {
+    await loadAll();
+    pbSelectedAddon = null;
+    renderAddonBuilder();
+  } else {
+    const data = await res.json().catch(() => ({}));
+    alert(data.error || 'Error deleting add-on.');
   }
 }
 

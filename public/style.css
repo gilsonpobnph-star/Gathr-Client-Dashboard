@@ -810,6 +810,29 @@ body {
 .pb-add-row { display: flex; gap: 8px; align-items: center; }
 .pb-add-row .pb-input { flex: 1; }
 
+/* ── Add-on Checklist Cards ───────────────────────────────────────────────── */
+.addon-checklist-card {
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 14px 16px; margin-bottom: 12px;
+}
+.addon-checklist-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.addon-checklist-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.addon-checklist-prog  { font-size: 12px; color: var(--text3); }
+.pb-item-del {
+  background: none; border: none; color: var(--text3); cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 0 4px; transition: color .12s;
+}
+.pb-item-del:hover { color: #e53e3e; }
+.pb-add-item-btn {
+  font-size: 12px; color: var(--accent); background: var(--accent-dim);
+  border: 1px solid var(--accent); border-radius: 5px; padding: 3px 10px;
+  cursor: pointer; transition: background .12s;
+}
+.pb-add-item-btn:hover { background: var(--accent); color: #fff; }
+
 /* ── Misc ─────────────────────────────────────────────────────────────────── */
 .text-muted { color: var(--text2); }
 .text-sm { font-size: 12px; }
