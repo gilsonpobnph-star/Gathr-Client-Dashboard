@@ -451,9 +451,9 @@ function renderTodaysRead() {
     return;
   }
 
-  const levelColor = { critical: '#b91c1c', warn: '#c2410c', caution: '#b45309', info: '#1d4ed8' };
-  const levelBg    = { critical: '#fef2f2', warn: '#fff7ed', caution: '#fffbeb', info: '#eff6ff' };
-  const levelBorder= { critical: '#fca5a5', warn: '#fdba74', caution: '#fcd34d', info: '#bfdbfe' };
+  const levelColor  = { critical: '#f87171', warn: '#fb923c', caution: '#fbbf24', info: '#7dd3fc' };
+  const levelBg     = { critical: 'rgba(248,113,113,.09)', warn: 'rgba(224,91,46,.10)', caution: 'rgba(251,191,36,.09)', info: 'rgba(125,211,252,.08)' };
+  const levelBorder = { critical: '#f87171', warn: 'var(--accent2)', caution: '#fbbf24', info: '#7dd3fc' };
 
   el.innerHTML = items.map(item => `
     <div class="tr-item" style="border-left-color:${levelBorder[item.level]};background:${levelBg[item.level]}">
@@ -1504,29 +1504,43 @@ function populateModal() {
   const clientProgs = c.programs?.length ? c.programs : (c.program ? [c.program] : []);
   const container = document.getElementById('cm-programs-container');
   const allProgs = Object.keys(programsMap).filter(k => k !== 'Old Program');
+  const progStatuses = c.programStatuses || {};
+  const PROG_STATUS_OPTS = ['Active','In Progress','On Hold','Completed','Cancelled'];
   container.innerHTML = allProgs.map(name => {
     const prog = programsMap[name];
     const checked = clientProgs.includes(name);
     const color = prog?.color || '#8A7A6E';
-    return `<label class="prog-check-label" onclick="event.stopPropagation()">
-      <input type="checkbox" class="prog-checkbox" value="${escHtml(name)}" ${checked ? 'checked' : ''}
-        onchange="onProgramToggle()">
-      <div class="prog-check-box ${checked ? 'checked' : ''}" style="${checked ? `background:${color}` : ''}">
-        <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
+    const ps = progStatuses[name] || 'Active';
+    const statusSel = PROG_STATUS_OPTS.map(s => `<option value="${s}" ${ps===s?'selected':''}>${s}</option>`).join('');
+    return `<div class="prog-enroll-row" id="prog-row-${escHtml(name).replace(/\s+/g,'_')}">
+      <label class="prog-check-label" onclick="event.stopPropagation()">
+        <input type="checkbox" class="prog-checkbox" value="${escHtml(name)}" ${checked ? 'checked' : ''}
+          onchange="onProgramToggle(this)">
+        <div class="prog-check-box ${checked ? 'checked' : ''}" style="${checked ? `background:${color}` : ''}">
+          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round"><polyline points="20,6 9,17 4,12"/></svg>
+        </div>
+        <span class="prog-check-dot" style="background:${color}"></span>
+        <span>${escHtml(name)}</span>
+      </label>
+      <div class="prog-enroll-meta ${checked ? '' : 'hidden'}" data-prog="${escHtml(name)}">
+        <select class="prog-status-sel inline-select" data-prog="${escHtml(name)}" style="font-size:11px;padding:2px 6px;min-width:100px">${statusSel}</select>
+        <button class="prog-restart-btn" title="Start new cycle (reset to Week 1)" onclick="restartProgram('${escHtml(name).replace(/'/g,"\\'")}')">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>
+          New cycle
+        </button>
       </div>
-      <span class="prog-check-dot" style="background:${color}"></span>
-      <span>${escHtml(name)}</span>
-    </label>`;
+    </div>`;
   }).join('');
 
-  // Sync checkbox visuals on change
+  // Sync checkbox visuals and show/hide meta on change
   container.querySelectorAll('.prog-checkbox').forEach(cb => {
     cb.addEventListener('change', () => {
       const box = cb.closest('label').querySelector('.prog-check-box');
+      const meta = cb.closest('.prog-enroll-row').querySelector('.prog-enroll-meta');
       const prog = programsMap[cb.value];
       const color = prog?.color || '#8A7A6E';
-      if (cb.checked) { box.classList.add('checked'); box.style.background = color; }
-      else            { box.classList.remove('checked'); box.style.background = ''; }
+      if (cb.checked) { box.classList.add('checked'); box.style.background = color; meta?.classList.remove('hidden'); }
+      else            { box.classList.remove('checked'); box.style.background = ''; meta?.classList.add('hidden'); }
     });
   });
 
@@ -1770,13 +1784,27 @@ function switchProgram(name) {
   loadChecklist(modalViewWeek);
 }
 
-function onProgramToggle() {
-  // Keep modalProgramWeeks in sync when a program is added
-  const checked = [...document.querySelectorAll('.prog-checkbox:checked')].map(cb => cb.value);
+function onProgramToggle(cb) {
+  const checked = [...document.querySelectorAll('.prog-checkbox:checked')].map(c => c.value);
   checked.forEach(p => { if (!modalProgramWeeks[p]) modalProgramWeeks[p] = 1; });
   if (!checked.includes(modalActiveProgram)) {
     modalActiveProgram = checked[0] || '';
     modalViewWeek = modalProgramWeeks[modalActiveProgram] || 1;
+  }
+}
+
+function restartProgram(progName) {
+  if (!modalClient) return;
+  if (!confirm(`Start a new cycle for "${progName}"? This will reset its week back to 1.`)) return;
+  modalProgramWeeks[progName] = 1;
+  // Update the status select to "Active"
+  const sel = document.querySelector(`.prog-status-sel[data-prog="${CSS.escape(progName)}"]`);
+  if (sel) sel.value = 'Active';
+  // If it's the currently active program, reload checklist at week 1
+  if (modalActiveProgram === progName) {
+    modalViewWeek = 1;
+    modalChecklistData = {};
+    loadChecklist(1);
   }
 }
 
@@ -2023,6 +2051,7 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
     business:           document.getElementById('cm-business').value,
     programs:           [...document.querySelectorAll('.prog-checkbox:checked')].map(cb => cb.value),
     programWeeks:       { ...modalProgramWeeks },
+    programStatuses:    Object.fromEntries([...document.querySelectorAll('.prog-status-sel')].map(s => [s.dataset.prog, s.value])),
     status:             document.getElementById('cm-status').value,
     startDate:          document.getElementById('cm-start').value,
     leadAssignee:       document.getElementById('cm-lead').value,
