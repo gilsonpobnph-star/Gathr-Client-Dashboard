@@ -291,7 +291,9 @@ function renderOverview() {
   document.getElementById('kpi-completed').textContent  = completed;
   document.getElementById('kpi-active-sub').textContent = `${clients.length} total clients`;
   document.getElementById('overview-subtitle').textContent =
-    `Last refreshed ${new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}`;
+    `${clients.filter(c => ['In Progress','Active','Onboarding'].includes(c.status)).length} active · refreshed ${new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' })}`;
+  const ovDate = document.getElementById('ov-date-label');
+  if (ovDate) ovDate.textContent = new Date().toLocaleDateString('en-AU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   renderTodaysRead();
   renderDeadlineHealth();

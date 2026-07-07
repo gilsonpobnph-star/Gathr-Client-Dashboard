@@ -81,114 +81,155 @@
 
     <!-- Overview -->
     <section id="tab-overview" class="tab-section hidden">
-      <div class="page-header">
-        <div>
-          <h1>Overview</h1>
-          <p class="subtitle" id="overview-subtitle">—</p>
+
+      <!-- Top bar -->
+      <div class="ov-topbar">
+        <div class="ov-topbar-left">
+          <h1 class="ov-title">Dashboard</h1>
+          <p class="ov-date" id="ov-date-label">—</p>
         </div>
-        <div class="header-actions">
-          <button class="btn-view" id="btn-migrate-old" onclick="showMigrateOldProgram()">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;vertical-align:-1px"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></svg>
-            Migrate Old Program
-          </button>
+        <div class="ov-topbar-right">
           <button class="btn-view" onclick="downloadBackup()">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;vertical-align:-1px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Backup
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:-1px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Backup
           </button>
           <label class="btn-view" style="cursor:pointer">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;vertical-align:-1px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            Restore
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:-1px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17,8 12,3 7,8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Restore
             <input type="file" id="restore-file" accept=".json" style="display:none" onchange="restoreBackup(this)">
           </label>
           <button class="btn-primary" onclick="window.open('/intake','_blank')">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:5px;vertical-align:-1px"><path d="M12 5v14M5 12h14"/></svg>
-            Client Intake Form
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="margin-right:4px;vertical-align:-1px"><path d="M12 5v14M5 12h14"/></svg>New Intake
           </button>
         </div>
-        <div id="import-result" style="display:none;margin-top:10px;padding:10px 14px;background:var(--green-dim);border:1px solid var(--green);border-radius:6px;font-size:12.5px;color:var(--green)"></div>
       </div>
+
       <div class="overview-scroll">
+        <div class="ov-layout">
 
-        <!-- Today's Read -->
-        <div class="chart-card" style="margin-bottom:16px">
-          <div class="chart-card-title">
-            <span class="dot" style="background:var(--accent)"></span>
-            Today's Read
-            <span style="font-size:11px;color:var(--text3);margin-left:6px;font-weight:400">Priorities · Alerts · Deadlines</span>
-          </div>
-          <div id="todays-read" class="todays-read-wrap"></div>
-        </div>
+          <!-- Left / main column -->
+          <div class="ov-main">
 
-        <div class="kpi-row">
-          <div class="kpi-card kc-accent">
-            <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
-            <div class="kpi-label">Active Clients</div>
-            <div class="kpi-value" id="kpi-active">—</div>
-            <div class="kpi-sub" id="kpi-active-sub">—</div>
-          </div>
-          <div class="kpi-card kc-purple">
-            <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg></div>
-            <div class="kpi-label">New Intakes</div>
-            <div class="kpi-value" id="kpi-intake">—</div>
-            <div class="kpi-sub">Awaiting assignment</div>
-          </div>
-          <div class="kpi-card kc-amber">
-            <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg></div>
-            <div class="kpi-label">Paused</div>
-            <div class="kpi-value" id="kpi-paused">—</div>
-            <div class="kpi-sub">On hold</div>
-          </div>
-          <div class="kpi-card kc-blue">
-            <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg></div>
-            <div class="kpi-label">Completed</div>
-            <div class="kpi-value" id="kpi-completed">—</div>
-            <div class="kpi-sub">Programs finished</div>
-          </div>
-        </div>
+            <!-- KPI stat cards -->
+            <div class="kpi-row">
+              <div class="kpi-card kc-accent">
+                <div class="kpi-top">
+                  <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+                  <span class="kpi-label">Active Clients</span>
+                </div>
+                <div class="kpi-value" id="kpi-active">—</div>
+                <div class="kpi-sub" id="kpi-active-sub">Total enrolled</div>
+              </div>
+              <div class="kpi-card kc-green">
+                <div class="kpi-top">
+                  <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg></div>
+                  <span class="kpi-label">Completed</span>
+                </div>
+                <div class="kpi-value" id="kpi-completed">—</div>
+                <div class="kpi-sub">Programs finished</div>
+              </div>
+              <div class="kpi-card kc-purple">
+                <div class="kpi-top">
+                  <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
+                  <span class="kpi-label">New Intakes</span>
+                </div>
+                <div class="kpi-value" id="kpi-intake">—</div>
+                <div class="kpi-sub">Awaiting assignment</div>
+              </div>
+              <div class="kpi-card kc-amber">
+                <div class="kpi-top">
+                  <div class="kpi-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12,6 12,12 16,14"/></svg></div>
+                  <span class="kpi-label">On Hold</span>
+                </div>
+                <div class="kpi-value" id="kpi-paused">—</div>
+                <div class="kpi-sub">Paused programs</div>
+              </div>
+            </div>
 
-        <!-- Deadline Health Row -->
-        <div class="dl-health-row">
-          <div class="dl-health-card dlh-green">
-            <div class="dlh-label">On Track</div>
-            <div class="dlh-value" id="dlh-on-track">—</div>
-            <div class="dlh-sub">Running to schedule</div>
-          </div>
-          <div class="dl-health-card dlh-yellow">
-            <div class="dlh-label">At Risk</div>
-            <div class="dlh-value" id="dlh-at-risk">—</div>
-            <div class="dlh-sub">1 week behind</div>
-          </div>
-          <div class="dl-health-card dlh-orange">
-            <div class="dlh-label">Behind</div>
-            <div class="dlh-value" id="dlh-behind">—</div>
-            <div class="dlh-sub">2+ weeks behind</div>
-          </div>
-          <div class="dl-health-card dlh-red">
-            <div class="dlh-label">Overdue</div>
-            <div class="dlh-value" id="dlh-overdue">—</div>
-            <div class="dlh-sub">Past end date</div>
-          </div>
-        </div>
+            <!-- Program Progress timeline -->
+            <div class="dash-card" style="margin-bottom:16px">
+              <div class="dash-card-header">
+                <div class="dash-card-title">
+                  <span class="dash-card-dot" style="background:var(--accent)"></span>
+                  Active Client Progress
+                </div>
+                <span class="dash-card-sub" id="overview-subtitle">—</span>
+              </div>
+              <div id="week-timeline-container" class="week-timeline-wrap"></div>
+            </div>
 
-        <div class="chart-card" style="margin-bottom:16px">
-          <div class="chart-card-title">
-            <span class="dot" style="background:var(--accent)"></span>
-            Active Client Program Progress
-          </div>
-          <div id="week-timeline-container" class="week-timeline-wrap"></div>
-        </div>
+            <!-- Charts row -->
+            <div class="chart-grid">
+              <div class="dash-card">
+                <div class="dash-card-header">
+                  <div class="dash-card-title"><span class="dash-card-dot" style="background:var(--accent)"></span>By Program</div>
+                </div>
+                <div class="chart-wrap" style="height:190px"><canvas id="chart-programs"></canvas></div>
+              </div>
+              <div class="dash-card">
+                <div class="dash-card-header">
+                  <div class="dash-card-title"><span class="dash-card-dot" style="background:var(--blue)"></span>Status Breakdown</div>
+                </div>
+                <div class="chart-wrap" style="height:190px"><canvas id="chart-status"></canvas></div>
+              </div>
+            </div>
 
-        <div class="chart-grid">
-          <div class="chart-card">
-            <div class="chart-card-title"><span class="dot" style="background:var(--purple)"></span>Clients by Program</div>
-            <div class="chart-wrap" style="height:200px"><canvas id="chart-programs"></canvas></div>
           </div>
-          <div class="chart-card">
-            <div class="chart-card-title"><span class="dot" style="background:var(--blue)"></span>Status Distribution</div>
-            <div class="chart-wrap" style="height:200px"><canvas id="chart-status"></canvas></div>
+
+          <!-- Right sidebar -->
+          <div class="ov-sidebar">
+
+            <!-- Alerts / Today's Read -->
+            <div class="dash-card ov-alerts-card">
+              <div class="dash-card-header">
+                <div class="dash-card-title">
+                  <span class="dash-card-dot" style="background:var(--accent)"></span>
+                  Today's Priorities
+                </div>
+              </div>
+              <div id="todays-read" class="todays-read-wrap"></div>
+            </div>
+
+            <!-- Deadline health -->
+            <div class="dash-card">
+              <div class="dash-card-header">
+                <div class="dash-card-title"><span class="dash-card-dot" style="background:var(--green)"></span>Schedule Health</div>
+              </div>
+              <div class="dlh-list">
+                <div class="dlh-row">
+                  <div class="dlh-row-left">
+                    <span class="dlh-dot" style="background:#15803d"></span>
+                    <span class="dlh-row-label">On Track</span>
+                  </div>
+                  <span class="dlh-row-val" id="dlh-on-track">—</span>
+                </div>
+                <div class="dlh-row">
+                  <div class="dlh-row-left">
+                    <span class="dlh-dot" style="background:#b45309"></span>
+                    <span class="dlh-row-label">At Risk</span>
+                  </div>
+                  <span class="dlh-row-val" id="dlh-at-risk">—</span>
+                </div>
+                <div class="dlh-row">
+                  <div class="dlh-row-left">
+                    <span class="dlh-dot" style="background:#c2410c"></span>
+                    <span class="dlh-row-label">Behind</span>
+                  </div>
+                  <span class="dlh-row-val" id="dlh-behind">—</span>
+                </div>
+                <div class="dlh-row dlh-row-last">
+                  <div class="dlh-row-left">
+                    <span class="dlh-dot" style="background:#b91c1c"></span>
+                    <span class="dlh-row-label">Overdue</span>
+                  </div>
+                  <span class="dlh-row-val dlh-row-val-danger" id="dlh-overdue">—</span>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </div>
+
+      <div id="import-result" style="display:none;margin:0 32px 10px;padding:10px 14px;background:var(--green-dim);border:1px solid var(--green);border-radius:6px;font-size:12.5px;color:var(--green)"></div>
     </section>
 
     <!-- All Clients -->
