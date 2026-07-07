@@ -455,7 +455,7 @@ function renderClients() {
     const week  = Math.min(c.currentWeek || 1, dur);
     const pct   = Math.round((week / dur) * 100);
     const color = progColor(c.program);
-    return `<tr>
+    return `<tr class="client-row" onclick="openModal('${c.id}')">
       <td>
         <div class="name-cell">
           <div class="avatar">${initials(c.name)}</div>
@@ -477,7 +477,7 @@ function renderClients() {
       <td>${c.techAssignee ? `<span class="assignee-chip"><span class="chip-dot" style="background:var(--blue)"></span>${c.techAssignee}</span>` : '<span class="text-muted text-sm">—</span>'}</td>
       <td class="text-sm text-muted">${fmtDate(c.startDate)}</td>
       <td class="text-sm text-muted">${endDateLabel(c)}</td>
-      <td><button class="btn-view" onclick="openModal('${c.id}')">View →</button></td>
+      <td><button class="btn-view" onclick="event.stopPropagation();openModal('${c.id}')">Edit →</button></td>
     </tr>`;
   }).join('');
 }

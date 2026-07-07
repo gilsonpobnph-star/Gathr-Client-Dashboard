@@ -291,6 +291,8 @@ body {
 .progress-bar-fill { height: 100%; border-radius: 3px; }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
+.client-row { cursor: pointer; }
+.client-row:hover td { background: var(--surface2); }
 .btn-view {
   background: var(--surface2); border: 1px solid var(--border);
   color: var(--text2); font-size: 11.5px; padding: 5px 12px;
