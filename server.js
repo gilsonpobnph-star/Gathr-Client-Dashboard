@@ -862,6 +862,33 @@ app.patch('/api/checklist/:week/:clientId', requireAuth, (req, res) => {
   res.json({ fields: shaped.checklists[pId][week], recordId: req.params.clientId, programId: pId });
 });
 
+// Mark all checklist items for a program as complete
+app.post('/api/clients/:id/complete-program/:programId', requireAuth, (req, res) => {
+  const store  = readStore();
+  const client = store.clients?.[req.params.id];
+  if (!client) return res.status(404).json({ error: 'Not found' });
+  const pId    = req.params.programId;
+  const prog   = store.programs?.[pId];
+  if (!prog?.weeks) return res.status(400).json({ error: 'Program not found' });
+
+  const shaped = shapeClient(client);
+  shaped.checklists[pId] = shaped.checklists[pId] || {};
+  const completed = {};
+  Object.entries(prog.weeks).forEach(([wk, def]) => {
+    const week = parseInt(wk);
+    shaped.checklists[pId][week] = shaped.checklists[pId][week] || {};
+    (def.items || []).forEach(item => {
+      shaped.checklists[pId][week][item.id] = true;
+      completed[`${week}:${item.id}`] = true;
+    });
+  });
+  Object.assign(client, { checklists: shaped.checklists });
+  store.clients[req.params.id] = client;
+  logActivity(store, req, 'Program completed', { clientId: req.params.id, clientName: client.name, details: `All tasks auto-checked for ${pId}` });
+  writeStore(store);
+  res.json({ checklists: shaped.checklists[pId], programId: pId });
+});
+
 // ── Add-ons CRUD ──────────────────────────────────────────────────────────────
 app.get('/api/addons', requireAuth, (req, res) => {
   const store = readStore();

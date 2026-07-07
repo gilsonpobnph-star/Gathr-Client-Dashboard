@@ -1604,6 +1604,31 @@ function populateModal() {
     </div>`;
   }).join('') : '<p style="font-size:12px;color:var(--text3);padding:4px 0">No programs enrolled yet.</p>';
 
+  // Wire status selects — auto-complete checklist when set to Completed
+  container.querySelectorAll('.prog-status-sel').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      if (sel.value !== 'Completed') return;
+      const progName = sel.dataset.prog;
+      if (!confirm(`Mark all checklist tasks for "${progName}" as complete?`)) return;
+      sel.disabled = true;
+      try {
+        const res = await fetch(`/api/clients/${modalClient.id}/complete-program/${encodeURIComponent(progName)}`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // Update local checklist cache so view reflects immediately
+          Object.entries(data.checklists || {}).forEach(([wk, fields]) => {
+            const key = `${progName}__${wk}`;
+            modalChecklistData[key] = { fields, recordId: modalClient.id, programId: progName };
+          });
+          if (modalActiveProgram === progName) renderChecklist(modalViewWeek);
+        }
+      } catch (e) { console.error('auto-complete failed', e); }
+      sel.disabled = false;
+    });
+  });
+
   // "Add program" dropdown for unenrolled programs
   const unenrolled = allProgs.filter(p => !clientProgs.includes(p));
   addArea.innerHTML = unenrolled.length ? `
