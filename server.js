@@ -215,6 +215,100 @@ const DEFAULT_PROGRAMS = {
       ]},
     },
   },
+  'Content': {
+    id: 'Content', name: 'Content', duration: 4, price: '$1,000–$1,500/mo', color: '#B07A28',
+    weeks: {
+      1:{title:'Week 1 — Planning',phase:'Planning',items:[
+        {id:'CSS',label:'Content strategy session completed'},
+        {id:'MCP',label:'Monthly content plan created & approved'},
+        {id:'SLB',label:'Shot list / content brief sent to client'},
+        {id:'FSD',label:'Filming session date confirmed'},
+      ]},
+      2:{title:'Week 2 — Filming',phase:'Production',items:[
+        {id:'FSC',label:'Filming session completed'},
+        {id:'RFR',label:'Raw footage received & reviewed'},
+        {id:'EBC',label:'Editing brief confirmed'},
+      ]},
+      3:{title:'Week 3 — Editing & Delivery',phase:'Delivery',items:[
+        {id:'HR4',label:'Hero reels edited & delivered (×4)'},
+        {id:'BR8',label:'Basic reels edited & delivered (×8)'},
+        {id:'SR8',label:'Short branded reels edited & delivered (×8)'},
+        {id:'PH5',label:'Photos edited & delivered (×5)'},
+      ]},
+      4:{title:'Week 4 — Review & Schedule',phase:'Wrap-up',items:[
+        {id:'CRR',label:'Client revision requests received'},
+        {id:'RVC',label:'Revisions completed'},
+        {id:'CPC',label:'Content posting calendar delivered'},
+        {id:'ACS',label:'All content scheduled / ready to post'},
+        {id:'MRC',label:'Monthly review call completed'},
+      ]},
+    },
+  },
+  'Ads Management': {
+    id: 'Ads Management', name: 'Ads Management', duration: 4, price: '$1,000–$1,500/mo', color: '#C4522A',
+    weeks: {
+      1:{title:'Week 1 — Setup & Launch',phase:'Setup',items:[
+        {id:'AAG',label:'Ad account access granted'},
+        {id:'AAA',label:'Ad account audited'},
+        {id:'PTC',label:'Pixel / tracking confirmed'},
+        {id:'SCS',label:'Campaign strategy session completed'},
+        {id:'ACB',label:'Ad creatives received / briefed'},
+        {id:'CAB',label:'Campaigns built'},
+        {id:'CAL',label:'Campaigns live'},
+      ]},
+      2:{title:'Week 2 — WIG & Optimise',phase:'Management',items:[
+        {id:'WIG2',label:'Weekly WIG meeting held'},
+        {id:'PBN',label:'Campaign performance baseline noted'},
+        {id:'IOM',label:'Initial optimisations made'},
+        {id:'ABT',label:'A/B test variants set up'},
+      ]},
+      3:{title:'Week 3 — Review & Adjust',phase:'Management',items:[
+        {id:'WIG3',label:'Weekly WIG meeting held'},
+        {id:'PDR',label:'Performance data reviewed'},
+        {id:'BPC',label:'Budget pacing checked'},
+        {id:'ACA',label:'Audience / creative adjustments made'},
+      ]},
+      4:{title:'Week 4 — Report & Plan',phase:'Reporting',items:[
+        {id:'WIG4',label:'Weekly WIG meeting held'},
+        {id:'MPR',label:'Monthly performance report delivered'},
+        {id:'CFO',label:'Campaign fully optimised'},
+        {id:'BRM',label:'Budget & strategy review for next month'},
+      ]},
+    },
+  },
+  'Website': {
+    id: 'Website', name: 'Website', duration: 5, price: '$3,500', color: '#4A7C5C',
+    weeks: {
+      1:{title:'Week 1 — Discovery',phase:'Discovery',items:[
+        {id:'DCC',label:'Discovery call completed'},
+        {id:'SCA',label:'Scope of work confirmed & approved'},
+        {id:'BAR',label:'Brand assets received'},
+        {id:'CPB',label:'Copy brief sent to client'},
+      ]},
+      2:{title:'Week 2 — Design',phase:'Design',items:[
+        {id:'SPA',label:'Sitemap / page structure approved'},
+        {id:'WMP',label:'Wireframes / mockups presented'},
+        {id:'DAC',label:'Design approved by client'},
+      ]},
+      3:{title:'Week 3 — Build',phase:'Build',items:[
+        {id:'WBL',label:'Website built'},
+        {id:'MRC',label:'Mobile responsiveness confirmed'},
+        {id:'BIC',label:'Booking / CRM integration connected'},
+        {id:'DCL',label:'Domain connected & SSL live'},
+      ]},
+      4:{title:'Week 4 — Review',phase:'Review',items:[
+        {id:'CRC',label:'Client review call completed'},
+        {id:'RVA',label:'Revisions applied'},
+        {id:'IQA',label:'Internal QA completed'},
+      ]},
+      5:{title:'Week 5 — Launch',phase:'Launch',items:[
+        {id:'WSL',label:'Website launched'},
+        {id:'CTH',label:'Client training / handover completed'},
+        {id:'PLC',label:'Post-launch check completed (48 hrs)'},
+        {id:'PSO',label:'Project signed off'},
+      ]},
+    },
+  },
   'Old Program': {
     id: 'Old Program', name: 'Old Program', duration: 4, price: '—', color: '#8A7A6E',
     weeks: {
@@ -256,6 +350,12 @@ function ensurePrograms(store) {
   if (!store.programs || !Object.keys(store.programs).length) {
     store.programs = JSON.parse(JSON.stringify(DEFAULT_PROGRAMS));
     return;
+  }
+  // Add any new default programs that don't exist in the store yet
+  for (const [key, def] of Object.entries(DEFAULT_PROGRAMS)) {
+    if (!store.programs[key]) {
+      store.programs[key] = JSON.parse(JSON.stringify(def));
+    }
   }
   // Migrate: update Personal Brand Full if it still has old empty weeks 5-16
   const pbf = store.programs['Personal Brand Full'];
