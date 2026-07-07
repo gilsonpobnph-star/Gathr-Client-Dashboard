@@ -408,7 +408,7 @@ function renderOverview() {
 
   renderTodaysRead();
   renderDeadlineHealth();
-  renderClientHealthBoard('client-health-board', clients.filter(c => ACTIVE_STATUSES.includes(c.status)));
+  renderClientHealthBoard('client-health-board', clients.filter(c => !['Closed'].includes(c.status)));
   renderChart('chart-programs', 'doughnut', programChartData());
   renderChart('chart-status',   'doughnut', statusChartData());
 }
@@ -490,44 +490,77 @@ function renderTodaysRead() {
 function renderClientHealthBoard(containerId, list) {
   const wrap = document.getElementById(containerId);
   if (!wrap) return;
-  if (!list.length) {
-    wrap.innerHTML = '<p style="color:var(--text3);font-size:13px;text-align:center;padding:20px 0">No active clients yet.</p>';
-    return;
-  }
 
-  const stateOrder = { overdue: 0, delayed: 1, 'at-risk': 2, 'on-track': 3, null: 4 };
-  const sorted = [...list].sort((a, b) => {
-    const sa = deadlineStatus(a)?.state || null;
-    const sb = deadlineStatus(b)?.state || null;
-    return (stateOrder[sa] ?? 4) - (stateOrder[sb] ?? 4);
-  });
-
+  const DONE_PROG_STATUSES = ['Completed', 'Cancelled'];
+  const DONE_CLIENT_STATUSES = ['Completed', 'Alumni', 'Closed'];
+  const stateRank = { overdue: 0, delayed: 1, 'at-risk': 2, 'on-track': 3 };
   const healthColor = { overdue: '#ef4444', delayed: '#f97316', 'at-risk': '#f59e0b', 'on-track': '#4ade80' };
   const healthLabel = { overdue: 'Overdue', delayed: 'Behind', 'at-risk': 'At Risk', 'on-track': 'On Track' };
   const healthBg    = { overdue: 'rgba(239,68,68,.15)', delayed: 'rgba(249,115,22,.15)', 'at-risk': 'rgba(245,158,11,.15)', 'on-track': 'rgba(74,222,128,.12)' };
 
-  wrap.innerHTML = sorted.map(c => {
-    const dur    = progDuration(c.program) || 1;
-    const week   = Math.min(c.currentWeek || 1, dur);
-    const pct    = Math.round((week / dur) * 100);
-    const color  = progColor(c.program);
-    const ds     = deadlineStatus(c);
-    const state  = ds?.state || 'on-track';
+  // Expand to one row per active program per client
+  const rows = [];
+  for (const c of list) {
+    const progs = c.programs?.length ? c.programs : (c.program ? [c.program] : []);
+    const progStatuses  = c.programStatuses  || {};
+    const progStartDates = c.programStartDates || {};
+    const clientDone = DONE_CLIENT_STATUSES.includes(c.status);
+
+    for (const prog of progs) {
+      const ps = progStatuses[prog] || '';
+      // Skip programs explicitly marked done
+      if (DONE_PROG_STATUSES.includes(ps)) continue;
+      // Skip if client is done and this program has no explicit active status
+      if (clientDone && !ps) continue;
+
+      const dur   = progDuration(prog) || 1;
+      const week  = Math.min((c.programWeeks?.[prog]) || (prog === progs[0] ? c.currentWeek || 1 : 1), dur);
+      const pct   = Math.round((week / dur) * 100);
+      const color = progColor(prog);
+      const phase = getPhaseLabel(prog, week);
+      const sd    = progStartDates[prog] || (prog === progs[0] ? c.startDate : null);
+
+      // Compute health for this specific program
+      let state = 'on-track', daysLeft = null, gap = 0;
+      if (sd) {
+        const end = new Date(new Date(sd).getTime() + dur * 7 * 86400000);
+        daysLeft = Math.ceil((end - new Date()) / 86400000);
+        gap = Math.abs(Math.round((new Date() - end) / (86400000 * 7)));
+        if (daysLeft < 0) state = 'overdue';
+        else if (daysLeft < 14) state = 'at-risk';
+        else if (daysLeft < 21) state = 'delayed';
+        else state = 'on-track';
+      }
+
+      rows.push({ c, prog, dur, week, pct, color, phase, state, daysLeft, gap, sd });
+    }
+  }
+
+  if (!rows.length) {
+    wrap.innerHTML = '<p style="color:var(--text3);font-size:13px;text-align:center;padding:20px 0">No active programs yet.</p>';
+    return;
+  }
+
+  // Sort worst state first
+  rows.sort((a, b) => (stateRank[a.state] ?? 9) - (stateRank[b.state] ?? 9));
+
+  wrap.innerHTML = rows.map(({ c, prog, dur, week, pct, color, phase, state, daysLeft, sd }) => {
     const hColor = healthColor[state] || '#4ade80';
     const hLabel = healthLabel[state] || 'On Track';
     const hBg    = healthBg[state]    || 'rgba(74,222,128,.12)';
     const lead   = c.leadAssignee ? `<span style="font-size:11px;color:var(--text3)">Lead: <span style="color:var(--text2)">${escHtml(c.leadAssignee)}</span></span>` : '';
-    const daysInfo = ds && ds.daysLeft !== undefined
-      ? (ds.daysLeft < 0 ? `<span style="color:#ef4444;font-size:11px">${Math.abs(ds.daysLeft)}d overdue</span>` : `<span style="font-size:11px;color:var(--text3)">${ds.daysLeft}d left</span>`)
-      : '';
-    const phase = getPhaseLabel(c.program, week);
+    const daysInfo = sd && daysLeft !== null
+      ? (daysLeft < 0
+          ? `<span style="color:#ef4444;font-size:11px">${Math.abs(daysLeft)}d overdue</span>`
+          : `<span style="font-size:11px;color:var(--text3)">${daysLeft}d left</span>`)
+      : `<span style="font-size:11px;color:var(--text3)">No date set</span>`;
 
     return `<div class="chb-row" onclick="openModal('${c.id}')">
       <div class="chb-left">
         <div class="chb-avatar">${initials(c.name)}</div>
         <div class="chb-info">
           <div class="chb-name">${escHtml(c.name)}${c.businessName ? `<span class="chb-biz"> · ${escHtml(c.businessName)}</span>` : ''}</div>
-          <div class="chb-meta">${escHtml(c.program || 'No program')}${phase ? ` · <span style="color:var(--text3)">${escHtml(phase)}</span>` : ''}${lead ? ' · ' + lead : ''}</div>
+          <div class="chb-meta">${escHtml(prog)}${phase ? ` · <span style="color:var(--text3)">${escHtml(phase)}</span>` : ''}${lead ? ' · ' + lead : ''}</div>
         </div>
       </div>
       <div class="chb-progress-wrap">
