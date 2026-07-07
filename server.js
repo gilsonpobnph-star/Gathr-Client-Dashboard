@@ -212,6 +212,20 @@ function ensureAddons(store) {
   }
 }
 
+function ensureAdminUser(store) {
+  if (!store.users) store.users = {};
+  const adminEmail = (process.env.ADMIN_EMAIL || 'gilson.po.bnph@gmail.com').toLowerCase();
+  const exists = Object.values(store.users).some(u => u.email === adminEmail);
+  if (!exists) {
+    const id = 'u_admin_seed';
+    const pass = process.env.DASHBOARD_PASSWORD || 'GathrGrowAdmin';
+    const salt = crypto.randomBytes(16).toString('hex');
+    const hash = crypto.pbkdf2Sync(pass, salt, 100000, 64, 'sha512').toString('hex');
+    store.users[id] = { id, name: 'Gilson', email: adminEmail, passwordHash: `${salt}:${hash}`, role: 'admin', createdAt: new Date().toISOString() };
+    console.log(`[seed] Admin user created: ${adminEmail}`);
+  }
+}
+
 function ensureTeam(store) {
   if (!store.team) {
     // Seed from env var on first boot so existing deployments keep their names
@@ -855,4 +869,11 @@ app.get('/intake', (req, res) => res.sendFile(path.join(__dirname, 'public', 'in
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
 const PORT = process.env.PORT || 3001;
+// Seed admin user on startup
+(function() {
+  const store = readStore();
+  ensureAdminUser(store);
+  writeStore(store);
+})();
+
 app.listen(PORT, () => console.log(`Gathr Grow → http://localhost:${PORT}`));
