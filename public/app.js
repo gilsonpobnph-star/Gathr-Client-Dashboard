@@ -18,7 +18,7 @@ let clients = [];
 let team = [];
 let gathrMembers = [];
 let localStore = {};
-let activeTab = 'overview';
+let activeTab = 'mydash';
 let modalClient = null;
 let modalViewWeek = 1;
 let modalChecklistData = {};
@@ -154,19 +154,11 @@ function showApp() {
 
 function applyRoleUI() {
   const isAdmin = currentUser.role === 'admin';
-  // Show/hide admin-only elements
   document.querySelectorAll('.nav-admin-only').forEach(el => el.classList.toggle('hidden', !isAdmin));
-  // Show My Dashboard for non-admin logged-in users (named users)
-  const hasMydash = currentUser.userId && currentUser.userId !== 'admin';
-  document.querySelectorAll('.nav-my-dash').forEach(el => el.classList.toggle('hidden', !hasMydash));
-  // User chip
   const name = currentUser.name || 'Admin';
   document.getElementById('sidebar-user-name').textContent = name;
   document.getElementById('sidebar-user-role').textContent = isAdmin ? 'Admin' : 'Team Member';
   document.getElementById('sidebar-user-avatar').textContent = name.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
-  if (document.getElementById('nav-my-dash-label')) {
-    document.getElementById('nav-my-dash-label').textContent = `My Dashboard`;
-  }
 }
 
 document.getElementById('btn-login').addEventListener('click', doAdminLogin);
@@ -394,6 +386,7 @@ function renderOverview() {
   renderClientHealthBoard('client-health-board', clients.filter(c => ACTIVE_STATUSES.includes(c.status)));
   renderChart('chart-programs', 'doughnut', programChartData());
   renderChart('chart-status',   'doughnut', statusChartData());
+  initAdminCalendar();
 }
 
 /* ── Deadline Health Cards ────────────────────────────────────────────────── */
@@ -530,26 +523,30 @@ function renderClientHealthBoard(containerId, list) {
 }
 
 /* ── My Dashboard ─────────────────────────────────────────────────────────── */
-function renderMyDash() {
+async function renderMyDash() {
   const name = currentUser.name || '';
   const myClients = clients.filter(c =>
     ACTIVE_STATUSES.includes(c.status) &&
     (c.leadAssignee === name || c.techAssignee === name)
   );
 
-  document.getElementById('mydash-title').textContent = `My Dashboard`;
+  // Welcome banner
+  const first = name.split(' ')[0] || 'there';
+  document.getElementById('welcome-text').textContent = `Hi ${first}! Welcome. It's time to work. 💪`;
+  document.getElementById('mydash-title').textContent = `${name}'s Dashboard`;
   document.getElementById('mydash-date').textContent  = new Date().toLocaleDateString('en-AU', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   const warn = myClients.filter(c => { const d = deadlineStatus(c); return d && ['overdue','delayed','at-risk'].includes(d.state); }).length;
   const ok   = myClients.filter(c => { const d = deadlineStatus(c); return !d || d.state === 'on-track'; }).length;
 
-  document.getElementById('my-kpi-active').textContent    = myClients.length;
-  document.getElementById('my-kpi-warn').textContent      = warn;
-  document.getElementById('my-kpi-ok').textContent        = ok;
-  document.getElementById('my-kpi-active-sub').textContent = `as lead or tech`;
+  document.getElementById('my-kpi-active').textContent     = myClients.length;
+  document.getElementById('my-kpi-warn').textContent       = warn;
+  document.getElementById('my-kpi-ok').textContent         = ok;
+  document.getElementById('my-kpi-active-sub').textContent = 'as lead or tech';
 
   renderClientHealthBoard('my-client-health', myClients);
   renderMyPriorities(myClients);
+  await initCalendar(myClients);
 }
 
 function renderMyPriorities(myClients) {
@@ -573,6 +570,218 @@ function renderMyPriorities(myClients) {
     <div class="tr-item" style="border-left-color:${levelBorder[item.level]};background:${levelBg[item.level]}">
       <div class="tr-item-header"><span class="tr-icon">${item.icon}</span><strong style="color:${levelColor[item.level]}">${item.title}</strong></div>
       <div class="tr-item-body">${item.body}</div>
+    </div>`).join('');
+}
+
+/* ── Calendar ─────────────────────────────────────────────────────────────── */
+let calYear, calMonth, calEntries = [], calSelectedDate = null, calMyClients = [];
+let adminCalYear, adminCalMonth, adminCalEntries = [], adminCalSelectedDate = null;
+
+function toYMD(d) { return d.toISOString().slice(0,10); }
+
+async function initCalendar(myClients) {
+  calMyClients = myClients;
+  const now = new Date();
+  if (!calYear) { calYear = now.getFullYear(); calMonth = now.getMonth(); }
+  calEntries = await fetchCalendarEntries(calYear, calMonth);
+  renderCalendar();
+  // default select today
+  const todayStr = toYMD(now);
+  selectCalDay(todayStr);
+}
+
+async function fetchCalendarEntries(year, month) {
+  const from = `${year}-${String(month+1).padStart(2,'0')}-01`;
+  const last = new Date(year, month+1, 0);
+  const to   = toYMD(last);
+  const res  = await fetch(`/api/calendar?from=${from}&to=${to}`);
+  return res.ok ? res.json() : [];
+}
+
+function calNav(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  fetchCalendarEntries(calYear, calMonth).then(e => { calEntries = e; renderCalendar(); });
+}
+
+function renderCalendar() {
+  const label = new Date(calYear, calMonth, 1).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
+  document.getElementById('cal-month-label').textContent = label;
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
+  const todayStr = toYMD(new Date());
+
+  // Build map of date → entries count
+  const entryMap = {};
+  calEntries.forEach(e => { entryMap[e.date] = (entryMap[e.date] || 0) + 1; });
+  // Build map of date → has deliverables (client week start)
+  const delivMap = {};
+  calMyClients.forEach(c => {
+    if (!c.startDate || !c.program) return;
+    const start = new Date(c.startDate);
+    if (isNaN(start)) return;
+    const dur = progDuration(c.program);
+    for (let w = 1; w <= dur; w++) {
+      const weekStart = new Date(start.getTime() + (w-1)*7*24*60*60*1000);
+      const d = toYMD(weekStart);
+      if (d.startsWith(`${calYear}-${String(calMonth+1).padStart(2,'0')}`)) {
+        delivMap[d] = (delivMap[d] || 0) + 1;
+      }
+    }
+  });
+
+  let html = '';
+  for (let i = 0; i < firstDay; i++) html += '<div class="cal-cell cal-cell-empty"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday    = dateStr === todayStr;
+    const isSelected = dateStr === calSelectedDate;
+    const hasEntry   = entryMap[dateStr] > 0;
+    const hasDeliv   = delivMap[dateStr] > 0;
+    html += `<div class="cal-cell${isToday?' cal-today':''}${isSelected?' cal-selected':''}" onclick="selectCalDay('${dateStr}')">
+      <span class="cal-day-num">${d}</span>
+      <div class="cal-dots">
+        ${hasEntry ? '<span class="cal-dot cal-dot-log"></span>' : ''}
+        ${hasDeliv ? '<span class="cal-dot cal-dot-deliv"></span>' : ''}
+      </div>
+    </div>`;
+  }
+  document.getElementById('cal-grid').innerHTML = html;
+}
+
+function selectCalDay(dateStr) {
+  calSelectedDate = dateStr;
+  renderCalendar();
+  const panel     = document.getElementById('cal-day-panel');
+  const titleEl   = document.getElementById('cal-day-panel-title');
+  const entriesEl = document.getElementById('cal-day-entries');
+  const addRow    = document.getElementById('cal-add-row');
+  const d = new Date(dateStr + 'T00:00:00');
+  titleEl.textContent = d.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long' });
+  addRow.style.display = 'flex';
+
+  // Entries for this day
+  const dayEntries = calEntries.filter(e => e.date === dateStr);
+  // Deliverables for this day
+  const dayDelivs = [];
+  calMyClients.forEach(c => {
+    if (!c.startDate || !c.program) return;
+    const start = new Date(c.startDate);
+    if (isNaN(start)) return;
+    const dur = progDuration(c.program);
+    for (let w = 1; w <= dur; w++) {
+      const weekStart = toYMD(new Date(start.getTime() + (w-1)*7*24*60*60*1000));
+      if (weekStart === dateStr) {
+        const def = getWeekDef(c.program, w);
+        dayDelivs.push({ client: c.name, week: w, items: def?.items || [], phase: def?.phase || '' });
+      }
+    }
+  });
+
+  let html = '';
+  if (!dayEntries.length && !dayDelivs.length) {
+    html = '<div class="cal-no-entries">No entries yet. Log what you worked on today.</div>';
+  }
+  dayEntries.forEach(e => {
+    html += `<div class="cal-entry-item">
+      <div class="cal-entry-text">${escHtml(e.text)}</div>
+      <button class="cal-entry-del" onclick="deleteCalEntry('${e.id}')">✕</button>
+    </div>`;
+  });
+  dayDelivs.forEach(d => {
+    html += `<div class="cal-deliv-block">
+      <div class="cal-deliv-title">📋 ${escHtml(d.client)} — Wk ${d.week}${d.phase ? ` · ${escHtml(d.phase)}` : ''}</div>
+      ${d.items.length ? d.items.map(i => `<div class="cal-deliv-item">· ${escHtml(i.label)}</div>`).join('') : '<div class="cal-deliv-item" style="color:var(--text3)">No checklist items defined.</div>'}
+    </div>`;
+  });
+  entriesEl.innerHTML = html;
+}
+
+async function submitCalEntry() {
+  const text = document.getElementById('cal-entry-text').value.trim();
+  if (!text) return;
+  const res = await fetch('/api/calendar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ date: calSelectedDate, text, type: 'log' }) });
+  if (res.ok) {
+    const entry = await res.json();
+    calEntries.push(entry);
+    document.getElementById('cal-entry-text').value = '';
+    renderCalendar();
+    selectCalDay(calSelectedDate);
+  }
+}
+
+async function deleteCalEntry(id) {
+  const res = await fetch(`/api/calendar/${id}`, { method:'DELETE' });
+  if (res.ok) {
+    calEntries = calEntries.filter(e => e.id !== id);
+    renderCalendar();
+    selectCalDay(calSelectedDate);
+  }
+}
+
+/* ── Admin calendar (Overview) ────────────────────────────────────────────── */
+async function initAdminCalendar() {
+  const now = new Date();
+  if (!adminCalYear) { adminCalYear = now.getFullYear(); adminCalMonth = now.getMonth(); }
+  adminCalEntries = await fetchAdminCalendarEntries(adminCalYear, adminCalMonth);
+  renderAdminCalendar();
+}
+
+async function fetchAdminCalendarEntries(year, month) {
+  const from = `${year}-${String(month+1).padStart(2,'0')}-01`;
+  const to   = toYMD(new Date(year, month+1, 0));
+  const res  = await fetch(`/api/calendar?from=${from}&to=${to}`);
+  return res.ok ? res.json() : [];
+}
+
+function adminCalNav(dir) {
+  adminCalMonth += dir;
+  if (adminCalMonth > 11) { adminCalMonth = 0; adminCalYear++; }
+  if (adminCalMonth < 0)  { adminCalMonth = 11; adminCalYear--; }
+  fetchAdminCalendarEntries(adminCalYear, adminCalMonth).then(e => { adminCalEntries = e; renderAdminCalendar(); });
+}
+
+function renderAdminCalendar() {
+  const label = new Date(adminCalYear, adminCalMonth, 1).toLocaleDateString('en-AU', { month:'long', year:'numeric' });
+  document.getElementById('admin-cal-month-label').textContent = label;
+  const firstDay = new Date(adminCalYear, adminCalMonth, 1).getDay();
+  const daysInMonth = new Date(adminCalYear, adminCalMonth+1, 0).getDate();
+  const todayStr = toYMD(new Date());
+  const entryMap = {};
+  adminCalEntries.forEach(e => { if (!entryMap[e.date]) entryMap[e.date] = []; entryMap[e.date].push(e); });
+
+  let html = '';
+  for (let i = 0; i < firstDay; i++) html += '<div class="cal-cell cal-cell-empty"></div>';
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${adminCalYear}-${String(adminCalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday    = dateStr === todayStr;
+    const isSelected = dateStr === adminCalSelectedDate;
+    const dayEntries = entryMap[dateStr] || [];
+    const dots = [...new Set(dayEntries.map(e => e.userId))].slice(0,4)
+      .map(() => '<span class="cal-dot cal-dot-log"></span>').join('');
+    html += `<div class="cal-cell${isToday?' cal-today':''}${isSelected?' cal-selected':''}" onclick="selectAdminCalDay('${dateStr}')">
+      <span class="cal-day-num">${d}</span>
+      <div class="cal-dots">${dots}</div>
+    </div>`;
+  }
+  document.getElementById('admin-cal-grid').innerHTML = html;
+}
+
+function selectAdminCalDay(dateStr) {
+  adminCalSelectedDate = dateStr;
+  renderAdminCalendar();
+  const titleEl   = document.getElementById('admin-cal-day-panel-title');
+  const entriesEl = document.getElementById('admin-cal-day-entries');
+  const d = new Date(dateStr + 'T00:00:00');
+  titleEl.textContent = d.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long' });
+  const dayEntries = adminCalEntries.filter(e => e.date === dateStr);
+  if (!dayEntries.length) { entriesEl.innerHTML = '<div class="cal-no-entries">No team entries for this day.</div>'; return; }
+  entriesEl.innerHTML = dayEntries.map(e => `
+    <div class="cal-entry-item">
+      <span class="cal-entry-author">${escHtml(e.userName)}</span>
+      <div class="cal-entry-text">${escHtml(e.text)}</div>
     </div>`).join('');
 }
 

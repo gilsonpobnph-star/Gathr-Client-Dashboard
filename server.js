@@ -674,6 +674,49 @@ app.delete('/api/programs/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Calendar entries ─────────────────────────────────────────────────────────
+app.get('/api/calendar', requireAuth, (req, res) => {
+  const store   = readStore();
+  const entries = Object.values(store.calendarEntries || {});
+  const { from, to } = req.query;
+  const isAdmin = req.session.role === 'admin';
+  let result = entries;
+  if (from) result = result.filter(e => e.date >= from);
+  if (to)   result = result.filter(e => e.date <= to);
+  if (!isAdmin) result = result.filter(e => e.userId === req.session.userId);
+  result.sort((a, b) => a.date.localeCompare(b.date));
+  res.json(result);
+});
+
+app.post('/api/calendar', requireAuth, (req, res) => {
+  const { date, text, type } = req.body;
+  if (!date || !text?.trim()) return res.status(400).json({ error: 'date and text required' });
+  const store = readStore();
+  if (!store.calendarEntries) store.calendarEntries = {};
+  const id = 'ce_' + Date.now();
+  const entry = {
+    id, date, text: text.trim(),
+    type: type || 'log',
+    userId:   req.session.userId || 'admin',
+    userName: req.session.name  || 'Admin',
+    createdAt: new Date().toISOString(),
+  };
+  store.calendarEntries[id] = entry;
+  writeStore(store);
+  res.json(entry);
+});
+
+app.delete('/api/calendar/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  const entry = store.calendarEntries?.[req.params.id];
+  if (!entry) return res.status(404).json({ error: 'Not found' });
+  const isAdmin = req.session.role === 'admin';
+  if (!isAdmin && entry.userId !== req.session.userId) return res.status(403).json({ error: 'Forbidden' });
+  delete store.calendarEntries[req.params.id];
+  writeStore(store);
+  res.json({ ok: true });
+});
+
 // ── Backup & Restore ──────────────────────────────────────────────────────────
 app.get('/api/backup', requireAuth, (req, res) => {
   const store    = readStore();
