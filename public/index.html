@@ -533,6 +533,30 @@
         </div>
       </div>
 
+      <!-- Reset Password modal -->
+      <div id="reset-pw-modal" class="modal-overlay hidden">
+        <div class="modal" style="max-width:380px">
+          <button class="modal-close" onclick="document.getElementById('reset-pw-modal').classList.add('hidden')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+          <div class="modal-header" style="padding-bottom:12px">
+            <div>
+              <h2>Reset Password</h2>
+              <p class="modal-position">for <span id="reset-pw-user-name"></span></p>
+            </div>
+          </div>
+          <div style="padding:0 24px 24px;display:flex;flex-direction:column;gap:12px">
+            <input type="hidden" id="reset-pw-user-id" />
+            <label class="login-label" style="margin-bottom:0">New Password</label>
+            <input type="password" id="reset-pw-input" class="inline-input" placeholder="Enter new password" />
+            <div style="display:flex;align-items:center;gap:12px;margin-top:4px">
+              <button class="btn-primary" onclick="doResetPassword()">Set Password</button>
+              <span id="reset-pw-msg" style="font-size:12.5px"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Add / Edit member modal -->
       <div id="team-modal" class="modal-overlay hidden">
         <div class="modal" style="max-width:420px">

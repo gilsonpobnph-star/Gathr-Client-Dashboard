@@ -379,6 +379,16 @@ app.put('/api/users/:id/role', requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
+app.put('/api/users/:id/password', requireAdmin, (req, res) => {
+  const { password } = req.body;
+  if (!password?.trim()) return res.status(400).json({ error: 'Password required' });
+  const store = readStore();
+  if (!store.users?.[req.params.id]) return res.status(404).json({ error: 'User not found' });
+  store.users[req.params.id].passwordHash = hashPassword(password.trim());
+  writeStore(store);
+  res.json({ ok: true });
+});
+
 app.delete('/api/users/:id', requireAdmin, (req, res) => {
   const store = readStore();
   if (!store.users?.[req.params.id]) return res.status(404).json({ error: 'User not found' });

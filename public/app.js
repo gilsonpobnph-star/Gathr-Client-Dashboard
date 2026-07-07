@@ -1714,9 +1714,34 @@ async function renderUsers() {
           </select>
         </td>
         <td class="text-sm text-muted">${fmtDate(u.createdAt)}</td>
-        <td><button class="btn-danger" style="padding:4px 10px;font-size:11px" onclick="removeUser('${u.id}','${escHtml(u.name)}')">Remove</button></td>
+        <td style="display:flex;gap:6px;align-items:center">
+          <button class="btn-view" style="padding:4px 10px;font-size:11px" onclick="showResetPassword('${u.id}','${escHtml(u.name)}')">Reset PW</button>
+          <button class="btn-danger" style="padding:4px 10px;font-size:11px" onclick="removeUser('${u.id}','${escHtml(u.name)}')">Remove</button>
+        </td>
       </tr>`).join('');
   } catch { tbody.innerHTML = ''; }
+}
+
+function showResetPassword(id, name) {
+  document.getElementById('reset-pw-user-id').value   = id;
+  document.getElementById('reset-pw-user-name').textContent = name;
+  document.getElementById('reset-pw-input').value     = '';
+  document.getElementById('reset-pw-msg').textContent = '';
+  document.getElementById('reset-pw-modal').classList.remove('hidden');
+}
+
+async function doResetPassword() {
+  const id  = document.getElementById('reset-pw-user-id').value;
+  const pw  = document.getElementById('reset-pw-input').value.trim();
+  const msg = document.getElementById('reset-pw-msg');
+  if (!pw) { msg.style.color = 'var(--accent2)'; msg.textContent = 'Enter a password.'; return; }
+  const res = await fetch(`/api/users/${id}/password`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: pw }) });
+  if (res.ok) {
+    msg.style.color = 'var(--green)'; msg.textContent = 'Password updated.';
+    setTimeout(() => document.getElementById('reset-pw-modal').classList.add('hidden'), 1200);
+  } else {
+    msg.style.color = 'var(--accent2)'; msg.textContent = 'Failed. Try again.';
+  }
 }
 
 async function setUserRole(id, role) {
