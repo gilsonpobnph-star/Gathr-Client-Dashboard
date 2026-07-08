@@ -17,6 +17,7 @@ function getPhaseLabel(program, week) {
 let clients = [];
 let team = [];
 let myTasks = [];
+let clientLastViewed = {}; // clientId → ISO ts, persisted in localStorage
 let editingTaskId = null;
 let gathrMembers = [];
 let localStore = {};
@@ -135,6 +136,23 @@ function endDateLabel(c) {
   return '—';
 }
 
+/* ── Client activity tracking ────────────────────────────────────────────── */
+function loadClientLastViewed() {
+  try { clientLastViewed = JSON.parse(localStorage.getItem('clientLastViewed') || '{}'); } catch { clientLastViewed = {}; }
+}
+function markClientViewed(clientId) {
+  clientLastViewed[clientId] = new Date().toISOString();
+  try { localStorage.setItem('clientLastViewed', JSON.stringify(clientLastViewed)); } catch {}
+}
+function hasNewActivity(c) {
+  if (!c.lastActivityAt) return false;
+  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  if (c.lastActivityAt < sevenDaysAgo) return false; // older than 7 days, skip
+  const lastViewed = clientLastViewed[c.id];
+  if (!lastViewed) return true; // never viewed → show dot
+  return c.lastActivityAt > lastViewed;
+}
+
 /* ── Auth ─────────────────────────────────────────────────────────────────── */
 let currentUser = { authenticated: false, role: 'member', name: '', userId: '' };
 
@@ -173,6 +191,7 @@ function showSignup() {
 function showApp() {
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('app').classList.remove('hidden');
+  loadClientLastViewed();
   applyRoleUI();
   loadAll();
 }
@@ -520,7 +539,7 @@ function renderClientHealthBoard(containerId, list) {
 
       const dur   = progDuration(prog) || 1;
       const week  = Math.min((c.programWeeks?.[prog]) || (prog === progs[0] ? c.currentWeek || 1 : 1), dur);
-      const pct   = Math.round((week / dur) * 100);
+      const pct   = ps === 'Completed' ? 100 : Math.round((week / dur) * 100);
       const color = progColor(prog);
       const phase = getPhaseLabel(prog, week);
       const sd    = progStartDates[prog] || (prog === progs[0] ? c.startDate : null);
@@ -1679,9 +1698,9 @@ function renderClients() {
       ? progs.map(p => {
           const dur   = progDuration(p) || 1;
           const week  = Math.min((c.programWeeks?.[p]) || (p === progs[0] ? c.currentWeek || 1 : 1), dur);
-          const pct   = Math.round((week / dur) * 100);
-          const color = progColor(p);
           const ps    = (c.programStatuses?.[p]) || '';
+          const pct   = ps === 'Completed' ? 100 : Math.round((week / dur) * 100);
+          const color = progColor(p);
           const psLabel = ps ? `<span style="font-size:10px;color:var(--text3);margin-left:2px">${ps}</span>` : '';
           return `<div class="week-progress" style="margin-bottom:3px">
             <span class="week-label" style="min-width:38px">Wk ${week}/${dur}</span>
@@ -1693,10 +1712,11 @@ function renderClients() {
         }).join('')
       : '<span class="text-muted text-sm">—</span>';
 
+    const activityDot = hasNewActivity(c) ? '<span class="client-activity-dot" title="New activity"></span>' : '';
     return `<tr class="client-row" onclick="openModal('${cid}')">
       <td>
         <div class="name-cell">
-          <div class="avatar">${initials(c.name)}</div>
+          <div class="avatar" style="position:relative">${initials(c.name)}${activityDot}</div>
           <div><strong>${c.name}</strong><small>${c.businessName || c.email}</small></div>
         </div>
       </td>
@@ -1776,9 +1796,9 @@ function renderProgramClientsView() {
     const cards = grp.map(({ c, prog }) => {
       const dur   = progDuration(prog);
       const wk    = Math.min((c.programWeeks?.[prog]) || c.currentWeek || 1, dur);
-      const pct   = Math.round((wk / dur) * 100);
-      const phase = getPhaseLabel(prog, wk);
       const ps    = (c.programStatuses?.[prog]) || '';
+      const pct   = ps === 'Completed' ? 100 : Math.round((wk / dur) * 100);
+      const phase = getPhaseLabel(prog, wk);
       const lead  = (c.programLeads?.[prog]) || c.leadAssignee || '';
       return `<div class="prog-client-card" onclick="openModal('${c.id}')">
         <div class="prog-card-top">
@@ -2109,6 +2129,7 @@ function openClientById(id) {
 function openModal(id) {
   modalClient = clients.find(c => c.id === id);
   if (!modalClient) return;
+  markClientViewed(id);
   modalChecklistData = {};
   // Init per-program week state
   const progs = modalClient.programs?.length ? modalClient.programs : (modalClient.program ? [modalClient.program] : []);

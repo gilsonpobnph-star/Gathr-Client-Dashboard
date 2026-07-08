@@ -503,6 +503,7 @@ function shapeClient(c) {
     addOns:             c.addOns             || '',
     intakeSubmitted:    c.intakeSubmitted     || '',
     activityLog:        c.activityLog        || [],
+    lastActivityAt:     (c.activityLog || [])[0]?.ts || null,
     oldProgramChecklist:c.oldProgramChecklist|| {},
     programLeads:       c.programLeads       || {},   // per-program lead assignee
     checklists,                                       // now namespaced by programId
