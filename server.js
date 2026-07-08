@@ -738,6 +738,7 @@ app.get('/api/chat', requireAuth, (req, res) => {
   // General always first
   const genMsgs = store.chat.rooms['general'].messages || [];
   rooms.push({ id: 'general', name: 'General', type: 'channel',
+    messageCount: genMsgs.length,
     lastMessage: genMsgs[genMsgs.length - 1] || null });
 
   // DMs this user is part of
@@ -747,7 +748,9 @@ app.get('/api/chat', requireAuth, (req, res) => {
     const parts = id.split('__').slice(1);
     const other = parts.find(p => p !== userName) || parts[0];
     const msgs  = room.messages || [];
-    rooms.push({ id, name: other, type: 'dm', lastMessage: msgs[msgs.length - 1] || null });
+    rooms.push({ id, name: other, type: 'dm',
+      messageCount: msgs.length,
+      lastMessage: msgs[msgs.length - 1] || null });
   });
 
   res.json(rooms);

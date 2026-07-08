@@ -1210,13 +1210,25 @@ let chatSinceTs      = null;
 let chatRooms        = [];
 let chatMessages     = [];
 let chatLastRead     = {}; // roomId → last-read ISO ts (localStorage)
+let chatReadCount    = {}; // roomId → message count at last read (localStorage)
 
 function chatLoadLastRead() {
-  try { chatLastRead = JSON.parse(localStorage.getItem('chatLastRead') || '{}'); } catch { chatLastRead = {}; }
+  try { chatLastRead  = JSON.parse(localStorage.getItem('chatLastRead')  || '{}'); } catch { chatLastRead  = {}; }
+  try { chatReadCount = JSON.parse(localStorage.getItem('chatReadCount') || '{}'); } catch { chatReadCount = {}; }
 }
 function chatSaveLastRead(roomId, ts) {
   chatLastRead[roomId] = ts;
   try { localStorage.setItem('chatLastRead', JSON.stringify(chatLastRead)); } catch {}
+}
+function markRoomRead(roomId) {
+  const room = chatRooms.find(r => r.id === roomId);
+  if (!room) return;
+  if (room.lastMessage) chatSaveLastRead(roomId, room.lastMessage.ts);
+  chatReadCount[roomId] = room.messageCount || 0;
+  try { localStorage.setItem('chatReadCount', JSON.stringify(chatReadCount)); } catch {}
+}
+function unreadCount(room) {
+  return Math.max(0, (room.messageCount || 0) - (chatReadCount[room.id] || 0));
 }
 
 function dmRoomId(a, b) { return 'dm__' + [a, b].sort().join('__'); }
@@ -1251,20 +1263,28 @@ function renderChatSidebar() {
   const dmNames  = dms.map(r => r.name);
   const newDmTargets = team.filter(t => t !== myName && !dmNames.includes(t));
 
-  document.getElementById('chat-channels-list').innerHTML = channels.map(r => `
-    <button class="chat-room-btn ${chatCurrentRoom === r.id ? 'active' : ''}" onclick="switchChatRoom('${r.id}')">
+  // Auto-mark active room as read while viewing it
+  const activeRoom = chatRooms.find(r => r.id === chatCurrentRoom);
+  if (activeRoom) markRoomRead(chatCurrentRoom);
+
+  document.getElementById('chat-channels-list').innerHTML = channels.map(r => {
+    const uc = unreadCount(r);
+    return `<button class="chat-room-btn ${chatCurrentRoom === r.id ? 'active' : ''}" onclick="switchChatRoom('${r.id}')">
       <span class="chat-room-icon">#</span>
       <span class="chat-room-label">${escHtml(r.name)}</span>
-      ${hasUnread(r) ? '<span class="chat-unread-dot"></span>' : ''}
-    </button>`).join('');
+      ${uc > 0 ? `<span class="chat-unread-count">${uc > 99 ? '99+' : uc}</span>` : ''}
+    </button>`;
+  }).join('');
 
   document.getElementById('chat-dm-list').innerHTML =
-    dms.map(r => `
-      <button class="chat-room-btn ${chatCurrentRoom === r.id ? 'active' : ''}" onclick="switchChatRoom('${r.id}')">
+    dms.map(r => {
+      const uc = unreadCount(r);
+      return `<button class="chat-room-btn ${chatCurrentRoom === r.id ? 'active' : ''}" onclick="switchChatRoom('${r.id}')">
         <span class="chat-dm-av" style="background:${stringToColor(r.name)}">${initials(r.name)}</span>
         <span class="chat-room-label">${escHtml(r.name)}</span>
-        ${hasUnread(r) ? '<span class="chat-unread-dot"></span>' : ''}
-      </button>`).join('') +
+        ${uc > 0 ? `<span class="chat-unread-count">${uc > 99 ? '99+' : uc}</span>` : ''}
+      </button>`;
+    }).join('') +
     (newDmTargets.length ? `<div class="chat-new-dm-wrap">${newDmTargets.map(name => `
       <button class="chat-new-dm-btn" onclick="startDm('${escHtml(name)}')" title="Message ${escHtml(name)}">
         <span class="chat-dm-av" style="background:${stringToColor(name)}">${initials(name)}</span>
@@ -1272,16 +1292,21 @@ function renderChatSidebar() {
         <span style="font-size:10px;color:var(--text3);margin-left:auto">+</span>
       </button>`).join('')}</div>` : '');
 
-  // Global unread badge on nav
-  const anyUnread = chatRooms.some(r => hasUnread(r));
-  document.getElementById('chat-unread-badge')?.classList.toggle('hidden', !anyUnread);
+  // Global unread badge on nav — show total unread count
+  const totalUnread = chatRooms.reduce((sum, r) => sum + unreadCount(r), 0);
+  const badge = document.getElementById('chat-unread-badge');
+  if (badge) {
+    if (totalUnread > 0) {
+      badge.textContent = totalUnread > 99 ? '99+' : String(totalUnread);
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
 }
 
 function hasUnread(room) {
-  if (!room.lastMessage) return false;
-  const lastRead = chatLastRead[room.id];
-  if (!lastRead) return room.lastMessage.author !== (currentUser.name || '');
-  return room.lastMessage.ts > lastRead && room.lastMessage.author !== (currentUser.name || '');
+  return unreadCount(room) > 0;
 }
 
 async function switchChatRoom(roomId) {
@@ -1320,8 +1345,8 @@ async function loadChatMessages(roomId) {
     chatMessages = data.messages || [];
     if (chatMessages.length) {
       chatSinceTs = chatMessages[chatMessages.length - 1].ts;
-      chatSaveLastRead(roomId, chatSinceTs);
     }
+    markRoomRead(roomId);
     renderChatMessages();
     scrollChatToBottom(true);
     updateChatHeader();
@@ -1403,10 +1428,9 @@ async function sendChatMessage() {
     const msg = await res.json();
     chatMessages.push(msg);
     chatSinceTs = msg.ts;
-    chatSaveLastRead(chatCurrentRoom, msg.ts);
     renderChatMessages();
     scrollChatToBottom(false);
-    // Refresh sidebar last-message preview
+    // Refresh sidebar last-message preview + auto-marks active room as read
     await loadChatRooms();
   } catch(e) { console.error('send failed', e); }
 }
