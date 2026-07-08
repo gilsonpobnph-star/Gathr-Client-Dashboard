@@ -2979,6 +2979,19 @@ document.getElementById('btn-save-client').addEventListener('click', async () =>
       badge.style.display = 'inline-block';
     }
 
+    // Refresh checklist tabs + content immediately after save
+    modalProgramWeeks = { ...(updated.programWeeks || {}) };
+    if (!updatedProgs.includes(modalActiveProgram)) {
+      modalActiveProgram = updatedProgs[0] || '';
+      modalViewWeek = modalProgramWeeks[modalActiveProgram] || 1;
+    }
+    renderChecklistTabs();
+    if (modalActiveProgram) loadChecklist(modalViewWeek);
+
+    // Refresh background client list (table / overview)
+    renderClients();
+    if (activeTab === 'overview') renderOverview();
+
     msgEl.style.color = 'var(--green)';
     msgEl.textContent = '✓ Saved';
     setTimeout(() => { msgEl.textContent = ''; }, 3000);
