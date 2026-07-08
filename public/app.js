@@ -290,6 +290,41 @@ async function loadAll() {
 
 document.getElementById('btn-refresh').addEventListener('click', loadAll);
 
+/* ── Auto-refresh (silent background poll every 30s) ─────────────────────── */
+async function silentRefresh() {
+  // Skip if modal open, tab hidden, or user is actively editing
+  if (!document.getElementById('client-modal')?.classList.contains('hidden')) return;
+  if (document.visibilityState === 'hidden') return;
+  try {
+    const [cRes, tRes, tkRes] = await Promise.all([
+      fetch('/api/clients'), fetch('/api/team'), fetch('/api/tasks'),
+    ]);
+    if (!cRes.ok || !tRes.ok || !tkRes.ok) return;
+    clients = await cRes.json();
+    const teamData = await tRes.json();
+    team    = teamData.map(m => typeof m === 'string' ? m : m.name);
+    window._teamFull = teamData;
+    myTasks = await tkRes.json();
+    // Re-render current view silently
+    renderCurrentTab();
+    const t = new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+    const sl = document.getElementById('sync-label');
+    if (sl) sl.textContent = `Synced ${t}`;
+  } catch { /* network error — silent */ }
+}
+
+function renderCurrentTab() {
+  if      (activeTab === 'clients')    renderClients();
+  else if (activeTab === 'overview')   renderOverview();
+  else if (activeTab === 'mydash')     renderMyDash();
+  else if (activeTab === 'analytics')  renderAnalytics();
+  else if (activeTab === 'programs')   renderPrograms();
+  else if (activeTab === 'intake')     renderIntakes();
+  else if (activeTab === 'activitylog') renderActivityLog();
+}
+
+setInterval(silentRefresh, 30000);
+
 /* ── Tab routing ──────────────────────────────────────────────────────────── */
 document.querySelectorAll('.nav-item').forEach(btn => {
   btn.addEventListener('click', () => {
