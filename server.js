@@ -741,12 +741,15 @@ app.get('/api/chat', requireAuth, (req, res) => {
     messageCount: genMsgs.length,
     lastMessage: genMsgs[genMsgs.length - 1] || null });
 
-  // DMs this user is part of
+  // DMs this user is part of (skip self-DMs, deduplicate by other user)
+  const seenDmPartners = new Set();
   Object.entries(store.chat.rooms).forEach(([id, room]) => {
     if (!id.startsWith('dm__')) return;
     if (!canAccessRoom(id, req.session)) return;
     const parts = id.split('__').slice(1);
-    const other = parts.find(p => p !== userName) || parts[0];
+    const other = parts.find(p => p !== userName) || null;
+    if (!other || seenDmPartners.has(other)) return; // skip self-DMs and dupes
+    seenDmPartners.add(other);
     const msgs  = room.messages || [];
     rooms.push({ id, name: other, type: 'dm',
       messageCount: msgs.length,
