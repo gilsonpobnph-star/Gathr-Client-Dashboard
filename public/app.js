@@ -297,6 +297,7 @@ function showTab(tab) {
   else if (tab === 'mydash')     renderMyDash();
   else if (tab === 'teamcal')    renderTeamCalendar();
   else if (tab === 'activitylog') renderActivityLog();
+  else if (tab === 'help')        renderHelp();
 }
 
 /* ── Assignee filters ─────────────────────────────────────────────────────── */
@@ -763,7 +764,7 @@ function openTaskModal(taskId) {
   renderMemberPicks('task-assignees', t?.assignedTo || [myName]);
   renderMemberPicks('task-shared',    t?.sharedWith || []);
 
-  document.getElementById('task-assign-wrap').style.display = isAdmin ? '' : 'none';
+  document.getElementById('task-assign-wrap').style.display = '';
 
   const canDelete = isAdmin || (t && t.createdBy === myName);
   document.getElementById('task-delete-btn').classList.toggle('hidden', !t || !canDelete);
@@ -817,7 +818,7 @@ async function saveTask() {
   const isAdmin = currentUser.role === 'admin';
   const myName  = currentUser.name || '';
   const getChecked = id => [...document.getElementById(id).querySelectorAll('input[type=checkbox]:checked')].map(cb => cb.value);
-  const assignedTo = isAdmin ? getChecked('task-assignees') : [myName];
+  const assignedTo = getChecked('task-assignees');
   const sharedWith = getChecked('task-shared');
 
   const payload = {
@@ -1116,6 +1117,90 @@ function openTeamCalDay(dateStr) {
 let actlogData = [];
 let actlogUserFilter = '';
 let actlogActionFilter = '';
+
+/* ── Help & Support ───────────────────────────────────────────────────────── */
+function renderHelp() {
+  const content = document.getElementById('help-content');
+  if (content) content.scrollTop = 0;
+  const input = document.getElementById('help-search');
+  if (input) input.value = '';
+  const clearBtn = document.getElementById('help-search-clear');
+  if (clearBtn) clearBtn.classList.add('hidden');
+  showAllHelpSections();
+
+  // Sidenav scroll-spy
+  if (content && !content._helpSpyBound) {
+    content._helpSpyBound = true;
+    content.addEventListener('scroll', () => {
+      const sections = content.querySelectorAll('.help-section');
+      let active = null;
+      sections.forEach(s => {
+        if (s.getBoundingClientRect().top - content.getBoundingClientRect().top < 80) active = s.id;
+      });
+      document.querySelectorAll('.help-nav-link').forEach(a => {
+        a.classList.toggle('active', a.getAttribute('href') === '#' + active);
+      });
+    });
+  }
+}
+
+function filterHelp(query) {
+  const clearBtn = document.getElementById('help-search-clear');
+  if (clearBtn) clearBtn.classList.toggle('hidden', !query.trim());
+
+  if (!query.trim()) { showAllHelpSections(); return; }
+
+  const q = query.toLowerCase();
+  let anyVisible = false;
+
+  document.querySelectorAll('.help-section').forEach(section => {
+    let sectionVisible = false;
+    section.querySelectorAll('.help-card').forEach(card => {
+      const text = card.textContent.toLowerCase();
+      const match = text.includes(q);
+      card.style.display = match ? '' : 'none';
+      if (match) sectionVisible = true;
+    });
+    section.style.display = sectionVisible ? '' : 'none';
+    if (sectionVisible) anyVisible = true;
+  });
+
+  const noResults = document.getElementById('help-no-results');
+  if (noResults) noResults.classList.toggle('hidden', anyVisible);
+}
+
+function clearHelpSearch() {
+  const input = document.getElementById('help-search');
+  if (input) { input.value = ''; input.focus(); }
+  showAllHelpSections();
+  const clearBtn = document.getElementById('help-search-clear');
+  if (clearBtn) clearBtn.classList.add('hidden');
+}
+
+function showAllHelpSections() {
+  document.querySelectorAll('.help-section').forEach(s => s.style.display = '');
+  document.querySelectorAll('.help-card').forEach(c => c.style.display = '');
+  const noResults = document.getElementById('help-no-results');
+  if (noResults) noResults.classList.add('hidden');
+}
+
+// Accordion toggle — delegated so it works after any render
+document.addEventListener('click', e => {
+  const q = e.target.closest('.help-card-q');
+  if (q) { const card = q.closest('.help-card'); if (card) card.classList.toggle('open'); return; }
+
+  // Sidenav smooth scroll
+  const navLink = e.target.closest('.help-nav-link');
+  if (navLink) {
+    e.preventDefault();
+    const targetId = navLink.getAttribute('href')?.slice(1);
+    const target   = document.getElementById(targetId);
+    const content  = document.getElementById('help-content');
+    if (target && content) content.scrollTo({ top: target.offsetTop - 16, behavior: 'smooth' });
+    document.querySelectorAll('.help-nav-link').forEach(a => a.classList.remove('active'));
+    navLink.classList.add('active');
+  }
+});
 
 async function renderActivityLog() {
   const listEl = document.getElementById('actlog-list');

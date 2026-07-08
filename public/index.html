@@ -116,6 +116,11 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         Activity Log
       </button>
+      <div class="nav-section-label" style="margin-top:8px">Support</div>
+      <button class="nav-item" data-tab="help">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Help & Support
+      </button>
     </nav>
 
     <!-- User chip + logout -->
@@ -794,6 +799,279 @@
       <div style="padding:16px 32px 32px">
         <div id="actlog-list" class="actlog-list"></div>
       </div>
+    </section>
+
+    <!-- Help & Support Tab -->
+    <section id="tab-help" class="tab-section hidden">
+      <div class="help-layout">
+        <!-- Sticky search hero -->
+        <div class="help-hero">
+          <h1 class="help-hero-title">How can we help?</h1>
+          <p class="help-hero-sub">Search guides, feature docs, and FAQs for the Gathr Grow dashboard.</p>
+          <div class="help-search-wrap">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0;color:var(--text3)"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="help-search" class="help-search-input" placeholder="Search — e.g. "tasks", "checklist", "assign"…" oninput="filterHelp(this.value)">
+            <button class="help-search-clear hidden" id="help-search-clear" onclick="clearHelpSearch()">×</button>
+          </div>
+        </div>
+
+        <div class="help-body">
+          <!-- Left: section nav -->
+          <nav class="help-sidenav" id="help-sidenav">
+            <a class="help-nav-link active" href="#help-s-overview">Overview</a>
+            <a class="help-nav-link" href="#help-s-mydash">My Dashboard</a>
+            <a class="help-nav-link" href="#help-s-tasks">Tasks</a>
+            <a class="help-nav-link" href="#help-s-clients">All Clients</a>
+            <a class="help-nav-link" href="#help-s-programs">Programs</a>
+            <a class="help-nav-link" href="#help-s-health">Schedule Health</a>
+            <a class="help-nav-link" href="#help-s-team">Team</a>
+            <a class="help-nav-link" href="#help-s-calendar">Team Calendar</a>
+            <a class="help-nav-link" href="#help-s-activity">Activity Log</a>
+            <a class="help-nav-link" href="#help-s-faq">FAQ</a>
+          </nav>
+
+          <!-- Right: content -->
+          <div class="help-content" id="help-content">
+
+            <div id="help-no-results" class="help-no-results hidden">No results found. Try different keywords.</div>
+
+            <!-- Overview -->
+            <div class="help-section" id="help-s-overview">
+              <h2 class="help-section-title">Overview</h2>
+              <div class="help-card">
+                <div class="help-card-q">What is the Gathr Grow Client Dashboard?</div>
+                <div class="help-card-a">The Gathr Grow dashboard is an internal tool for your agency team to manage clients, track program progress, assign tasks, monitor schedule health, and log team activity — all in one place. It is not client-facing.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">Who can access the dashboard?</div>
+                <div class="help-card-a">There are two roles: <strong>Admin</strong> and <strong>Team Member</strong>. Admins log in with the admin password and have full access including team management, activity logs, and deleting any task. Team members log in with their own email and password and see their assigned clients and tasks.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">How do I log in?</div>
+                <div class="help-card-a">On the login screen, choose <strong>Admin</strong> or <strong>Team Member</strong>. Admins enter the shared admin password. Team members enter their registered email and password. Contact your admin if you need access added or a password reset.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">Navigation</div>
+                <div class="help-card-a">The left sidebar has all main sections. Items marked <strong>Admin only</strong> are hidden from team members. Your name and role appear at the bottom of the sidebar. Click <strong>Logout</strong> to end your session.</div>
+              </div>
+            </div>
+
+            <!-- My Dashboard -->
+            <div class="help-section" id="help-s-mydash">
+              <h2 class="help-section-title">My Dashboard</h2>
+              <div class="help-card">
+                <div class="help-card-q">What does My Dashboard show?</div>
+                <div class="help-card-a">My Dashboard is your personal home screen. It shows your active client count, how many need attention, and how many are on track — based on clients where you are the Lead or Tech assignee. It also shows your Tasks list, Today's Priorities checklist items, and a personal calendar.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">What are "Today's Priorities"?</div>
+                <div class="help-card-a">This panel shows the top unchecked checklist items across your active clients, sorted by urgency. Overdue clients appear first (red), followed by at-risk (yellow), then on track (grey). Click any item to open the client modal and tick it off.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">How does the personal calendar work?</div>
+                <div class="help-card-a">Click any date to open that day's panel. You can log a work entry describing what you worked on. Your entries appear on the calendar as dots. Entries are private to your login unless viewed by an admin on the Team Calendar tab.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">My Clients health board</div>
+                <div class="help-card-a">Below the task list, My Clients shows one row per active program for each client assigned to you. The colour indicates health: green = on track, yellow = at risk, orange = behind, red = overdue. Click a row to open that client's profile.</div>
+              </div>
+            </div>
+
+            <!-- Tasks -->
+            <div class="help-section" id="help-s-tasks">
+              <h2 class="help-section-title">Tasks</h2>
+              <div class="help-card">
+                <div class="help-card-q">How do I create a task?</div>
+                <div class="help-card-a">Click <strong>+ New Task</strong> in the My Tasks section of your dashboard. Give the task a title (required), set the priority, due date, and status. You can optionally link it to a client and assign it to one or more team members. Click <strong>Save</strong>.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">Can I assign tasks to other people?</div>
+                <div class="help-card-a">Yes — any user can create a task and assign it to one or more team members using the <strong>Assign To</strong> section. Click the person's chip to toggle them on (it turns orange when selected). The task will appear in their My Tasks list on their dashboard.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">What is "Share With"?</div>
+                <div class="help-card-a"><strong>Share With</strong> gives read-only access to a team member who is not the primary assignee. They can see the task and post updates, but they are not listed as responsible for completing it.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">How do I update a task's status?</div>
+                <div class="help-card-a">Click the task row to open the detail panel. Change the <strong>Status</strong> pill at the top (To Do → In Progress → Done) and click Save. You can also post a comment in the Activity panel on the right to log progress updates.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">Who can delete a task?</div>
+                <div class="help-card-a">Only the person who <strong>created</strong> the task can delete it. If a task was assigned to you by someone else, you cannot delete it — contact the creator or an admin. Admins can delete any task.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">What are the priority levels?</div>
+                <div class="help-card-a"><strong>🔴 High</strong> — urgent, needs immediate attention. <strong>🟡 Medium</strong> — important but not blocking. <strong>🟢 Low</strong> — nice to have or can wait. The coloured left stripe on each task row reflects the priority.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">How do I post an update or comment on a task?</div>
+                <div class="help-card-a">Open the task detail panel by clicking the task row. On the right side you'll see the Activity feed. Type your update in the text box at the bottom and click <strong>Post</strong>. Comments are visible to all users who have access to that task.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">How do I filter my tasks?</div>
+                <div class="help-card-a">Use the <strong>All statuses</strong> and <strong>All priorities</strong> dropdowns at the top of the My Tasks section to filter the list. The list updates instantly — no page reload needed.</div>
+              </div>
+            </div>
+
+            <!-- All Clients -->
+            <div class="help-section" id="help-s-clients">
+              <h2 class="help-section-title">All Clients</h2>
+              <div class="help-card">
+                <div class="help-card-q">How do I add a new client?</div>
+                <div class="help-card-a">Go to the <strong>All Clients</strong> tab and click <strong>+ Add Client</strong>. Fill in the client's name, business name, email, and any other details. Assign a Lead Coach and Tech, and select their enrolled programs. Click Save.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">How do I edit a client?</div>
+                <div class="help-card-a">Click the <strong>Edit</strong> button on any client row in the table, or click the client's name to open their profile modal. All fields are editable. Remember to click <strong>Save</strong> when done.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">What do the client statuses mean?</div>
+                <div class="help-card-a"><strong>New</strong> — just added, not yet onboarded. <strong>Onboarding</strong> — in intake/setup phase. <strong>Active</strong> — currently being served. <strong>On New Program</strong> — starting a new program cycle. <strong>Completed</strong> — finished all programs. <strong>Alumni</strong> — past client still in the system. <strong>Closed</strong> — no longer active.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">How do multi-program clients work?</div>
+                <div class="help-card-a">A client can be enrolled in multiple programs simultaneously. In the client modal, the <strong>Enrolled Programs</strong> section shows one card per program — each with its own start date, end date, status, lead assignee, and week tracker. Progress bars in the All Clients table show one bar per enrolled program.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">What is "Hourly / Out-of-Scope"?</div>
+                <div class="help-card-a">This free-text field in the client modal is for logging any ad-hoc or hourly work that falls outside the standard program scope — e.g. "3hrs extra reels editing" or "rush ad copy". It's purely for your internal records.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">What are the checklist tabs in a client profile?</div>
+                <div class="help-card-a">Each enrolled program has its own checklist tab. Click a program tab to switch to that program's week view. Navigate weeks with the arrow buttons. Each checklist item can be checked off, given a status (Pending / In Progress / Done / Blocked), assigned to a team member, and given a note with details or blockers.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">What is "New Cycle" on a program card?</div>
+                <div class="help-card-a">Clicking <strong>New Cycle</strong> resets the week counter for that program back to Week 1, allowing you to run the same program again with the same client without losing their history. The previous checklist data is preserved.</div>
+              </div>
+            </div>
+
+            <!-- Programs -->
+            <div class="help-section" id="help-s-programs">
+              <h2 class="help-section-title">Programs</h2>
+              <div class="help-card">
+                <div class="help-card-q">What is the Programs tab?</div>
+                <div class="help-card-a">The Programs tab has three views: <strong>By Program</strong> (see all clients grouped by their enrolled program), <strong>Manage Programs</strong> (create and edit program templates), and <strong>Manage Add-ons</strong> (add-on services).</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">How does the By Program view work?</div>
+                <div class="help-card-a">Each program section shows client cards for every client enrolled in that program. If a client is in two programs, they appear under both sections. Each card shows the client's week progress, program-level status, lead assignee, and deadline badge. Click a card to open the client profile.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">How do I build or edit a program?</div>
+                <div class="help-card-a">Go to <strong>Programs → Manage Programs</strong>. Click an existing program to edit it, or click <strong>+ New Program</strong>. You can set the program name, colour, duration (weeks), and define deliverables for each week. Each week has a phase label and a list of checklist items with unique IDs.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">What is the per-program lead assignee?</div>
+                <div class="help-card-a">Each enrolled program card in a client's profile has its own <strong>Lead Assignee</strong> dropdown, separate from the client-level lead. This lets you assign different team members as lead for different programs within the same client relationship.</div>
+              </div>
+            </div>
+
+            <!-- Schedule Health -->
+            <div class="help-section" id="help-s-health">
+              <h2 class="help-section-title">Schedule Health Board</h2>
+              <div class="help-card">
+                <div class="help-card-q">What is the Schedule Health board?</div>
+                <div class="help-card-a">Found on the main Dashboard tab, the Schedule Health board shows one row per active program per client. It gives a quick visual of which client-programs need attention, sorted by urgency.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">What do the health statuses mean?</div>
+                <div class="help-card-a"><strong>🔴 Overdue</strong> — past the expected end date. <strong>🟠 Behind</strong> — less than 21 days remaining. <strong>🟡 At Risk</strong> — less than 14 days remaining. <strong>🟢 On Track</strong> — progressing normally. <strong>Done</strong> — program status is Completed or Cancelled.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">Why is a completed program still showing?</div>
+                <div class="help-card-a">The health board only skips programs whose <strong>program status</strong> (in the client's enrolled program card) is set to Completed or Cancelled. Make sure you update the per-program status — not just the top-level client status — to remove it from the board.</div>
+              </div>
+            </div>
+
+            <!-- Team -->
+            <div class="help-section" id="help-s-team">
+              <h2 class="help-section-title">Team Management</h2>
+              <div class="help-card">
+                <div class="help-card-q">How do I add a team member? (Admin only)</div>
+                <div class="help-card-a">Go to the <strong>Team</strong> tab (admin only) and click <strong>+ Add Member</strong>. Enter their name, email, and role (Admin / Lead Coach / Tech). They will receive login access with their email as username. You set their initial password — share it with them securely.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">What are the team roles?</div>
+                <div class="help-card-a"><strong>Admin</strong> — full access to everything including team management, all activity logs, and deleting any task or client. <strong>Lead Coach</strong> — standard team member focused on coaching deliverables. <strong>Tech</strong> — standard team member focused on technical execution. Lead and Tech are labels only; both have the same dashboard access.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">How do I remove a team member?</div>
+                <div class="help-card-a">In the Team tab, open the member's edit modal and click <strong>Remove Member</strong>. Their login will be disabled immediately. Clients and tasks they were assigned to are not affected — you'll need to reassign those manually.</div>
+              </div>
+            </div>
+
+            <!-- Team Calendar -->
+            <div class="help-section" id="help-s-calendar">
+              <h2 class="help-section-title">Team Calendar</h2>
+              <div class="help-card">
+                <div class="help-card-q">What is the Team Calendar?</div>
+                <div class="help-card-a">The Team Calendar (admin only) shows all team members' daily log entries in a shared calendar view. Select a date to see who logged what that day — useful for tracking team activity and accountability.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">How do I log a personal work entry?</div>
+                <div class="help-card-a">In <strong>My Dashboard</strong>, click any date on your personal calendar, then click the date panel that opens below the calendar. Type your notes in the text box and click <strong>Log Entry</strong>. Entries are timestamped and linked to your user account.</div>
+              </div>
+            </div>
+
+            <!-- Activity Log -->
+            <div class="help-section" id="help-s-activity">
+              <h2 class="help-section-title">Activity Log</h2>
+              <div class="help-card">
+                <div class="help-card-q">What does the Activity Log track?</div>
+                <div class="help-card-a">The Activity Log (admin only) records every significant action in the system: client edits, checklist updates, task changes, notes added, calendar entries, team member changes, and program completions. Each entry shows who did it, what changed, and when.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">Can I filter the Activity Log?</div>
+                <div class="help-card-a">Yes — use the <strong>Team Member</strong> dropdown to filter by who made the change, and the <strong>Action type</strong> dropdown to filter by category (Client changes, Tasks, Notes, Calendar, Team changes).</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">Is activity also visible inside client profiles?</div>
+                <div class="help-card-a">Yes. Inside a client's profile modal, the <strong>Notes &amp; Activity</strong> feed on the right panel shows a combined timeline of manual notes added by the team and auto-logged change entries for that specific client.</div>
+              </div>
+            </div>
+
+            <!-- FAQ -->
+            <div class="help-section" id="help-s-faq">
+              <h2 class="help-section-title">FAQ</h2>
+              <div class="help-card">
+                <div class="help-card-q">I can't see the Team or Activity Log tabs — why?</div>
+                <div class="help-card-a">Those tabs are admin-only and are hidden from team member accounts. If you need access, ask your admin to upgrade your role to Admin.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">My changes aren't saving — what do I do?</div>
+                <div class="help-card-a">Make sure you click the <strong>Save</strong> button in the modal after making changes. If the issue persists, try refreshing the page with the refresh button (top right of the sidebar). If it continues, there may be a server issue — contact your technical admin.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">Why does a client show on the health board even though their program is done?</div>
+                <div class="help-card-a">Open the client's profile and find the program card under Enrolled Programs. Set that program's status to <strong>Completed</strong>. The health board uses per-program status, not the top-level client status.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">How do I start a client on a new round of the same program?</div>
+                <div class="help-card-a">In the client modal, find the program card and click <strong>New Cycle</strong>. This resets the week counter to Week 1 and updates the start date. Previous checklist data is kept in history.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">Can I assign a checklist item to a specific team member?</div>
+                <div class="help-card-a">Yes. In a client's checklist, click the pencil/note icon on any item to expand its detail panel. You'll see an <strong>Assignee</strong> dropdown — select a team member. This is saved automatically without needing to re-save the client.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">What happens when I mark a program as "Completed"?</div>
+                <div class="help-card-a">You'll be prompted to confirm. If you confirm, all checklist items for that program across all weeks are automatically checked off as complete. This is useful for bulk-closing a finished engagement.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">Is data backed up?</div>
+                <div class="help-card-a">Data is stored on Railway's persistent volume. Railway maintains infrastructure reliability, but for an additional safety net it's a good practice to periodically export your client data. Speak to your admin about backup procedures.</div>
+              </div>
+              <div class="help-card">
+                <div class="help-card-q">Something is broken or missing — who do I contact?</div>
+                <div class="help-card-a">Report it to your admin or the developer who built the system. Include a description of what you were doing, what you expected to happen, and what actually happened. A screenshot helps.</div>
+              </div>
+            </div>
+
+          </div><!-- end help-content -->
+        </div><!-- end help-body -->
+      </div><!-- end help-layout -->
     </section>
 
   </main>
