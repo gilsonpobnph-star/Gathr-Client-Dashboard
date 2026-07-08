@@ -714,6 +714,95 @@ app.delete('/api/team/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Chat ──────────────────────────────────────────────────────────────────────
+function ensureChat(store) {
+  if (!store.chat) store.chat = { rooms: {} };
+  if (!store.chat.rooms['general']) store.chat.rooms['general'] = { messages: [] };
+}
+
+function dmRoomId(a, b) { return 'dm__' + [a, b].sort().join('__'); }
+
+function canAccessRoom(roomId, session) {
+  if (!roomId.startsWith('dm__')) return true;
+  const parts = roomId.split('__').slice(1);
+  return session.role === 'admin' || parts.includes(session.name || '');
+}
+
+// List rooms visible to current user (sidebar data)
+app.get('/api/chat', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureChat(store);
+  const userName = req.session.name || '';
+  const rooms = [];
+
+  // General always first
+  const genMsgs = store.chat.rooms['general'].messages || [];
+  rooms.push({ id: 'general', name: 'General', type: 'channel',
+    lastMessage: genMsgs[genMsgs.length - 1] || null });
+
+  // DMs this user is part of
+  Object.entries(store.chat.rooms).forEach(([id, room]) => {
+    if (!id.startsWith('dm__')) return;
+    if (!canAccessRoom(id, req.session)) return;
+    const parts = id.split('__').slice(1);
+    const other = parts.find(p => p !== userName) || parts[0];
+    const msgs  = room.messages || [];
+    rooms.push({ id, name: other, type: 'dm', lastMessage: msgs[msgs.length - 1] || null });
+  });
+
+  res.json(rooms);
+});
+
+// Get messages for a room (supports ?since= for polling)
+app.get('/api/chat/:roomId', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureChat(store);
+  if (!canAccessRoom(req.params.roomId, req.session)) return res.status(403).json({ error: 'Forbidden' });
+  const room = store.chat.rooms[req.params.roomId];
+  if (!room) return res.json({ messages: [] });
+  let msgs = room.messages || [];
+  if (req.query.since) msgs = msgs.filter(m => m.ts > req.query.since);
+  res.json({ messages: msgs.slice(-200) });
+});
+
+// Post message to a room
+app.post('/api/chat/:roomId', requireAuth, (req, res) => {
+  const text = (req.body.text || '').trim();
+  if (!text) return res.status(400).json({ error: 'text required' });
+  // Strip any HTML to prevent XSS
+  const safe = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const store = readStore();
+  ensureChat(store);
+  const roomId = req.params.roomId;
+  if (!canAccessRoom(roomId, req.session)) return res.status(403).json({ error: 'Forbidden' });
+  if (!store.chat.rooms[roomId]) store.chat.rooms[roomId] = { messages: [] };
+  const msg = {
+    id:  'msg_' + Date.now() + '_' + Math.random().toString(36).slice(2,6),
+    text: safe,
+    author:   req.session.name   || 'Team',
+    authorId: req.session.userId || 'admin',
+    ts: new Date().toISOString(),
+  };
+  store.chat.rooms[roomId].messages.push(msg);
+  // Cap at 500 messages per room
+  if (store.chat.rooms[roomId].messages.length > 500) {
+    store.chat.rooms[roomId].messages = store.chat.rooms[roomId].messages.slice(-500);
+  }
+  writeStore(store);
+  res.json(msg);
+});
+
+// Start a DM (creates the room so it shows in sidebar before first message)
+app.post('/api/chat/dm/start', requireAuth, (req, res) => {
+  const { withUser } = req.body;
+  if (!withUser) return res.status(400).json({ error: 'withUser required' });
+  const store  = readStore();
+  ensureChat(store);
+  const roomId = dmRoomId(req.session.name || '', withUser);
+  if (!store.chat.rooms[roomId]) { store.chat.rooms[roomId] = { messages: [] }; writeStore(store); }
+  res.json({ roomId });
+});
+
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 function ensureTasks(store) { if (!store.tasks) store.tasks = {}; }
 

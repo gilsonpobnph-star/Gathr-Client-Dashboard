@@ -298,6 +298,7 @@ function showTab(tab) {
   else if (tab === 'teamcal')    renderTeamCalendar();
   else if (tab === 'activitylog') renderActivityLog();
   else if (tab === 'help')        renderHelp();
+  else if (tab === 'chat')        initChat();
 }
 
 /* ── Assignee filters ─────────────────────────────────────────────────────── */
@@ -1201,6 +1202,274 @@ document.addEventListener('click', e => {
     navLink.classList.add('active');
   }
 });
+
+/* ── Chat ─────────────────────────────────────────────────────────────────── */
+let chatCurrentRoom  = 'general';
+let chatPollInterval = null;
+let chatSinceTs      = null;
+let chatRooms        = [];
+let chatMessages     = [];
+let chatLastRead     = {}; // roomId → last-read ISO ts (localStorage)
+
+function chatLoadLastRead() {
+  try { chatLastRead = JSON.parse(localStorage.getItem('chatLastRead') || '{}'); } catch { chatLastRead = {}; }
+}
+function chatSaveLastRead(roomId, ts) {
+  chatLastRead[roomId] = ts;
+  try { localStorage.setItem('chatLastRead', JSON.stringify(chatLastRead)); } catch {}
+}
+
+function dmRoomId(a, b) { return 'dm__' + [a, b].sort().join('__'); }
+
+function linkify(text) {
+  return text.replace(/(https?:\/\/[^\s<>"]+)/g,
+    '<a href="$1" target="_blank" rel="noopener noreferrer" class="chat-link">$1</a>');
+}
+
+async function initChat() {
+  chatLoadLastRead();
+  await loadChatRooms();
+  await loadChatMessages(chatCurrentRoom);
+  startChatPolling();
+}
+
+async function loadChatRooms() {
+  try {
+    const res = await fetch('/api/chat');
+    if (!res.ok) return;
+    chatRooms = await res.json();
+    renderChatSidebar();
+  } catch(e) { console.error('chat rooms load failed', e); }
+}
+
+function renderChatSidebar() {
+  const channels = chatRooms.filter(r => r.type === 'channel');
+  const dms      = chatRooms.filter(r => r.type === 'dm');
+  const myName   = currentUser.name || '';
+
+  // Build team list for new DM (people not already in DM list)
+  const dmNames  = dms.map(r => r.name);
+  const newDmTargets = team.filter(t => t !== myName && !dmNames.includes(t));
+
+  document.getElementById('chat-channels-list').innerHTML = channels.map(r => `
+    <button class="chat-room-btn ${chatCurrentRoom === r.id ? 'active' : ''}" onclick="switchChatRoom('${r.id}')">
+      <span class="chat-room-icon">#</span>
+      <span class="chat-room-label">${escHtml(r.name)}</span>
+      ${hasUnread(r) ? '<span class="chat-unread-dot"></span>' : ''}
+    </button>`).join('');
+
+  document.getElementById('chat-dm-list').innerHTML =
+    dms.map(r => `
+      <button class="chat-room-btn ${chatCurrentRoom === r.id ? 'active' : ''}" onclick="switchChatRoom('${r.id}')">
+        <span class="chat-dm-av" style="background:${stringToColor(r.name)}">${initials(r.name)}</span>
+        <span class="chat-room-label">${escHtml(r.name)}</span>
+        ${hasUnread(r) ? '<span class="chat-unread-dot"></span>' : ''}
+      </button>`).join('') +
+    (newDmTargets.length ? `<div class="chat-new-dm-wrap">${newDmTargets.map(name => `
+      <button class="chat-new-dm-btn" onclick="startDm('${escHtml(name)}')" title="Message ${escHtml(name)}">
+        <span class="chat-dm-av" style="background:${stringToColor(name)}">${initials(name)}</span>
+        <span class="chat-room-label" style="color:var(--text3)">${escHtml(name)}</span>
+        <span style="font-size:10px;color:var(--text3);margin-left:auto">+</span>
+      </button>`).join('')}</div>` : '');
+
+  // Global unread badge on nav
+  const anyUnread = chatRooms.some(r => hasUnread(r));
+  document.getElementById('chat-unread-badge')?.classList.toggle('hidden', !anyUnread);
+}
+
+function hasUnread(room) {
+  if (!room.lastMessage) return false;
+  const lastRead = chatLastRead[room.id];
+  if (!lastRead) return room.lastMessage.author !== (currentUser.name || '');
+  return room.lastMessage.ts > lastRead && room.lastMessage.author !== (currentUser.name || '');
+}
+
+async function switchChatRoom(roomId) {
+  chatCurrentRoom = roomId;
+  chatSinceTs     = null;
+  chatMessages    = [];
+  renderChatSidebar();
+  updateChatHeader();
+  document.getElementById('chat-messages').innerHTML = '<div class="chat-loading">Loading…</div>';
+  document.getElementById('chat-input').placeholder =
+    roomId === 'general' ? 'Message #general… (Enter to send)' :
+    `Message ${chatRooms.find(r=>r.id===roomId)?.name||''}…`;
+  await loadChatMessages(roomId);
+}
+
+function updateChatHeader() {
+  const room = chatRooms.find(r => r.id === chatCurrentRoom);
+  const nameEl = document.getElementById('chat-room-name');
+  const metaEl = document.getElementById('chat-room-meta');
+  if (!room) return;
+  if (room.type === 'channel') {
+    nameEl.innerHTML = `<span style="color:var(--text3)">#</span> ${escHtml(room.name)}`;
+    metaEl.textContent = 'Team channel';
+  } else {
+    nameEl.innerHTML = `<span class="chat-dm-av" style="background:${stringToColor(room.name)};width:20px;height:20px;font-size:8px;display:inline-flex;align-items:center;justify-content:center;border-radius:50%;color:#fff;font-weight:700;margin-right:6px">${initials(room.name)}</span>${escHtml(room.name)}`;
+    metaEl.textContent = 'Direct message';
+  }
+}
+
+async function loadChatMessages(roomId) {
+  try {
+    const url = `/api/chat/${encodeURIComponent(roomId)}`;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const data = await res.json();
+    chatMessages = data.messages || [];
+    if (chatMessages.length) {
+      chatSinceTs = chatMessages[chatMessages.length - 1].ts;
+      chatSaveLastRead(roomId, chatSinceTs);
+    }
+    renderChatMessages();
+    scrollChatToBottom(true);
+    updateChatHeader();
+  } catch(e) { console.error('chat load failed', e); }
+}
+
+function renderChatMessages() {
+  const el = document.getElementById('chat-messages');
+  if (!el) return;
+  if (!chatMessages.length) {
+    el.innerHTML = '<div class="chat-empty">No messages yet. Say something!</div>';
+    return;
+  }
+
+  let html = '';
+  let prevAuthor = null;
+  let prevDateStr = null;
+
+  chatMessages.forEach(msg => {
+    const d = new Date(msg.ts);
+    const dateStr = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+    const timeStr = d.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+    const isMe    = msg.author === (currentUser.name || '');
+
+    if (dateStr !== prevDateStr) {
+      html += `<div class="chat-day-divider"><span>${dateStr}</span></div>`;
+      prevAuthor  = null;
+      prevDateStr = dateStr;
+    }
+
+    const grouped = msg.author === prevAuthor;
+    prevAuthor = msg.author;
+
+    if (grouped) {
+      html += `<div class="chat-msg chat-msg-grouped ${isMe ? 'chat-msg-me' : ''}">
+        <div class="chat-msg-spacer"></div>
+        <div class="chat-msg-content">
+          <div class="chat-bubble">${linkify(msg.text)}</div>
+          <span class="chat-msg-time">${timeStr}</span>
+        </div>
+      </div>`;
+    } else {
+      html += `<div class="chat-msg ${isMe ? 'chat-msg-me' : ''}">
+        <div class="chat-msg-av" style="background:${stringToColor(msg.author)}">${initials(msg.author)}</div>
+        <div class="chat-msg-content">
+          <div class="chat-msg-meta">
+            <span class="chat-msg-author">${escHtml(msg.author)}</span>
+            <span class="chat-msg-time">${timeStr}</span>
+          </div>
+          <div class="chat-bubble">${linkify(msg.text)}</div>
+        </div>
+      </div>`;
+    }
+  });
+
+  el.innerHTML = html;
+}
+
+function scrollChatToBottom(instant) {
+  const el = document.getElementById('chat-messages');
+  if (!el) return;
+  el.scrollTo({ top: el.scrollHeight, behavior: instant ? 'auto' : 'smooth' });
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById('chat-input');
+  const text  = input?.value.trim();
+  if (!text) return;
+  input.value = '';
+  chatInputResize(input);
+
+  try {
+    const res = await fetch(`/api/chat/${encodeURIComponent(chatCurrentRoom)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) return;
+    const msg = await res.json();
+    chatMessages.push(msg);
+    chatSinceTs = msg.ts;
+    chatSaveLastRead(chatCurrentRoom, msg.ts);
+    renderChatMessages();
+    scrollChatToBottom(false);
+    // Refresh sidebar last-message preview
+    await loadChatRooms();
+  } catch(e) { console.error('send failed', e); }
+}
+
+function chatInputKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendChatMessage();
+  }
+}
+
+function chatInputResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function startChatPolling() {
+  stopChatPolling();
+  chatPollInterval = setInterval(async () => {
+    if (activeTab !== 'chat') return;
+    try {
+      const url = `/api/chat/${encodeURIComponent(chatCurrentRoom)}${chatSinceTs ? '?since=' + encodeURIComponent(chatSinceTs) : ''}`;
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const data = await res.json();
+      const newMsgs = data.messages || [];
+      if (newMsgs.length) {
+        chatMessages.push(...newMsgs);
+        chatSinceTs = newMsgs[newMsgs.length - 1].ts;
+        chatSaveLastRead(chatCurrentRoom, chatSinceTs);
+        const el = document.getElementById('chat-messages');
+        const nearBottom = el ? el.scrollHeight - el.scrollTop - el.clientHeight < 120 : true;
+        renderChatMessages();
+        if (nearBottom) scrollChatToBottom(false);
+      }
+      // Poll sidebar for unread dots on other rooms
+      await loadChatRooms();
+    } catch {}
+  }, 3000);
+}
+
+function stopChatPolling() {
+  if (chatPollInterval) { clearInterval(chatPollInterval); chatPollInterval = null; }
+}
+
+// Stop polling when switching away from chat tab
+document.querySelectorAll('.nav-item[data-tab]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.tab !== 'chat') stopChatPolling();
+  });
+});
+
+async function startDm(name) {
+  const res = await fetch('/api/chat/dm/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ withUser: name }),
+  });
+  if (!res.ok) return;
+  const data = await res.json();
+  await loadChatRooms();
+  await switchChatRoom(data.roomId);
+}
 
 async function renderActivityLog() {
   const listEl = document.getElementById('actlog-list');

@@ -116,6 +116,11 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
         Activity Log
       </button>
+      <button class="nav-item" data-tab="chat" id="nav-chat-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Chat
+        <span id="chat-unread-badge" class="chat-unread-badge hidden"></span>
+      </button>
       <div class="nav-section-label" style="margin-top:8px">Support</div>
       <button class="nav-item" data-tab="help">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
@@ -798,6 +803,54 @@
       </div>
       <div style="padding:16px 32px 32px">
         <div id="actlog-list" class="actlog-list"></div>
+      </div>
+    </section>
+
+    <!-- Chat Tab -->
+    <section id="tab-chat" class="tab-section tab-chat-section hidden">
+      <div class="chat-layout">
+
+        <!-- Left sidebar: channels + DMs -->
+        <div class="chat-sidebar">
+          <div class="chat-sidebar-header">Chat</div>
+
+          <div class="chat-sidebar-section">
+            <div class="chat-sidebar-label">Channels</div>
+            <div id="chat-channels-list"></div>
+          </div>
+
+          <div class="chat-sidebar-section">
+            <div class="chat-sidebar-label">Direct Messages</div>
+            <div id="chat-dm-list"></div>
+          </div>
+        </div>
+
+        <!-- Right: message area -->
+        <div class="chat-main">
+          <div class="chat-main-header">
+            <span id="chat-room-name">General</span>
+            <span id="chat-room-meta" class="chat-room-meta"></span>
+          </div>
+
+          <div class="chat-messages" id="chat-messages">
+            <div class="chat-loading">Loading messages…</div>
+          </div>
+
+          <div class="chat-input-wrap">
+            <textarea
+              id="chat-input"
+              class="chat-input"
+              placeholder="Message #general… (Enter to send, Shift+Enter for new line)"
+              rows="1"
+              onkeydown="chatInputKeydown(event)"
+              oninput="chatInputResize(this)"
+            ></textarea>
+            <button class="chat-send-btn" onclick="sendChatMessage()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            </button>
+          </div>
+        </div>
+
       </div>
     </section>
 
