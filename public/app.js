@@ -2176,6 +2176,7 @@ function openModal(id) {
   populateModal();
   document.getElementById('client-modal').classList.remove('hidden');
   renderChecklistTabs();
+  if (modalActiveProgram) loadChecklist(modalViewWeek);
 }
 
 function populateModal() {
