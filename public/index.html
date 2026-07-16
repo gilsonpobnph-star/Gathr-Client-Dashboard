@@ -692,6 +692,7 @@
                     <option value="Medium">Medium</option>
                     <option value="Low">Low</option>
                   </select>
+                  <button id="btn-toggle-archived" class="btn-toggle-archived" onclick="toggleArchivedTasks()">Archived</button>
                   <button class="btn-primary" style="font-size:12px;padding:6px 14px" onclick="openTaskModal()">+ New Task</button>
                 </div>
               </div>
@@ -1191,7 +1192,10 @@
           <button class="btn-primary" onclick="saveTask()">Save</button>
           <button class="btn-view" onclick="closeTaskModal()">Cancel</button>
         </div>
-        <button id="task-delete-btn" class="tdp-delete-btn hidden" onclick="deleteTask()">Delete task</button>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="task-archive-btn" class="tdp-archive-btn hidden" onclick="archiveTask()">Archive</button>
+          <button id="task-delete-btn" class="tdp-delete-btn hidden" onclick="deleteTask()">Delete task</button>
+        </div>
       </div>
     </div>
 

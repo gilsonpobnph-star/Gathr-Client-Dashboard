@@ -814,7 +814,6 @@ app.post('/api/chat/dm/start', requireAuth, (req, res) => {
 function ensureTasks(store) { if (!store.tasks) store.tasks = {}; }
 
 function canSeeTask(task, session) {
-  if (session.role === 'admin') return true;
   const name = session.name || '';
   return task.createdBy === name ||
     (task.assignedTo || []).includes(name) ||
@@ -824,8 +823,10 @@ function canSeeTask(task, session) {
 app.get('/api/tasks', requireAuth, (req, res) => {
   const store = readStore();
   ensureTasks(store);
+  const showArchived = req.query.archived === 'true';
   const list = Object.values(store.tasks)
     .filter(t => canSeeTask(t, req.session))
+    .filter(t => showArchived ? t.archived : !t.archived)
     .sort((a, b) => (a.deadline || '9999') < (b.deadline || '9999') ? -1 : 1);
   res.json(list);
 });
@@ -847,6 +848,7 @@ app.post('/api/tasks', requireAuth, (req, res) => {
     createdBy:   req.session.name      || 'Admin',
     createdAt:   new Date().toISOString(),
     updatedAt:   new Date().toISOString(),
+    archived:    false,
   };
   store.tasks[id] = task;
   logActivity(store, req, 'Task created', { details: task.title });
@@ -860,7 +862,7 @@ app.patch('/api/tasks/:id', requireAuth, (req, res) => {
   const task = store.tasks[req.params.id];
   if (!task) return res.status(404).json({ error: 'Not found' });
   if (!canSeeTask(task, req.session)) return res.status(403).json({ error: 'Forbidden' });
-  const allowed = ['title','description','priority','status','deadline','clientId','assignedTo','sharedWith'];
+  const allowed = ['title','description','priority','status','deadline','clientId','assignedTo','sharedWith','archived'];
   allowed.forEach(k => { if (req.body[k] !== undefined) task[k] = req.body[k]; });
   task.updatedAt = new Date().toISOString();
   store.tasks[req.params.id] = task;

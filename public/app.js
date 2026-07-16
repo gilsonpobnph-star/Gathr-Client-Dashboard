@@ -19,6 +19,7 @@ let team = [];
 let myTasks = [];
 let clientLastViewed = {}; // clientId → ISO ts, persisted in localStorage
 let editingTaskId = null;
+let showArchivedTasks = false;
 let gathrMembers = [];
 let localStore = {};
 let activeTab = 'mydash';
@@ -740,6 +741,20 @@ function initials(name) {
   return (name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
 }
 
+async function toggleArchivedTasks() {
+  showArchivedTasks = !showArchivedTasks;
+  const btn = document.getElementById('btn-toggle-archived');
+  if (btn) btn.classList.toggle('active', showArchivedTasks);
+  if (showArchivedTasks) {
+    const res = await fetch('/api/tasks?archived=true');
+    if (res.ok) myTasks = await res.json();
+  } else {
+    const res = await fetch('/api/tasks');
+    if (res.ok) myTasks = await res.json();
+  }
+  renderMyTasks();
+}
+
 function renderMyTasks() {
   const el = document.getElementById('my-tasks-list');
   if (!el) return;
@@ -747,11 +762,14 @@ function renderMyTasks() {
   const priorityF = document.getElementById('task-filter-priority')?.value || '';
 
   let list = [...myTasks];
+  if (!showArchivedTasks) list = list.filter(t => !t.archived);
   if (statusF)   list = list.filter(t => t.status   === statusF);
   if (priorityF) list = list.filter(t => t.priority === priorityF);
 
   if (!list.length) {
-    el.innerHTML = `<div class="task-empty">No tasks yet — hit <strong>+ New Task</strong> to get started.</div>`;
+    el.innerHTML = showArchivedTasks
+      ? `<div class="task-empty">No archived tasks.</div>`
+      : `<div class="task-empty">No tasks yet — hit <strong>+ New Task</strong> to get started.</div>`;
     return;
   }
 
@@ -761,11 +779,11 @@ function renderMyTasks() {
     const avatars = (t.assignedTo || []).slice(0,3).map(n =>
       `<span class="task-avatar" title="${escHtml(n)}" style="background:${stringToColor(n)}">${initials(n)}</span>`
     ).join('');
-    return `<div class="task-row" onclick="openTaskModal('${t.id}')">
+    return `<div class="task-row${t.archived?' task-row-archived':''}" onclick="openTaskModal('${t.id}')">
       <div class="task-row-name">
         <span class="task-row-stripe" style="background:${PRIORITY_COLOR[t.priority]||'#8A7A6E'}"></span>
         <div class="task-row-info">
-          <span class="task-row-title">${escHtml(t.title)}</span>
+          <span class="task-row-title">${escHtml(t.title)}${t.archived?' <span class="task-archived-banner">Archived</span>':''}</span>
           ${client ? `<span class="task-row-client">🔗 ${escHtml(client.name)}</span>` : ''}
         </div>
       </div>
@@ -823,8 +841,15 @@ function openTaskModal(taskId) {
 
   document.getElementById('task-assign-wrap').style.display = '';
 
-  const canDelete = isAdmin || (t && t.createdBy === myName);
+  const canDelete  = isAdmin || (t && t.createdBy === myName);
+  const canArchive = t && (isAdmin || t.createdBy === myName ||
+    (t.assignedTo||[]).includes(myName) || (t.sharedWith||[]).includes(myName));
   document.getElementById('task-delete-btn').classList.toggle('hidden', !t || !canDelete);
+  const archiveBtn = document.getElementById('task-archive-btn');
+  if (archiveBtn) {
+    archiveBtn.classList.toggle('hidden', !canArchive);
+    archiveBtn.textContent = t?.archived ? 'Unarchive' : 'Archive';
+  }
 
   renderTaskActivity(t);
 
@@ -913,6 +938,25 @@ async function deleteTask() {
   if (!res.ok) return;
   myTasks = myTasks.filter(x => x.id !== editingTaskId);
   closeTaskModal();
+  renderMyTasks();
+}
+
+async function archiveTask() {
+  if (!editingTaskId) return;
+  const t = myTasks.find(x => x.id === editingTaskId);
+  if (!t) return;
+  const newArchived = !t.archived;
+  const res = await fetch(`/api/tasks/${editingTaskId}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ archived: newArchived }),
+  });
+  if (!res.ok) return;
+  const saved = await res.json();
+  const idx = myTasks.findIndex(x => x.id === editingTaskId);
+  if (idx !== -1) myTasks[idx] = saved;
+  closeTaskModal();
+  if (!showArchivedTasks) myTasks = myTasks.filter(x => !x.archived);
   renderMyTasks();
 }
 
