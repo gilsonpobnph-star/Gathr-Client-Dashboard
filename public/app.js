@@ -372,6 +372,8 @@ function populateAssigneeFilters() {
       const o = document.createElement('option'); o.value = t; o.textContent = t;
       s.appendChild(o);
     });
+    // Default note author to the currently logged-in user
+    if (id === 'cm-note-author' && currentUser.name) s.value = currentUser.name;
   });
 
   // Populate program dropdowns from dynamic programsMap
