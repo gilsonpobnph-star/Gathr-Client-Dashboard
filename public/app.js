@@ -2207,6 +2207,63 @@ function openClientById(id) {
   setTimeout(() => openModal(id), 100);
 }
 
+function openAddClientModal() {
+  // Populate program dropdown
+  const progSel = document.getElementById('acm-program');
+  progSel.innerHTML = '<option value="">— None —</option>' +
+    Object.entries(programsMap).map(([id, p]) => `<option value="${escHtml(id)}">${escHtml(p.name||id)}</option>`).join('');
+
+  // Populate coach dropdowns
+  const teamOpts = ['<option value="">— Unassigned —</option>', ...team.map(m => `<option value="${escHtml(m)}">${escHtml(m)}</option>`)].join('');
+  document.getElementById('acm-lead').innerHTML = teamOpts;
+  document.getElementById('acm-tech').innerHTML = teamOpts;
+
+  // Reset fields
+  ['acm-name','acm-biz','acm-email','acm-phone'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('acm-status').value = 'New';
+  document.getElementById('acm-error').style.display = 'none';
+
+  document.getElementById('add-client-modal').classList.remove('hidden');
+  document.getElementById('acm-name').focus();
+}
+
+function closeAddClientModal() {
+  document.getElementById('add-client-modal').classList.add('hidden');
+}
+
+async function saveNewClient() {
+  const name = document.getElementById('acm-name').value.trim();
+  const errEl = document.getElementById('acm-error');
+  if (!name) {
+    errEl.textContent = 'Name is required.';
+    errEl.style.display = 'block';
+    document.getElementById('acm-name').focus();
+    return;
+  }
+  errEl.style.display = 'none';
+
+  const payload = {
+    name,
+    businessName:  document.getElementById('acm-biz').value.trim(),
+    email:         document.getElementById('acm-email').value.trim(),
+    phone:         document.getElementById('acm-phone').value.trim(),
+    status:        document.getElementById('acm-status').value,
+    program:       document.getElementById('acm-program').value || '',
+    programs:      document.getElementById('acm-program').value ? [document.getElementById('acm-program').value] : [],
+    leadAssignee:  document.getElementById('acm-lead').value,
+    techAssignee:  document.getElementById('acm-tech').value,
+  };
+
+  const res = await fetch('/api/clients', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  if (!res.ok) { errEl.textContent = 'Failed to save. Please try again.'; errEl.style.display = 'block'; return; }
+  const newClient = await res.json();
+  clients.push(newClient);
+  closeAddClientModal();
+  renderClients();
+  // Open the full profile so they can fill in more details
+  openModal(newClient.id);
+}
+
 function openModal(id) {
   modalClient = clients.find(c => c.id === id);
   if (!modalClient) return;
