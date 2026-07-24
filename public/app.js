@@ -293,8 +293,10 @@ document.getElementById('btn-refresh').addEventListener('click', loadAll);
 
 /* ── Auto-refresh (silent background poll every 30s) ─────────────────────── */
 async function silentRefresh() {
-  // Skip if modal open, tab hidden, or user is actively editing
+  // Skip if any modal open, or tab hidden
   if (!document.getElementById('client-modal')?.classList.contains('hidden')) return;
+  if (!document.getElementById('task-modal')?.classList.contains('hidden')) return;
+  if (!document.getElementById('add-client-modal')?.classList.contains('hidden')) return;
   if (document.visibilityState === 'hidden') return;
   try {
     const [cRes, tRes, tkRes] = await Promise.all([
@@ -916,9 +918,18 @@ async function saveTask() {
 
   const url    = editingTaskId ? `/api/tasks/${editingTaskId}` : '/api/tasks';
   const method = editingTaskId ? 'PATCH' : 'POST';
-  const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
-  if (!res.ok) return;
-  const saved = await res.json();
+  let res, saved;
+  try {
+    res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    saved = await res.json();
+  } catch (e) {
+    alert('Could not save task — network error. Please try again.');
+    return;
+  }
+  if (!res.ok) {
+    alert(`Could not save task: ${saved?.error || res.status}`);
+    return;
+  }
 
   if (editingTaskId) {
     const idx = myTasks.findIndex(t => t.id === editingTaskId);

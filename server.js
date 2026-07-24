@@ -815,6 +815,9 @@ function ensureTasks(store) { if (!store.tasks) store.tasks = {}; }
 
 function canSeeTask(task, session) {
   const name = session.name || '';
+  // Backward compat: tasks created via the legacy admin login have createdBy:'Admin'
+  // — keep these visible to any admin-role user
+  if (session.role === 'admin' && (task.createdBy === 'Admin' || !task.createdBy)) return true;
   return task.createdBy === name ||
     (task.assignedTo || []).includes(name) ||
     (task.sharedWith || []).includes(name);
