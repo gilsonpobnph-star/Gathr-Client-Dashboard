@@ -221,22 +221,22 @@
       ? `<div class="period-head">
            <span class="ph-tag now">This period</span>
            <div class="ph-dates">
-             <label class="ph-field"><span>From</span><input type="date" value="${p.start}" onchange="Growth.updPeriodDate('${p.id}','start',this.value)"></label>
+             <label class="ph-field"><span>Period start</span><input type="date" value="${p.start}" onchange="Growth.updPeriodDate('${p.id}','start',this.value)"></label>
              <span class="ph-arrow">→</span>
-             <label class="ph-field"><span>To</span><input type="date" value="${p.end}" onchange="Growth.updPeriodDate('${p.id}','end',this.value)"></label>
+             <label class="ph-field"><span>Next meeting date</span><input type="date" value="${p.end}" onchange="Growth.updPeriodDate('${p.id}','end',this.value)"></label>
            </div></div>`
       : `<div class="period-head"><div class="ph-title">${shortDate(p.start)} → ${shortDate(p.end)}</div><span class="ph-tag past">Locked</span></div>`;
-    wrap.innerHTML = head + scoreboardBlock(p) + goalsBlock(p, isOpen) + '<div class="pb-people"></div>';
-    const peopleHost = wrap.querySelector('.pb-people');
-    (p.people || []).forEach(pn => peopleHost.appendChild(personBlock(p, pn, isOpen)));
+    let bodyHtml = scoreboardBlock(p) + goalsBlock(p, isOpen) + '<div class="pb-people"></div>';
     if (isOpen) {
-      const actions = document.createElement('div'); actions.className = 'period-actions';
-      actions.innerHTML = `
+      bodyHtml += `<div class="period-actions">
         <button class="secondary" onclick="Growth.savePeriodProgress('${p.id}')">Save</button>
         <button class="accent" onclick="Growth.closePeriod('${p.id}')">Close period (after follow-up meeting)</button>
-        <span class="muted" style="font-size:12.5px;">Save keeps this period open. Closing locks the goals in and starts a fresh period.</span>`;
-      wrap.appendChild(actions);
+        <span class="muted" style="font-size:12.5px;">Save keeps this period open. Closing locks the goals in and starts a fresh period.</span>
+      </div>`;
     }
+    wrap.innerHTML = head + `<div class="period-body">${bodyHtml}</div>`;
+    const peopleHost = wrap.querySelector('.pb-people');
+    (p.people || []).forEach(pn => peopleHost.appendChild(personBlock(p, pn, isOpen)));
     return wrap;
   }
   // The scoreboard for a period IS its goal list: done = goals ticked off,
@@ -266,14 +266,17 @@
   function goalsBlock(p, isOpen) {
     const goals = p.goals || [];
     const earned = goals.filter(g => g.done).length;
-    const rows = goals.map(g => isOpen
-      ? `<div class="goal-row">
-           <label class="chkbox"><input type="checkbox" ${g.done ? 'checked' : ''} onchange="Growth.toggleGoal('${p.id}','${g.id}',this.checked)"></label>
-           <input class="goal-text" value="${esc(g.text)}" placeholder="e.g. 4 assessments paid" onchange="Growth.updateGoalText('${p.id}','${g.id}',this.value)">
-           <button class="linkish" onclick="Growth.removeGoal('${p.id}','${g.id}')">remove</button>
-         </div>`
-      : `<div class="goal-row readonly"><span class="sdot ${g.done ? 'hit' : 'miss'}"></span><span class="goal-text-ro">${esc(g.text || '—')}</span></div>`
-    ).join('');
+    const rows = goals.map(g => {
+      const added = g.addedAt ? `<span class="goal-added">Added ${shortDate(g.addedAt)}</span>` : '';
+      return isOpen
+        ? `<div class="goal-row">
+             <label class="chkbox"><input type="checkbox" ${g.done ? 'checked' : ''} onchange="Growth.toggleGoal('${p.id}','${g.id}',this.checked)"></label>
+             <input class="goal-text" value="${esc(g.text)}" placeholder="e.g. 4 assessments paid" onchange="Growth.updateGoalText('${p.id}','${g.id}',this.value)">
+             ${added}
+             <button class="linkish" onclick="Growth.removeGoal('${p.id}','${g.id}')">remove</button>
+           </div>`
+        : `<div class="goal-row readonly"><span class="sdot ${g.done ? 'hit' : 'miss'}"></span><span class="goal-text-ro">${esc(g.text || '—')}</span>${added}</div>`;
+    }).join('');
     const addRow = isOpen
       ? `<div class="goal-add-row">
            <input id="g-newGoal-${p.id}" placeholder="Add a goal or commitment for this period…" onkeydown="if(event.key==='Enter'){Growth.addGoal('${p.id}');event.preventDefault();}">
@@ -294,7 +297,7 @@
     const input = document.getElementById('g-newGoal-' + pid);
     const text = (input?.value || '').trim(); if (!text) return;
     if (!p.goals) p.goals = [];
-    p.goals.push({ id: newGoalId(), text, done: false });
+    p.goals.push({ id: newGoalId(), text, done: false, addedAt: todayStr() });
     await persist(); renderWig();
   }
   async function toggleGoal(pid, gid, done) {

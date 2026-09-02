@@ -1595,11 +1595,37 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/intake', (req, res) => res.sendFile(path.join(__dirname, 'public', 'intake.html')));
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
+// One-time cleanup: "Glaiza" was carried on Growth clients/periods as a
+// standing coach on every account — strip her out everywhere she appears.
+// Idempotent (safe to run on every boot; no-ops once she's gone).
+function pruneGrowthPerson(store, name) {
+  if (!store.growth) return false;
+  const target = name.trim().toLowerCase();
+  let changed = false;
+  (store.growth.clients || []).forEach(c => {
+    if (Array.isArray(c.people) && c.people.some(n => (n || '').trim().toLowerCase() === target)) {
+      c.people = c.people.filter(n => (n || '').trim().toLowerCase() !== target);
+      changed = true;
+    }
+  });
+  Object.values(store.growth.data || {}).forEach(d => {
+    (d.periods || []).forEach(p => {
+      if (Array.isArray(p.people)) {
+        const before = p.people.length;
+        p.people = p.people.filter(pn => (pn.name || '').trim().toLowerCase() !== target);
+        if (p.people.length !== before) changed = true;
+      }
+    });
+  });
+  return changed;
+}
+
 const PORT = process.env.PORT || 3001;
 // Seed admin user on startup
 (function() {
   const store = readStore();
   ensureAdminUser(store);
+  if (pruneGrowthPerson(store, 'Glaiza')) console.log('[migration] Removed Glaiza from Growth clients/periods');
   writeStore(store);
 })();
 

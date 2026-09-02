@@ -103,6 +103,7 @@
 #tab-growth details.cfg[open] > summary{margin-bottom:12px;}
 
 #tab-growth .period{padding:0; overflow:hidden;}
+#tab-growth .period-body{padding:18px 22px 22px;}
 #tab-growth .period.open{border-color:var(--g-orange); border-width:2px;}
 #tab-growth .period-head{background:var(--g-lightgrey); padding:12px 18px; display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; margin:-22px -22px 0;}
 #tab-growth .period.open .period-head{background:var(--g-cream);}
@@ -153,6 +154,7 @@
 #tab-growth .goal-row{display:flex; align-items:center; gap:10px; padding:6px 0;}
 #tab-growth .goal-row .chkbox{padding:6px 9px;}
 #tab-growth .goal-row .goal-text{flex:1;}
+#tab-growth .goal-added{font-size:11px; color:#7d766e; white-space:nowrap; flex-shrink:0;}
 #tab-growth .goal-row.readonly{gap:8px;}
 #tab-growth .goal-row.readonly .sdot{flex-shrink:0;}
 #tab-growth .goal-text-ro{font-size:14px;}
@@ -231,10 +233,16 @@
 #tab-growth .report-actions{padding:16px 48px; background:var(--g-lightgrey); border-top:1px solid var(--g-warmgrey); display:flex; gap:10px; flex-wrap:wrap;}
 
 @media print{
-  body > *:not(#tab-growth){display:none !important;}
-  #tab-growth .g-header, #tab-growth .crumb, #tab-growth .no-print, #tab-growth .report-actions, #tab-growth .toast{display:none !important;}
-  #tab-growth .g-main{max-width:none; padding:0;}
-  #tab-growth #g-reportView{border:none;}
+  /* #tab-growth is nested deep inside the app shell (sidebar, #app, main),
+     so hiding siblings-of-tab-growth alone leaves its own ancestors — and
+     everything else on the page — showing. Isolate the report the standard
+     way instead: hide everything, then re-show only the report subtree. */
+  body *{ visibility:hidden !important; }
+  #tab-growth #g-reportView, #tab-growth #g-reportView *{ visibility:visible !important; }
+  #tab-growth #g-reportView{
+    position:absolute; top:0; left:0; width:100%; margin:0; border:none;
+  }
+  #tab-growth .report-actions, #tab-growth .toast{ visibility:hidden !important; display:none !important; }
   #tab-growth .report-inner{padding:8mm 5mm;}
 }
 @media (max-width:640px){ #tab-growth .report-inner{padding:26px 18px;} }
