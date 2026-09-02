@@ -26,7 +26,7 @@
     try { const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r.ok ? r.json() : null; }
     catch { return null; }
   }
-  function fresh() { return { board: null, periods: [], weeks: {}, fees: {}, notes: {} }; }
+  function fresh() { return { periods: [], weeks: {}, fees: {}, notes: {} }; }
 
   // One-time, idempotent migration: old model was one WIG + one commitment per
   // PERSON per period (2 points each). New model is a flat list of goals per
@@ -107,19 +107,19 @@
     const inv = s.spend + fees;
     return { roas: s.spend ? s.rev / s.spend : null, roi: inv ? s.rev / inv : null, cac: s.closed ? s.spend / s.closed : null, any: s.any };
   }
-  function boardCurrent(d) { const b = d.board; if (!b) return null; return (b.current != null && !isNaN(b.current)) ? Number(b.current) : null; }
-  function boardCalc(d) {
-    const b = d.board; if (!b || !b.goal || !b.start || !b.end) return null;
-    const total = Math.max(1, daysBetween(b.start, b.end)); const t = todayStr();
-    const ref = t > b.end ? b.end : (t < b.start ? b.start : t); const done = Math.max(0, daysBetween(b.start, ref));
-    const pacing = b.goal * done / total; const current = boardCurrent(d);
-    return { total, done, pacing, current, winning: current != null ? current >= pacing : null };
+  // The scoreboard is derived straight from a period's own goal list — no
+  // separate manually-entered number. "Done" = goals ticked off, "goal count"
+  // = total goals set, "pacing" = how many you'd expect to have done by today
+  // given the period's date range. Winning = done ≥ pacing.
+  function periodPacing(p) {
+    if (!p || !p.start || !p.end) return null;
+    const goals = p.goals || []; const goalCount = goals.length; const done = goals.filter(g => g.done).length;
+    const totalDays = Math.max(1, daysBetween(p.start, p.end)); const t = todayStr();
+    const ref = t > p.end ? p.end : (t < p.start ? p.start : t); const elapsedDays = Math.max(0, daysBetween(p.start, ref));
+    const pacing = goalCount * elapsedDays / totalDays;
+    return { goalCount, done, totalDays, elapsedDays, pacing, winning: goalCount ? done >= pacing : null };
   }
-  function boardPacingAtDate(d, dateStr) {
-    const b = d.board; if (!b || !b.goal || !b.start || !b.end) return 0;
-    const total = Math.max(1, daysBetween(b.start, b.end)); const dd = Math.min(Math.max(0, daysBetween(b.start, dateStr)), total);
-    return b.goal * dd / total;
-  }
+  function openPeriod(d) { return (d.periods || []).find(p => !p.locked) || null; }
   // Commitment % = goals hit ÷ goals set, across locked periods (client-level,
   // not tied to any one person — a client can have any number of goals per period).
   function commitPct(d) {
@@ -134,8 +134,8 @@
     const grid = $('clientGrid'); if (!grid) return; grid.innerHTML = '';
     $('dashEmpty').classList.toggle('hidden', clients.length > 0);
     clients.forEach(c => {
-      const d = dataCache[c.id] || fresh(); const lr = longRun(d); const bc = boardCalc(d); const cp = commitPct(d);
-      const status = bc == null || bc.winning == null ? { c: 'idle', t: 'No scoreboard' } : (bc.winning ? { c: 'win', t: 'Winning' } : { c: 'lose', t: 'Losing' });
+      const d = dataCache[c.id] || fresh(); const lr = longRun(d); const bc = periodPacing(openPeriod(d)); const cp = commitPct(d);
+      const status = bc == null || bc.winning == null ? { c: 'idle', t: 'No goals yet' } : (bc.winning ? { c: 'win', t: 'Winning' } : { c: 'lose', t: 'Losing' });
       const card = document.createElement('div');
       card.className = 'client-card ' + roiClass(lr.roi); card.tabIndex = 0; card.setAttribute('role', 'button');
       card.innerHTML = `
@@ -189,48 +189,8 @@
   }
 
   function renderWig() {
-    const d = cData(); if (!d) return; const b = d.board;
-    $('wMetric').value = b?.metric || ''; $('wGoal').value = b?.goal ?? ''; $('wStart').value = b?.start || ''; $('wEnd').value = b?.end || '';
-    const bc = boardCalc(d); const status = $('sbStatus'); const entry = $('sbEntry');
-    if (bc) {
-      entry.classList.remove('hidden');
-      entry.innerHTML = `<div class="sb-entry">
-        <label for="g-sbCurInput">Where we're up to</label>
-        <input id="g-sbCurInput" type="number" min="0" step="any" value="${b.current ?? ''}" placeholder="0" onchange="Growth.saveCurrent(this.value)">
-        <span class="se-metric">${esc(b.metric || '')} of ${b.goal}</span>
-        <span class="se-hint">Update this in the WIG meeting</span></div>`;
-      status.className = 'sb-status ' + (bc.winning == null ? 'idle' : (bc.winning ? 'win' : 'lose'));
-      status.textContent = bc.winning == null ? 'Enter where you’re up to to see winning / losing' : (bc.winning ? 'WINNING' : 'LOSING');
-      renderScoreBars(d, bc);
-    } else {
-      entry.classList.add('hidden'); entry.innerHTML = '';
-      status.className = 'sb-status idle'; status.textContent = 'No scoreboard yet — set the WIG below';
-      $('sbBars').innerHTML = ''; $('sbMeta').innerHTML = '';
-    }
+    if (!cData()) return;
     renderPeriods();
-  }
-  function renderScoreBars(d, bc) {
-    const b = d.board; const cur2 = bc.current ?? 0, goal = b.goal, pace = bc.pacing; const max = Math.max(cur2, goal, pace, 1);
-    const bar = (cls, l, v) => `<div class="sb-bar ${cls}"><div class="b-num">${Math.round(v * 10) / 10}</div><div class="b-fill" style="height:${Math.max(2, v / max * 140)}px"></div><div class="b-lbl">${l}</div></div>`;
-    $('sbBars').innerHTML = bar('mtd', 'MTD', cur2) + bar('goal', 'Goal', goal) + bar('pace', 'Pacing', pace);
-    const cp = commitPct(d);
-    $('sbMeta').innerHTML = `
-      <div class="sb-game">${esc(b.metric || 'Goal')}: ${goal} by ${niceDate(b.end)}</div>
-      <div class="sb-line">Day ${bc.done} of ${bc.total}</div>
-      <div class="sb-line">On pace you'd need <b>${Math.round(pace)}</b> by today — you have <b>${cur2}</b></div>
-      <div style="margin-top:14px;"><div class="commit-pct">${cp != null ? Math.round(cp) + '%' : '—'}</div><div style="font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7d766e;">Long-run commitment</div></div>`;
-  }
-  async function saveBoard() {
-    const goal = parseFloat($('wGoal').value);
-    const prevCurrent = cData().board?.current ?? null;
-    cData().board = { metric: $('wMetric').value.trim(), goal: isNaN(goal) ? null : goal, start: $('wStart').value || null, end: $('wEnd').value || null, current: prevCurrent };
-    await persist(); renderWig(); renderDash(); toast('WIG saved');
-  }
-  async function saveCurrent(val) {
-    const v = parseFloat(val);
-    if (!cData().board) return;
-    cData().board.current = isNaN(v) ? null : v;
-    await persist(); renderWig(); renderDash();
   }
   function ensureOpenPeriod() {
     const d = cData(); if (!d.periods) d.periods = [];
@@ -257,14 +217,6 @@
   }
   function periodCard(p, isOpen) {
     const wrap = document.createElement('div'); wrap.className = 'card period ' + (isOpen ? 'open' : ''); wrap.dataset.pid = p.id;
-    let hint = '';
-    if (isOpen) {
-      const d = cData(), bc = boardCalc(d);
-      if (bc) {
-        const target = boardPacingAtDate(d, p.end); const need = Math.max(0, Math.ceil(target - (bc.current ?? 0)));
-        hint = `<div class="pacing-hint">To be on pace by <b>${shortDate(p.end)}</b> the scoreboard needs <b>${Math.round(target)}</b> ${esc(d.board.metric || 'units')} — you have <b>${bc.current ?? 0}</b>, so this period needs <b>${need} more</b>.</div>`;
-      }
-    }
     const head = isOpen
       ? `<div class="period-head">
            <span class="ph-tag now">This period</span>
@@ -274,15 +226,39 @@
              <label class="ph-field"><span>To</span><input type="date" value="${p.end}" onchange="Growth.updPeriodDate('${p.id}','end',this.value)"></label>
            </div></div>`
       : `<div class="period-head"><div class="ph-title">${shortDate(p.start)} → ${shortDate(p.end)}</div><span class="ph-tag past">Locked</span></div>`;
-    wrap.innerHTML = head + hint + goalsBlock(p, isOpen) + '<div class="pb-people"></div>';
+    wrap.innerHTML = head + scoreboardBlock(p) + goalsBlock(p, isOpen) + '<div class="pb-people"></div>';
     const peopleHost = wrap.querySelector('.pb-people');
     (p.people || []).forEach(pn => peopleHost.appendChild(personBlock(p, pn, isOpen)));
     if (isOpen) {
-      const save = document.createElement('div'); save.style.marginTop = '16px'; save.style.paddingTop = '16px'; save.style.borderTop = '1px solid var(--g-lightgrey)';
-      save.innerHTML = `<button class="accent" onclick="Growth.savePeriod('${p.id}')">Save &amp; close this period</button><span class="muted" style="font-size:12.5px; margin-left:12px;">Goals lock and a fresh period opens.</span>`;
-      wrap.appendChild(save);
+      const actions = document.createElement('div'); actions.className = 'period-actions';
+      actions.innerHTML = `
+        <button class="secondary" onclick="Growth.savePeriodProgress('${p.id}')">Save</button>
+        <button class="accent" onclick="Growth.closePeriod('${p.id}')">Close period (after follow-up meeting)</button>
+        <span class="muted" style="font-size:12.5px;">Save keeps this period open. Closing locks the goals in and starts a fresh period.</span>`;
+      wrap.appendChild(actions);
     }
     return wrap;
+  }
+  // The scoreboard for a period IS its goal list: done = goals ticked off,
+  // goal count = goals set, pacing = expected progress by today given the
+  // period's date range.
+  function scoreboardBlock(p) {
+    const pace = periodPacing(p);
+    if (!pace || !pace.goalCount) {
+      return `<div class="sb-status idle">No goals set yet</div>`;
+    }
+    const cls = pace.winning ? 'win' : 'lose';
+    const label = pace.winning ? 'WINNING' : 'LOSING';
+    const max = Math.max(pace.done, pace.goalCount, pace.pacing, 1);
+    const bar = (cls2, l, v) => `<div class="sb-bar ${cls2}"><div class="b-num">${Math.round(v * 10) / 10}</div><div class="b-fill" style="height:${Math.max(2, v / max * 140)}px"></div><div class="b-lbl">${l}</div></div>`;
+    return `<div class="sb-status ${cls}">${label}</div>
+      <div class="sb-wrap">
+        <div class="sb-bars">${bar('mtd', 'Done', pace.done)}${bar('goal', 'Goals', pace.goalCount)}${bar('pace', 'Pacing', pace.pacing)}</div>
+        <div class="sb-meta">
+          <div class="sb-line">Day ${pace.elapsedDays} of ${pace.totalDays}</div>
+          <div class="sb-line">On pace you'd need <b>${Math.round(pace.pacing)}</b> goals done by today — you have <b>${pace.done}</b></div>
+        </div>
+      </div>`;
   }
   // Flat list of goals/WIGs for this period — not tied to a person. Any number
   // can be added; each is saved immediately so nothing is lost before the
@@ -370,12 +346,24 @@
     }));
     return people;
   }
-  async function savePeriod(pid) {
+  // "Save" keeps the period open — for jotting progress mid-week. Goals
+  // themselves already auto-save on every add/tick/edit; this also captures
+  // the coaching-notes fields, which don't.
+  async function savePeriodProgress(pid) {
     const d = cData(), p = d.periods.find(x => x.id === pid); if (!p) return;
+    const people = collectOpenPeriod(pid); if (people) p.people = people;
+    const ok = await persist();
+    toast(ok ? 'Saved' : 'Save failed');
+  }
+  // "Close period" is the after-follow-up-meeting action — locks the goals in
+  // permanently and opens a fresh period.
+  async function closePeriod(pid) {
+    const d = cData(), p = d.periods.find(x => x.id === pid); if (!p) return;
+    if (!confirm('Close this period? Goals will lock in and a fresh period will open.')) return;
     const people = collectOpenPeriod(pid); if (people) p.people = people;
     p.locked = true; ensureOpenPeriod();
     const ok = await persist(); renderWig(); renderDash();
-    toast(ok ? 'Period locked — new period opened' : 'Save failed');
+    toast(ok ? 'Period closed — new period opened' : 'Save failed');
     document.getElementById('tab-growth')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   async function addPerson() {
@@ -509,14 +497,6 @@
     const notes = d.notes[mo] || {};
     const delta = (cv, pv, inv = false) => { if (cv == null || pv == null || pv === 0) return ''; const ch = (cv - pv) / Math.abs(pv) * 100; const good = inv ? ch < 0 : ch > 0; return `<div class="k-delta ${good ? 'delta-up' : 'delta-down'}">${ch > 0 ? '▲' : '▼'} ${Math.abs(Math.round(ch))}% vs ${monthLabel(prevMo)}</div>`; };
 
-    let boardHtml = ''; const bc = boardCalc(d);
-    if (bc && bc.current != null) {
-      const max = Math.max(bc.current, d.board.goal, bc.pacing, 1);
-      const bar = (cls, l, v) => `<div class="sb-bar ${cls}"><div class="b-num">${Math.round(v * 10) / 10}</div><div class="b-fill" style="height:${Math.max(2, v / max * 120)}px"></div><div class="b-lbl">${l}</div></div>`;
-      boardHtml = `<div class="sb-status ${bc.winning ? 'win' : 'lose'}" style="margin-bottom:14px;">${bc.winning ? 'WINNING' : 'LOSING'}</div>
-        <div style="font-family:var(--g-serif); font-size:19px; margin-bottom:10px;">${esc(d.board.metric || 'Goal')}: ${d.board.goal} by ${niceDate(d.board.end)}</div>
-        <div class="sb-bars" style="max-width:420px; height:160px; margin-bottom:28px;">${bar('mtd', 'Now', bc.current)}${bar('goal', 'Goal', d.board.goal)}${bar('pace', 'Pacing', bc.pacing)}</div>`;
-    }
     const shades = ['#8a7f6e', '#a5674b', '#b95c3f', '#cd5f39'];
     const stages = [{ n: a.leads, l: 'Leads' }, { n: a.booked, l: 'Booked' }, { n: a.showed, l: 'Showed' }, { n: a.closed, l: 'Closed' }];
     const convs = [a.bookPct, a.showPct, a.closePct];
@@ -559,7 +539,7 @@
     let html = `
       <div class="report-masthead"><div><div class="wm">GATHR <span>GROW</span></div><div class="sub">Monthly Performance Report</div></div>
         <div class="report-for"><div class="c-name">${esc(c.name)}</div><div class="c-month">${monthLabel(mo)}</div></div></div>
-      ${boardHtml}${funnel}
+      ${funnel}
       <div class="kpi-grid">${kpis.map(k => `<div class="kpi"><div class="k-lbl">${k.l}</div><div class="k-val">${k.v}</div>${k.d}</div>`).join('')}</div>
       ${trendHtml}${acct}`;
     if (notes.did) html += `<div class="report-notes"><h3>What's working well</h3><p>${esc(notes.did)}</p></div>`;
@@ -572,7 +552,7 @@
 
   window.Growth = {
     onOpen, toggleAddClient, saveNewClient, deleteClient, showDash, openClient, switchTab,
-    saveBoard, saveCurrent, addPerson, updPeriodDate, savePeriod, removePerson,
+    addPerson, updPeriodDate, savePeriodProgress, closePeriod, removePerson,
     addGoal, toggleGoal, updateGoalText, removeGoal,
     loadWeek, recalcWeek, saveWeek, delWeek, setFee, setClientCurrency,
     showReport, saveMonthNotes, backToClient,

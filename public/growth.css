@@ -159,6 +159,8 @@
 #tab-growth .goal-add-row{display:flex; gap:10px; margin-top:10px;}
 #tab-growth .goal-add-row input{flex:1;}
 
+#tab-growth .period-actions{margin-top:16px; padding-top:16px; border-top:1px solid var(--g-lightgrey); display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
+
 #tab-growth .metric-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px;}
 #tab-growth .computed{background:var(--g-lightgrey); border:1px solid var(--g-warmgrey); border-radius:3px; padding:8px 10px; font-size:14px; min-height:38px; display:flex; align-items:center;}
 #tab-growth .computed.on{color:var(--g-orange); font-weight:bold;}
