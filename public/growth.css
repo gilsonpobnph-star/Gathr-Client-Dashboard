@@ -149,6 +149,16 @@
 #tab-growth .leadgrid label{font-size:10px;}
 #tab-growth .add-person-row{display:flex; gap:10px; align-items:flex-end; max-width:420px;}
 
+#tab-growth .goals-block{padding:16px 0; border-top:1px solid var(--g-warmgrey);}
+#tab-growth .goal-row{display:flex; align-items:center; gap:10px; padding:6px 0;}
+#tab-growth .goal-row .chkbox{padding:6px 9px;}
+#tab-growth .goal-row .goal-text{flex:1;}
+#tab-growth .goal-row.readonly{gap:8px;}
+#tab-growth .goal-row.readonly .sdot{flex-shrink:0;}
+#tab-growth .goal-text-ro{font-size:14px;}
+#tab-growth .goal-add-row{display:flex; gap:10px; margin-top:10px;}
+#tab-growth .goal-add-row input{flex:1;}
+
 #tab-growth .metric-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px;}
 #tab-growth .computed{background:var(--g-lightgrey); border:1px solid var(--g-warmgrey); border-radius:3px; padding:8px 10px; font-size:14px; min-height:38px; display:flex; align-items:center;}
 #tab-growth .computed.on{color:var(--g-orange); font-weight:bold;}

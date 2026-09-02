@@ -28,12 +28,34 @@
   }
   function fresh() { return { board: null, periods: [], weeks: {}, fees: {}, notes: {} }; }
 
+  // One-time, idempotent migration: old model was one WIG + one commitment per
+  // PERSON per period (2 points each). New model is a flat list of goals per
+  // period, not tied to a person — each existing wig/commit text becomes its
+  // own goal so nothing already typed in is lost. Coaching notes (hot/later/
+  // renew/refer) stay on the person entry, just without the scoring fields.
+  function migrateClientData(d) {
+    let changed = false;
+    (d.periods || []).forEach(p => {
+      if (p.goals) return; // already migrated
+      const goals = [];
+      (p.people || []).forEach(pn => {
+        if (pn.wig && pn.wig.trim()) goals.push({ id: 'g' + Date.now() + Math.random().toString(36).slice(2, 6), text: pn.wig.trim(), done: !!pn.wigDone });
+        if (pn.commit && pn.commit.trim()) goals.push({ id: 'g' + Date.now() + Math.random().toString(36).slice(2, 6), text: pn.commit.trim(), done: !!pn.commitDone });
+        delete pn.wig; delete pn.wigDone; delete pn.commit; delete pn.commitDone;
+      });
+      p.goals = goals;
+      changed = true;
+    });
+    return changed;
+  }
+
   let booted = false;
   async function onOpen() {
     setSync('Loading…');
     clients = (await apiGet('/api/growth/clients')) || [];
     await Promise.all(clients.map(async c => {
       dataCache[c.id] = (await apiGet('/api/growth/data/' + c.id)) || fresh();
+      if (migrateClientData(dataCache[c.id])) await apiSend('/api/growth/data/' + c.id, 'PUT', dataCache[c.id]);
     }));
     setSync('Synced · shared with your team');
     if (!booted) { booted = true; }
@@ -98,13 +120,11 @@
     const total = Math.max(1, daysBetween(b.start, b.end)); const dd = Math.min(Math.max(0, daysBetween(b.start, dateStr)), total);
     return b.goal * dd / total;
   }
+  // Commitment % = goals hit ÷ goals set, across locked periods (client-level,
+  // not tied to any one person — a client can have any number of goals per period).
   function commitPct(d) {
-    let e = 0, p = 0; (d.periods || []).filter(pd => pd.locked).forEach(pd => pd.people.forEach(pn => { p += 2; e += (pn.wigDone ? 1 : 0) + (pn.commitDone ? 1 : 0); }));
+    let e = 0, p = 0; (d.periods || []).filter(pd => pd.locked).forEach(pd => (pd.goals || []).forEach(g => { p++; if (g.done) e++; }));
     return p ? e / p * 100 : null;
-  }
-  function commitPctPerson(d, name) {
-    let e = 0, p = 0; (d.periods || []).filter(pd => pd.locked).forEach(pd => { const pn = pd.people.find(x => x.name === name); if (pn) { p += 2; e += (pn.wigDone ? 1 : 0) + (pn.commitDone ? 1 : 0); } });
-    return p ? { earned: e, possible: p, pct: e / p * 100 } : null;
   }
 
   function roiClass(v) { return v == null ? '' : (v >= 1.5 ? 'roi-good' : v >= 1 ? 'roi-warn' : 'roi-bad'); }
@@ -215,13 +235,14 @@
   function ensureOpenPeriod() {
     const d = cData(); if (!d.periods) d.periods = [];
     if (d.periods.some(p => !p.locked)) return;
-    const people = (cRec()?.people || []).map(n => ({ name: n, hot: '', later: '', renew: '', refer: '', commit: '', commitDone: false, wig: '', wigDone: false }));
+    const people = (cRec()?.people || []).map(n => ({ name: n, hot: '', later: '', renew: '', refer: '' }));
     const locked = d.periods.filter(p => p.locked).sort((a, b) => (a.end || '').localeCompare(b.end || ''));
     let start = todayStr();
     if (locked.length && locked[locked.length - 1].end) { const nd = new Date(locked[locked.length - 1].end + 'T00:00'); nd.setDate(nd.getDate() + 1); start = nd.toISOString().slice(0, 10); }
     const ed = new Date(start + 'T00:00'); ed.setDate(ed.getDate() + 6);
-    d.periods.push({ id: 'p' + Date.now(), start, end: ed.toISOString().slice(0, 10), locked: false, people });
+    d.periods.push({ id: 'p' + Date.now(), start, end: ed.toISOString().slice(0, 10), locked: false, goals: [], people });
   }
+  function newGoalId() { return 'g' + Date.now() + Math.random().toString(36).slice(2, 6); }
   function renderPeriods() {
     ensureOpenPeriod(); const d = cData(); const host = $('periodsHost'); host.innerHTML = '';
     const open = d.periods.filter(p => !p.locked);
@@ -253,39 +274,81 @@
              <label class="ph-field"><span>To</span><input type="date" value="${p.end}" onchange="Growth.updPeriodDate('${p.id}','end',this.value)"></label>
            </div></div>`
       : `<div class="period-head"><div class="ph-title">${shortDate(p.start)} → ${shortDate(p.end)}</div><span class="ph-tag past">Locked</span></div>`;
-    wrap.innerHTML = head + hint + '<div class="pb-people"></div>';
+    wrap.innerHTML = head + hint + goalsBlock(p, isOpen) + '<div class="pb-people"></div>';
     const peopleHost = wrap.querySelector('.pb-people');
     (p.people || []).forEach(pn => peopleHost.appendChild(personBlock(p, pn, isOpen)));
     if (isOpen) {
       const save = document.createElement('div'); save.style.marginTop = '16px'; save.style.paddingTop = '16px'; save.style.borderTop = '1px solid var(--g-lightgrey)';
-      save.innerHTML = `<button class="accent" onclick="Growth.savePeriod('${p.id}')">Save &amp; close this period</button><span class="muted" style="font-size:12.5px; margin-left:12px;">Scores lock and a fresh period opens.</span>`;
+      save.innerHTML = `<button class="accent" onclick="Growth.savePeriod('${p.id}')">Save &amp; close this period</button><span class="muted" style="font-size:12.5px; margin-left:12px;">Goals lock and a fresh period opens.</span>`;
       wrap.appendChild(save);
     }
     return wrap;
   }
+  // Flat list of goals/WIGs for this period — not tied to a person. Any number
+  // can be added; each is saved immediately so nothing is lost before the
+  // period is closed.
+  function goalsBlock(p, isOpen) {
+    const goals = p.goals || [];
+    const earned = goals.filter(g => g.done).length;
+    const rows = goals.map(g => isOpen
+      ? `<div class="goal-row">
+           <label class="chkbox"><input type="checkbox" ${g.done ? 'checked' : ''} onchange="Growth.toggleGoal('${p.id}','${g.id}',this.checked)"></label>
+           <input class="goal-text" value="${esc(g.text)}" placeholder="e.g. 4 assessments paid" onchange="Growth.updateGoalText('${p.id}','${g.id}',this.value)">
+           <button class="linkish" onclick="Growth.removeGoal('${p.id}','${g.id}')">remove</button>
+         </div>`
+      : `<div class="goal-row readonly"><span class="sdot ${g.done ? 'hit' : 'miss'}"></span><span class="goal-text-ro">${esc(g.text || '—')}</span></div>`
+    ).join('');
+    const addRow = isOpen
+      ? `<div class="goal-add-row">
+           <input id="g-newGoal-${p.id}" placeholder="Add a goal or commitment for this period…" onkeydown="if(event.key==='Enter'){Growth.addGoal('${p.id}');event.preventDefault();}">
+           <button class="secondary small" onclick="Growth.addGoal('${p.id}')">+ Add goal</button>
+         </div>`
+      : '';
+    const empty = !goals.length ? `<p class="muted" style="font-size:13px; margin:6px 0 10px;">${isOpen ? 'No goals set yet — add one below.' : 'No goals were set this period.'}</p>` : '';
+    return `<div class="goals-block">
+      <div class="pb-head" style="margin-bottom:8px;">
+        <h4 style="font-size:17px;">Goals &amp; WIGs this period</h4>
+        <span class="muted" style="font-size:13px;">${goals.length ? `${earned} / ${goals.length} hit` : ''}</span>
+      </div>
+      ${empty}${rows}${addRow}
+    </div>`;
+  }
+  async function addGoal(pid) {
+    const p = cData().periods.find(x => x.id === pid); if (!p) return;
+    const input = document.getElementById('g-newGoal-' + pid);
+    const text = (input?.value || '').trim(); if (!text) return;
+    if (!p.goals) p.goals = [];
+    p.goals.push({ id: newGoalId(), text, done: false });
+    await persist(); renderWig();
+  }
+  async function toggleGoal(pid, gid, done) {
+    const p = cData().periods.find(x => x.id === pid); const g = p?.goals?.find(x => x.id === gid); if (!g) return;
+    g.done = !!done; await persist(); renderWig(); renderDash();
+  }
+  async function updateGoalText(pid, gid, text) {
+    const p = cData().periods.find(x => x.id === pid); const g = p?.goals?.find(x => x.id === gid); if (!g) return;
+    g.text = text.trim(); await persist();
+  }
+  async function removeGoal(pid, gid) {
+    const p = cData().periods.find(x => x.id === pid); if (!p) return;
+    p.goals = (p.goals || []).filter(x => x.id !== gid); await persist(); renderWig(); renderDash();
+  }
   function personBlock(period, pn, isOpen) {
     const div = document.createElement('div'); div.className = 'person-block'; div.dataset.name = pn.name;
-    const lr = commitPctPerson(cData(), pn.name); const pts = (pn.wigDone ? 1 : 0) + (pn.commitDone ? 1 : 0);
-    if (period.locked) div.classList.add(pts === 2 ? 'full' : pts === 0 ? 'zero' : '');
-    const headRight = isOpen
-      ? `<button class="linkish" onclick="Growth.removePerson('${period.id}','${esc(pn.name)}')">remove</button>`
-      : `<div class="score-readonly"><div class="sr"><span class="sdot ${pn.wigDone ? 'hit' : 'miss'}"></span> WIG</div>
-           <div class="sr"><span class="sdot ${pn.commitDone ? 'hit' : 'miss'}"></span> Commitment</div>
-           <div class="pb-score"><span>${pts}</span> / 2</div></div>`;
-    const head = `<div class="pb-head">
-        <div class="pb-name-wrap"><h4>${esc(pn.name)}</h4>${lr ? `<span class="muted" style="font-size:13px;">${Math.round(lr.pct)}% long-run</span>` : ''}</div>
-        ${headRight}</div>`;
+    const headRight = isOpen ? `<button class="linkish" onclick="Growth.removePerson('${period.id}','${esc(pn.name)}')">remove</button>` : '';
+    const head = `<div class="pb-head"><div class="pb-name-wrap"><h4>${esc(pn.name)}</h4></div>${headRight}</div>`;
     if (!isOpen) {
-      div.innerHTML = head + `<div class="wig-commit-grid">
-          <div><label>WIG</label><div class="computed">${esc(pn.wig || '—')}</div></div>
-          <div><label>Commitment</label><div class="computed">${esc(pn.commit || '—')}</div></div></div>`;
+      const hasNotes = pn.hot || pn.later || pn.renew || pn.refer;
+      if (!hasNotes) { div.innerHTML = ''; div.style.display = 'none'; return div; }
+      div.innerHTML = head + `<div class="leadgrid" style="font-size:13px;">
+          ${pn.hot ? `<div><label>Hot leads</label><div class="computed">${esc(pn.hot)}</div></div>` : ''}
+          ${pn.later ? `<div><label>Later</label><div class="computed">${esc(pn.later)}</div></div>` : ''}
+          ${pn.renew ? `<div><label>Renewals</label><div class="computed">${esc(pn.renew)}</div></div>` : ''}
+          ${pn.refer ? `<div><label>Referrals</label><div class="computed">${esc(pn.refer)}</div></div>` : ''}
+        </div>`;
       return div;
     }
     div.innerHTML = head + `
-      <div class="wig-commit-grid">
-        <div><label>WIG this period — outcome needed</label><input class="pc-wig" value="${esc(pn.wig || '')}" placeholder="e.g. 4 assessments paid"></div>
-        <div><label>Commitment — specific, binary, in ${esc(pn.name)}'s control</label><input class="pc-commit" value="${esc(pn.commit || '')}" placeholder="e.g. Call all 6 hot leads + record 1 sales call"></div>
-      </div>
       <details class="coach">
         <summary>Lead inventory &amp; coaching notes</summary>
         <div class="coach-inner"><div class="leadgrid">
@@ -294,24 +357,16 @@
           <div><label>Renewals / retests</label><textarea class="pc-renew" rows="2">${esc(pn.renew || '')}</textarea></div>
           <div><label>Referrals</label><textarea class="pc-refer" rows="2">${esc(pn.refer || '')}</textarea></div>
         </div></div>
-      </details>
-      <div class="score-row">
-        <label class="chkbox"><input type="checkbox" class="pc-wigdone" ${pn.wigDone ? 'checked' : ''} onchange="Growth.tickPerson(this)"> Hit the WIG</label>
-        <label class="chkbox"><input type="checkbox" class="pc-commitdone" ${pn.commitDone ? 'checked' : ''} onchange="Growth.tickPerson(this)"> Fulfilled commitment</label>
-        <div class="pb-score"><span class="pb-n">${pts}</span> / 2 this period</div>
-      </div>`;
+      </details>`;
     return div;
   }
-  function tickPerson(el) { const b = el.closest('.person-block'); const pts = (b.querySelector('.pc-wigdone').checked ? 1 : 0) + (b.querySelector('.pc-commitdone').checked ? 1 : 0); b.querySelector('.pb-n').textContent = pts; }
   async function updPeriodDate(pid, f, v) { const p = cData().periods.find(x => x.id === pid); if (p) { p[f] = v; await persist(); renderWig(); } }
   function collectOpenPeriod(pid) {
     const wrap = document.querySelector(`#tab-growth .period[data-pid="${pid}"]`); if (!wrap) return null;
-    const people = []; const val = (b, s) => { const el = b.querySelector(s); return el ? el.value : ''; }; const chk = (b, s) => { const el = b.querySelector(s); return el ? el.checked : false; };
+    const people = []; const val = (b, s) => { const el = b.querySelector(s); return el ? el.value : ''; };
     wrap.querySelectorAll('.person-block').forEach(b => people.push({
       name: b.dataset.name, hot: val(b, '.pc-hot'), later: val(b, '.pc-later'),
       renew: val(b, '.pc-renew'), refer: val(b, '.pc-refer'),
-      commit: val(b, '.pc-commit'), commitDone: chk(b, '.pc-commitdone'),
-      wig: val(b, '.pc-wig'), wigDone: chk(b, '.pc-wigdone'),
     }));
     return people;
   }
@@ -482,28 +537,23 @@
 
     const monthPeriods = (d.periods || []).filter(p => p.locked && monthOf(p.end || '') === mo);
     let acct = '';
-    if (monthPeriods.length) {
-      const names = [...new Set(monthPeriods.flatMap(p => p.people.map(x => x.name)))];
-      let totE = 0, totP = 0, persons = '';
-      names.forEach(n => {
-        let rows = '', e = 0, poss = 0;
-        monthPeriods.slice().sort((a, b) => (a.end || '').localeCompare(b.end || '')).forEach(p => {
-          const pn = p.people.find(x => x.name === n); if (!pn) return; poss += 2; e += (pn.wigDone ? 1 : 0) + (pn.commitDone ? 1 : 0);
-          rows += `<div style="display:grid; grid-template-columns:120px 1fr 1fr; gap:10px; font-size:13px; align-items:center; border-bottom:1px solid var(--g-lightgrey); padding:7px 0;">
+    if (monthPeriods.length && monthPeriods.some(p => (p.goals || []).length)) {
+      let totE = 0, totP = 0, rows = '';
+      monthPeriods.slice().sort((a, b) => (a.end || '').localeCompare(b.end || '')).forEach(p => {
+        (p.goals || []).forEach(g => {
+          totP++; if (g.done) totE++;
+          rows += `<div style="display:grid; grid-template-columns:120px 1fr; gap:10px; font-size:13px; align-items:center; border-bottom:1px solid var(--g-lightgrey); padding:7px 0;">
             <div style="font-size:11px; letter-spacing:.06em; text-transform:uppercase; color:#7d766e;">${shortDate(p.start)}–${shortDate(p.end)}</div>
-            <div><span class="sdot ${pn.wigDone ? 'hit' : 'miss'}" style="display:inline-block; margin-right:6px; vertical-align:middle;"></span>WIG: ${esc(pn.wig || '—')}</div>
-            <div><span class="sdot ${pn.commitDone ? 'hit' : 'miss'}" style="display:inline-block; margin-right:6px; vertical-align:middle;"></span>Commitment: ${esc(pn.commit || '—')}</div></div>`;
+            <div><span class="sdot ${g.done ? 'hit' : 'miss'}" style="display:inline-block; margin-right:6px; vertical-align:middle;"></span>${esc(g.text || '—')}</div></div>`;
         });
-        totE += e; totP += poss; const lr = commitPctPerson(d, n);
-        persons += `<div style="margin-top:14px;"><h4 style="font-family:var(--g-serif); font-size:17px; margin-bottom:6px;">${esc(n)} — ${e}/${poss} this month${lr ? ` · ${Math.round(lr.pct)}% long-run` : ''}</h4>${rows}</div>`;
       });
       const pct = totP ? totE / totP * 100 : 0;
-      const verdict = pct >= 80 ? 'Scoreboard held — the system works when both sides play.' : pct >= 50 ? 'Partial scoreboard — results track with the commitments missed.' : 'Scoreboard mostly missed — ad results only convert when the weekly commitments get done.';
+      const verdict = pct >= 80 ? 'Scoreboard held — the system works when both sides play.' : pct >= 50 ? 'Partial scoreboard — results track with the goals missed.' : 'Scoreboard mostly missed — ad results only convert when the weekly goals get done.';
       acct = `<div style="border-top:3px solid var(--g-charcoal); padding-top:16px; margin-top:6px;">
         <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:10px;">
           <h3 style="font-size:21px;">The scoreboard — your side of the system</h3>
-          <div style="font-family:var(--g-serif); font-size:26px;"><span style="color:var(--g-orange);">${totE}</span> / ${totP} points</div></div>
-        ${persons}<p style="font-size:13.5px; margin-top:12px; color:#57524c;">${verdict}</p></div>`;
+          <div style="font-family:var(--g-serif); font-size:26px;"><span style="color:var(--g-orange);">${totE}</span> / ${totP} goals</div></div>
+        ${rows}<p style="font-size:13.5px; margin-top:12px; color:#57524c;">${verdict}</p></div>`;
     }
 
     let html = `
@@ -522,7 +572,8 @@
 
   window.Growth = {
     onOpen, toggleAddClient, saveNewClient, deleteClient, showDash, openClient, switchTab,
-    saveBoard, saveCurrent, addPerson, updPeriodDate, savePeriod, removePerson, tickPerson,
+    saveBoard, saveCurrent, addPerson, updPeriodDate, savePeriod, removePerson,
+    addGoal, toggleGoal, updateGoalText, removeGoal,
     loadWeek, recalcWeek, saveWeek, delWeek, setFee, setClientCurrency,
     showReport, saveMonthNotes, backToClient,
   };
