@@ -528,6 +528,26 @@
           </div>
 
           <div id="g-tab-wig">
+            <div class="card">
+              <div id="g-sbStatus" class="sb-status idle">No scoreboard yet</div>
+              <div id="g-sbEntry" class="hidden"></div>
+              <div class="sb-wrap">
+                <div class="sb-bars" id="g-sbBars"></div>
+                <div class="sb-meta" id="g-sbMeta"></div>
+              </div>
+              <div id="g-sbStats" class="sb-stats hidden"></div>
+              <details class="cfg">
+                <summary>Set / edit the WIG (X by Y date)</summary>
+                <div class="row">
+                  <div><label for="g-wMetric">What we're counting</label><input id="g-wMetric" placeholder="e.g. Assessments paid"></div>
+                  <div><label for="g-wGoal">Goal (X)</label><input id="g-wGoal" type="number" min="0"></div>
+                  <div><label for="g-wStart">Start date</label><input id="g-wStart" type="date"></div>
+                  <div><label for="g-wEnd">By date (Y)</label><input id="g-wEnd" type="date"></div>
+                </div>
+                <div style="margin-top:12px;"><button class="small" onclick="Growth.saveBoard()">Save WIG</button></div>
+              </details>
+            </div>
+
             <div id="g-periodsHost"></div>
 
             <div class="card">

@@ -97,6 +97,13 @@
 #tab-growth .sb-entry input{max-width:110px; font-family:var(--g-serif); font-size:22px; text-align:center; padding:6px 10px;}
 #tab-growth .sb-entry .se-metric{font-family:var(--g-serif); font-size:18px; color:#57524c;}
 #tab-growth .sb-entry .se-hint{font-size:12px; color:#7d766e; margin-left:auto;}
+#tab-growth .sb-stats{display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-top:18px;}
+@media (max-width:700px){ #tab-growth .sb-stats{grid-template-columns:repeat(2,1fr);} }
+#tab-growth .sb-stat{background:var(--g-lightgrey); border-radius:3px; padding:10px 12px; text-align:center;}
+#tab-growth .sb-stat.highlight{background:var(--g-cream); border:1px solid var(--g-orange);}
+#tab-growth .sb-stat .ss-lbl{font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color:#7d766e;}
+#tab-growth .sb-stat .ss-val{font-family:var(--g-serif); font-size:19px; margin-top:3px;}
+#tab-growth .sb-stat.highlight .ss-val{color:var(--g-orange);}
 
 #tab-growth details.cfg{margin-top:18px; padding-top:16px; border-top:1px solid var(--g-lightgrey);}
 #tab-growth details.cfg > summary{cursor:pointer; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:#7d766e;}
