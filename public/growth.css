@@ -111,6 +111,10 @@
 
 #tab-growth .period{padding:0; overflow:hidden;}
 #tab-growth .period-body{padding:18px 22px 22px;}
+#tab-growth .snapshot-block{background:var(--g-lightgrey); border:1px dashed var(--g-dust); border-radius:4px; padding:14px 16px; margin-bottom:18px;}
+#tab-growth .snapshot-label{font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:#7d766e; margin-bottom:10px;}
+#tab-growth .snapshot-block .sb-stats{margin-top:0;}
+#tab-growth .snapshot-block .sb-stat{background:#fff;}
 #tab-growth .period.open{border-color:var(--g-orange); border-width:2px;}
 #tab-growth .period-head{background:var(--g-lightgrey); padding:12px 18px; display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap; margin:-22px -22px 0;}
 #tab-growth .period.open .period-head{background:var(--g-cream);}

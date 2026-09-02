@@ -287,18 +287,38 @@
              <label class="ph-field"><span>Next meeting date</span><input type="date" value="${p.end}" onchange="Growth.updPeriodDate('${p.id}','end',this.value)"></label>
            </div></div>`
       : `<div class="period-head"><div class="ph-title">${shortDate(p.start)} → ${shortDate(p.end)}</div><span class="ph-tag past">Locked</span></div>`;
-    let bodyHtml = goalsBlock(p, isOpen) + '<div class="pb-people"></div>';
+    let bodyHtml = (isOpen ? '' : snapshotBlock(p)) + goalsBlock(p, isOpen) + '<div class="pb-people"></div>';
     if (isOpen) {
       bodyHtml += `<div class="period-actions">
         <button class="secondary" onclick="Growth.savePeriodProgress('${p.id}')">Save</button>
         <button class="accent" onclick="Growth.closePeriod('${p.id}')">Close period (after follow-up meeting)</button>
-        <span class="muted" style="font-size:12.5px;">Save keeps this period open. Closing locks the goals in and starts a fresh period.</span>
+        <span class="muted" style="font-size:12.5px;">Save keeps this period open. Closing locks the goals in, snapshots the scoreboard, and starts a fresh period.</span>
       </div>`;
     }
     wrap.innerHTML = head + `<div class="period-body">${bodyHtml}</div>`;
     const peopleHost = wrap.querySelector('.pb-people');
     (p.people || []).forEach(pn => peopleHost.appendChild(personBlock(p, pn, isOpen)));
     return wrap;
+  }
+  // Frozen scoreboard numbers as they stood the moment this period was closed
+  // (captured in closePeriod). The live scoreboard at the top of the tab keeps
+  // moving with today's date and the latest Actual — this is what was true
+  // at that specific follow-up meeting, for the history.
+  function snapshotBlock(p) {
+    const s = p.scoreboardSnapshot; if (!s) return '';
+    const cls = s.winning == null ? 'idle' : (s.winning ? 'win' : 'lose');
+    const label = s.winning == null ? 'NO SCOREBOARD AT CLOSE' : (s.winning ? 'WINNING' : 'LOSING');
+    return `<div class="snapshot-block">
+      <div class="snapshot-label">Scoreboard snapshot — at this meeting (${shortDate(s.capturedAt)})</div>
+      <div class="sb-status ${cls}" style="font-size:16px; padding:8px; margin-bottom:12px;">${label}</div>
+      <div class="sb-stats">
+        <div class="sb-stat"><div class="ss-lbl">Metric</div><div class="ss-val" style="font-size:13px;">${esc(s.metric || '—')}</div></div>
+        <div class="sb-stat"><div class="ss-lbl">WIG</div><div class="ss-val">${s.goal ?? '—'}</div></div>
+        <div class="sb-stat"><div class="ss-lbl">Actual</div><div class="ss-val">${s.actual ?? '—'}</div></div>
+        <div class="sb-stat"><div class="ss-lbl">Pacing</div><div class="ss-val">${s.pacing != null ? Math.round(s.pacing) : '—'}</div></div>
+        <div class="sb-stat highlight"><div class="ss-lbl">Needed that week</div><div class="ss-val">${s.neededThisWeek ?? '—'}</div></div>
+      </div>
+    </div>`;
   }
   // Flat list of goals/WIGs for this period — not tied to a person. Any number
   // can be added; each is saved immediately so nothing is lost before the
@@ -399,11 +419,25 @@
     toast(ok ? 'Saved' : 'Save failed');
   }
   // "Close period" is the after-follow-up-meeting action — locks the goals in
-  // permanently and opens a fresh period.
+  // permanently, freezes a snapshot of the scoreboard as it stood at this
+  // meeting, and opens a fresh period.
   async function closePeriod(pid) {
     const d = cData(), p = d.periods.find(x => x.id === pid); if (!p) return;
     if (!confirm('Close this period? Goals will lock in and a fresh period will open.')) return;
     const people = collectOpenPeriod(pid); if (people) p.people = people;
+    const bc = boardCalc(d);
+    if (bc) {
+      p.scoreboardSnapshot = {
+        metric: d.board?.metric || '',
+        goal: d.board?.goal ?? null,
+        boardEnd: d.board?.end || null,
+        actual: bc.current ?? null,
+        pacing: bc.pacing,
+        winning: bc.winning,
+        neededThisWeek: neededByNextMeeting(d), // computed before ensureOpenPeriod() re-points "open period"
+        capturedAt: todayStr(),
+      };
+    }
     p.locked = true; ensureOpenPeriod();
     const ok = await persist(); renderWig(); renderDash();
     toast(ok ? 'Period closed — new period opened' : 'Save failed');
