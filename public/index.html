@@ -8,6 +8,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="growth.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
@@ -95,6 +97,10 @@
       <button class="nav-item" data-tab="analytics">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
         Analytics
+      </button>
+      <button class="nav-item" data-tab="growth">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        Growth
       </button>
 
       <div class="nav-section-label">Intake</div>
@@ -467,6 +473,163 @@
           <div id="analytics-timeline"></div>
         </div>
       </div>
+    </section>
+
+    <!-- Growth (Gathr Grow reporting / WIG scoreboards) -->
+    <section id="tab-growth" class="tab-section hidden" style="display:block;overflow-y:auto;">
+
+      <div class="g-header">
+        <div>
+          <div class="wordmark">GATHR <span>GROW</span></div>
+          <div class="tagline">Client Reporting &amp; Scoreboards</div>
+        </div>
+        <div class="tagline no-print" id="g-syncStatus">Loading…</div>
+      </div>
+
+      <div class="g-main">
+
+        <section id="g-dashView">
+          <div class="list-head">
+            <div><div class="eyebrow">Gathr Grow</div><h1>Clients</h1></div>
+            <button class="accent" onclick="Growth.toggleAddClient(true)">+ Add client</button>
+          </div>
+          <div class="legend">Border by long-run ROI:
+            <b style="background:var(--g-bad)">&lt;1x</b><b style="background:var(--g-warn)">1&ndash;1.5x</b><b style="background:var(--g-good)">1.5x+</b>
+            &nbsp;&middot;&nbsp; long-run = entire tracked history
+          </div>
+          <div id="g-addClientForm" class="card hidden">
+            <div class="row">
+              <div><label for="g-ncName">Client name</label><input id="g-ncName" placeholder="e.g. Brick London"></div>
+              <div><label for="g-ncBiz">Business / location</label><input id="g-ncBiz" placeholder="e.g. S&amp;C — London"></div>
+              <div style="max-width:130px;"><label for="g-ncCur">Currency</label>
+                <select id="g-ncCur"><option value="£">£ GBP</option><option value="$">$ USD</option><option value="A$">A$ AUD</option><option value="€">€ EUR</option></select></div>
+              <div><label for="g-ncFee">Monthly fee</label><input id="g-ncFee" type="number" min="0" placeholder="1000"></div>
+              <div><label for="g-ncPeople">People (comma-separated)</label><input id="g-ncPeople" placeholder="e.g. Gus"></div>
+            </div>
+            <div style="margin-top:14px; display:flex; gap:10px;">
+              <button onclick="Growth.saveNewClient()">Save client</button>
+              <button class="secondary" onclick="Growth.toggleAddClient(false)">Cancel</button>
+            </div>
+          </div>
+          <div id="g-clientGrid" class="client-grid"></div>
+          <div id="g-dashEmpty" class="empty-state hidden"><h2>No clients yet</h2><p class="muted">Add your first client to begin.</p></div>
+        </section>
+
+        <section id="g-clientView" class="hidden">
+          <div class="crumb"><a onclick="Growth.showDash()">&larr; All clients</a></div>
+          <div class="list-head" style="margin-bottom:16px;">
+            <div><div class="eyebrow" id="g-cBiz"></div><h1 id="g-cName"></h1></div>
+            <button class="secondary small linkish" onclick="Growth.deleteClient()">Delete client</button>
+          </div>
+          <div class="g-tabs">
+            <button class="g-tab active" id="g-tabBtn-wig" onclick="Growth.switchTab('wig')">WIG</button>
+            <button class="g-tab" id="g-tabBtn-weekly" onclick="Growth.switchTab('weekly')">Weekly data</button>
+            <button class="g-tab" id="g-tabBtn-report" onclick="Growth.switchTab('report')">Monthly report</button>
+          </div>
+
+          <div id="g-tab-wig">
+            <div class="card">
+              <div id="g-sbStatus" class="sb-status idle">No scoreboard yet</div>
+              <div id="g-sbEntry" class="hidden"></div>
+              <div class="sb-wrap">
+                <div class="sb-bars" id="g-sbBars"></div>
+                <div class="sb-meta" id="g-sbMeta"></div>
+              </div>
+              <details class="cfg">
+                <summary>Set / edit the WIG (X by Y date)</summary>
+                <div class="row">
+                  <div><label for="g-wMetric">What we're counting</label><input id="g-wMetric" placeholder="e.g. Assessments paid"></div>
+                  <div><label for="g-wGoal">Goal (X)</label><input id="g-wGoal" type="number" min="0"></div>
+                  <div><label for="g-wStart">Start date</label><input id="g-wStart" type="date"></div>
+                  <div><label for="g-wEnd">By date (Y)</label><input id="g-wEnd" type="date"></div>
+                </div>
+                <div style="margin-top:12px;"><button class="small" onclick="Growth.saveBoard()">Save WIG</button></div>
+              </details>
+            </div>
+
+            <div id="g-periodsHost"></div>
+
+            <div class="card">
+              <div class="add-person-row">
+                <div style="flex:1;"><label for="g-newPerson">Add a person to this client</label><input id="g-newPerson" placeholder="Name"></div>
+                <button class="secondary" onclick="Growth.addPerson()">Add</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="g-tab-weekly" class="hidden">
+            <div class="card">
+              <h2 style="margin-bottom:4px;">Weekly data pull</h2>
+              <p class="section-note">Every Friday. Enter the raw numbers for the week &mdash; rates compute, months add up automatically. Separate from the client's WIG meeting day.</p>
+              <div class="row" style="max-width:300px;">
+                <div><label for="g-wkDate">Week ending (Friday)</label><input type="date" id="g-wkDate" onchange="Growth.loadWeek()"></div>
+              </div>
+              <div id="g-weekForm" class="hidden" style="margin-top:18px;">
+                <h3 style="font-size:17px; margin-bottom:10px;">Ad account</h3>
+                <div class="metric-grid" style="margin-bottom:18px;">
+                  <div><label for="g-aSpend">Ad spend ($)</label><input type="number" id="g-aSpend" min="0" step="0.01" oninput="Growth.recalcWeek()"></div>
+                  <div><label for="g-aImpr">Impressions</label><input type="number" id="g-aImpr" min="0" oninput="Growth.recalcWeek()"></div>
+                  <div><label for="g-aClicks">Link clicks</label><input type="number" id="g-aClicks" min="0" oninput="Growth.recalcWeek()"></div>
+                  <div><label for="g-aLeads">Leads (opt-ins)</label><input type="number" id="g-aLeads" min="0" oninput="Growth.recalcWeek()"></div>
+                  <div><label>CPM</label><div class="computed" id="g-xCPM">&mdash;</div></div>
+                  <div><label>CTR</label><div class="computed" id="g-xCTR">&mdash;</div></div>
+                  <div><label>Opt-in rate</label><div class="computed" id="g-xOpt">&mdash;</div></div>
+                  <div><label>CPL</label><div class="computed" id="g-xCPL">&mdash;</div></div>
+                </div>
+                <h3 style="font-size:17px; margin-bottom:10px;">Pipeline (GHL)</h3>
+                <div class="metric-grid" style="margin-bottom:18px;">
+                  <div><label for="g-pBooked">Booked</label><input type="number" id="g-pBooked" min="0" oninput="Growth.recalcWeek()"></div>
+                  <div><label for="g-pShowed">Showed</label><input type="number" id="g-pShowed" min="0" oninput="Growth.recalcWeek()"></div>
+                  <div><label for="g-pClosed">Closed</label><input type="number" id="g-pClosed" min="0" oninput="Growth.recalcWeek()"></div>
+                  <div><label for="g-pRev">New revenue ($)</label><input type="number" id="g-pRev" min="0" step="0.01" oninput="Growth.recalcWeek()"></div>
+                  <div><label>Book %</label><div class="computed" id="g-xBook">&mdash;</div></div>
+                  <div><label>Show %</label><div class="computed" id="g-xShow">&mdash;</div></div>
+                  <div><label>Close %</label><div class="computed" id="g-xClose">&mdash;</div></div>
+                </div>
+                <button class="accent" onclick="Growth.saveWeek()">Save week</button>
+              </div>
+            </div>
+            <div class="card">
+              <h2 style="margin-bottom:12px;">Saved weeks</h2>
+              <div style="overflow-x:auto;" class="week-list">
+                <table id="g-weekTable">
+                  <thead><tr><th>Week ending</th><th>Spend</th><th>Leads</th><th>CPL</th><th>Booked</th><th>Showed</th><th>Closed</th><th>Revenue</th><th></th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <div id="g-tab-report" class="hidden">
+            <div id="g-monthlyTables"></div>
+            <div class="card">
+              <h2 style="margin-bottom:12px;">Send monthly report</h2>
+              <div class="row" style="align-items:flex-end;">
+                <div style="max-width:190px;"><label for="g-repMonth">Month</label><select id="g-repMonth"></select></div>
+                <div><label for="g-repDid">What's working well</label><textarea id="g-repDid" rows="2"></textarea></div>
+                <div><label for="g-repNext">What we're changing</label><textarea id="g-repNext" rows="2"></textarea></div>
+              </div>
+              <div style="margin-top:14px; display:flex; gap:10px;">
+                <button class="accent" onclick="Growth.showReport()">Generate report</button>
+                <button class="secondary" onclick="Growth.saveMonthNotes()">Save notes</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="g-reportSection" class="hidden">
+          <div class="crumb no-print"><a onclick="Growth.backToClient()">&larr; Back to client</a></div>
+          <div id="g-reportView">
+            <div class="report-inner" id="g-reportInner"></div>
+            <div class="report-actions no-print">
+              <button class="accent" onclick="window.print()">Print / save as PDF</button>
+              <button class="secondary" onclick="Growth.backToClient()">Back</button>
+            </div>
+          </div>
+        </section>
+
+      </div>
+      <div class="toast" id="g-toast"></div>
     </section>
 
     <!-- New Intakes -->
@@ -1584,6 +1747,7 @@
   </div>
 </div>
 
+<script src="growth.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

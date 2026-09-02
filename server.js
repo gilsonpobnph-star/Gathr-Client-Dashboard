@@ -909,6 +909,78 @@ app.delete('/api/tasks/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Growth (Gathr Grow reporting/scoreboards) ─────────────────────────────────
+// Self-contained: its own client roster + per-client data blob, isolated from
+// the main CRM clients/tasks so it can't disrupt the rest of the app.
+function ensureGrowth(store) {
+  if (!store.growth) store.growth = { clients: [], data: {} };
+  if (!store.growth.clients) store.growth.clients = [];
+  if (!store.growth.data) store.growth.data = {};
+}
+function freshGrowthData() {
+  return { board: null, periods: [], weeks: {}, fees: {}, notes: {} };
+}
+
+app.get('/api/growth/clients', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureGrowth(store);
+  res.json(store.growth.clients);
+});
+
+app.post('/api/growth/clients', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureGrowth(store);
+  const { name, business, currency, fee, people } = req.body;
+  if (!name?.trim()) return res.status(400).json({ error: 'Client name required' });
+  const id = 'gc_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  const client = {
+    id, name: name.trim(),
+    business: business || '',
+    currency: currency || '£',
+    fee: (fee === null || fee === undefined || isNaN(fee)) ? null : Number(fee),
+    people: Array.isArray(people) ? people : [],
+  };
+  store.growth.clients.push(client);
+  store.growth.data[id] = freshGrowthData();
+  writeStore(store);
+  res.json(client);
+});
+
+app.put('/api/growth/clients/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureGrowth(store);
+  const client = store.growth.clients.find(c => c.id === req.params.id);
+  if (!client) return res.status(404).json({ error: 'Not found' });
+  const allowed = ['name', 'business', 'currency', 'fee', 'people'];
+  allowed.forEach(k => { if (req.body[k] !== undefined) client[k] = req.body[k]; });
+  writeStore(store);
+  res.json(client);
+});
+
+app.delete('/api/growth/clients/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureGrowth(store);
+  store.growth.clients = store.growth.clients.filter(c => c.id !== req.params.id);
+  delete store.growth.data[req.params.id];
+  writeStore(store);
+  res.json({ ok: true });
+});
+
+app.get('/api/growth/data/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureGrowth(store);
+  res.json(store.growth.data[req.params.id] || freshGrowthData());
+});
+
+app.put('/api/growth/data/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureGrowth(store);
+  if (!store.growth.clients.some(c => c.id === req.params.id)) return res.status(404).json({ error: 'Not found' });
+  store.growth.data[req.params.id] = req.body || freshGrowthData();
+  writeStore(store);
+  res.json({ ok: true });
+});
+
 // ── Client CRUD ───────────────────────────────────────────────────────────────
 app.get('/api/clients', requireAuth, (req, res) => {
   const store = readStore();
