@@ -981,6 +981,51 @@ app.put('/api/growth/data/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Diagnostic (Scoreboard intake instrument + strategy PDF) ──────────────────
+// Self-contained, like Growth: its own store, its own CRUD, no shared state
+// with the main CRM clients so it can't disrupt anything else.
+function ensureDiagnostic(store) {
+  if (!store.diagnostic) store.diagnostic = { assessments: {} };
+  if (!store.diagnostic.assessments) store.diagnostic.assessments = {};
+}
+app.get('/api/diagnostic/assessments', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureDiagnostic(store);
+  res.json(Object.values(store.diagnostic.assessments));
+});
+app.post('/api/diagnostic/assessments', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureDiagnostic(store);
+  const id = 'da_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  const a = {
+    id,
+    businessName: req.body.businessName || '',
+    contactName: req.body.contactName || '',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    answers: req.body.answers || {},
+  };
+  store.diagnostic.assessments[id] = a;
+  writeStore(store);
+  res.json(a);
+});
+app.put('/api/diagnostic/assessments/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureDiagnostic(store);
+  if (!store.diagnostic.assessments[req.params.id]) return res.status(404).json({ error: 'Not found' });
+  const a = { ...req.body, id: req.params.id, updatedAt: new Date().toISOString() };
+  store.diagnostic.assessments[req.params.id] = a;
+  writeStore(store);
+  res.json(a);
+});
+app.delete('/api/diagnostic/assessments/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureDiagnostic(store);
+  delete store.diagnostic.assessments[req.params.id];
+  writeStore(store);
+  res.json({ ok: true });
+});
+
 // ── Client CRUD ───────────────────────────────────────────────────────────────
 app.get('/api/clients', requireAuth, (req, res) => {
   const store = readStore();

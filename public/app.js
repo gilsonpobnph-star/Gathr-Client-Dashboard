@@ -357,6 +357,7 @@ function showTab(tab) {
   else if (tab === 'help')        renderHelp();
   else if (tab === 'chat')        initChat();
   else if (tab === 'growth')      window.Growth && window.Growth.onOpen();
+  else if (tab === 'diagnostic')  window.Diagnostic && window.Diagnostic.onOpen();
 }
 
 /* ── Assignee filters ─────────────────────────────────────────────────────── */

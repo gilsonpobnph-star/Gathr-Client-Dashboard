@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="growth.css" />
+  <link rel="stylesheet" href="diagnostic.css" />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -101,6 +102,10 @@
       <button class="nav-item" data-tab="growth">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
         Growth
+      </button>
+      <button class="nav-item" data-tab="diagnostic">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        Diagnostic
       </button>
 
       <div class="nav-section-label">Intake</div>
@@ -631,6 +636,64 @@
 
       </div>
       <div class="toast" id="g-toast"></div>
+    </section>
+
+    <!-- Diagnostic (Scoreboard intake instrument) -->
+    <section id="tab-diagnostic" class="tab-section hidden" style="display:block;overflow-y:auto;">
+      <div class="g-header">
+        <div>
+          <div class="wordmark">GATHR <span>GROW</span></div>
+          <div class="tagline">The Scoreboard — Diagnostic Intake</div>
+        </div>
+      </div>
+
+      <div class="g-main">
+
+        <section id="dg-dashView">
+          <div class="list-head">
+            <div><div class="eyebrow">Diagnostic</div><h1>Assessments</h1></div>
+            <button class="accent" onclick="Diagnostic.newAssessment()">+ New assessment</button>
+          </div>
+          <div id="dg-assessGrid" class="assess-grid"></div>
+          <div id="dg-dashEmpty" class="empty-state hidden"><h2>No assessments yet</h2><p class="muted">Run one during a discovery call to see where a practitioner stands and what to recommend.</p></div>
+        </section>
+
+        <section id="dg-formView" class="hidden">
+          <div class="crumb"><a onclick="Diagnostic.showDash()">&larr; All assessments</a></div>
+          <div class="list-head" style="margin-bottom:16px;">
+            <div><div class="eyebrow" id="dg-formSub"></div><h1 id="dg-formTitle"></h1></div>
+            <button class="secondary small linkish" onclick="Diagnostic.deleteAssessment()">Delete assessment</button>
+          </div>
+
+          <div class="card">
+            <div class="headline-score">
+              <div class="headline-num" id="dg-headlineNum">0<small> / 100</small></div>
+              <div class="headline-anchor">Healthy practices sit at 75 or higher. Scored live as you answer.</div>
+            </div>
+            <div class="job-bars" id="dg-jobBars"></div>
+            <div class="chip-row" id="dg-chipRow"></div>
+          </div>
+
+          <div id="dg-formHost"></div>
+
+          <div class="card" style="text-align:center;">
+            <button class="accent" onclick="Diagnostic.showReport()">Generate strategy report</button>
+          </div>
+        </section>
+
+        <section id="dg-reportSection" class="hidden">
+          <div class="crumb no-print"><a onclick="Diagnostic.backToForm()">&larr; Back to assessment</a></div>
+          <div id="dg-reportView">
+            <div class="report-inner" id="dg-reportInner"></div>
+            <div class="report-actions no-print">
+              <button class="accent" onclick="window.print()">Print / save as PDF</button>
+              <button class="secondary" onclick="Diagnostic.backToForm()">Back</button>
+            </div>
+          </div>
+        </section>
+
+      </div>
+      <div class="toast" id="dg-toast"></div>
     </section>
 
     <!-- New Intakes -->
@@ -1749,6 +1812,7 @@
 </div>
 
 <script src="growth.js"></script>
+<script src="diagnostic.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
