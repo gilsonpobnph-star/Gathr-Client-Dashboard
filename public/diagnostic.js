@@ -210,27 +210,27 @@
     outreach: { group: 'active',
       why: "Past clients and your warm network do not know you are taking on new clients right now — silence reads as unavailable.",
       quickWin: 'Message 10 past or lapsed clients today with a genuine check-in, not a pitch.',
-      service: 'Setup', serviceBlurb: 'We build your reactivation and referral-ask sequences.' },
+      service: 'Software Setup', serviceBlurb: 'We build your reactivation and referral-ask sequences.' },
     referrals: { group: 'passive',
       why: "If you never ask, happy clients assume you do not need more — referrals need a specific, well-timed ask.",
       quickWin: 'Ask your next 3 happy clients for an introduction to someone specific, not just "tell your friends."',
-      service: 'Setup', serviceBlurb: 'We build a referral-ask system triggered at the right moment.' },
+      service: 'Software Setup', serviceBlurb: 'We build a referral-ask system triggered at the right moment.' },
     reviews: { group: 'passive',
       why: 'A thin or inconsistent Google profile with few recent reviews makes you invisible against competitors who show up first.',
       quickWin: 'Send your last 5 happy clients your Google review link today.',
-      service: 'Setup', serviceBlurb: 'We set up your profile properly and build an always-on review-ask flow.' },
+      service: 'Software Setup', serviceBlurb: 'We set up your profile properly and build an always-on review-ask flow.' },
     website: { group: 'passive',
       why: 'A slow site, a buried call-to-action, or a vague headline loses visitors before they see what you offer.',
       quickWin: 'Add one clear button above the fold: "Book now" or "Get started."',
-      service: 'Setup', serviceBlurb: 'We build a fast, clear, mobile-first website.' },
+      service: 'Software Setup', serviceBlurb: 'We build a fast, clear, mobile-first website.' },
     directories: { group: 'passive',
       why: 'Missing or inconsistent directory listings mean you are invisible on the exact platforms your ideal clients search.',
       quickWin: 'List your business on the 2-3 directories that matter most for your profession today — most are free.',
-      service: 'Setup', serviceBlurb: 'We audit and set up every directory that matters for your type.' },
+      service: 'Software Setup', serviceBlurb: 'We audit and set up every directory that matters for your type.' },
     capture: { group: null,
       why: 'Sending traffic to a generic page or a long form loses interested people before they become a lead.',
       quickWin: 'Build one simple, focused landing page for your main offer this week — even a single page with a short form.',
-      service: 'Setup', serviceBlurb: 'We build a focused capture page and shorten your form to convert more.' },
+      service: 'Software Setup', serviceBlurb: 'We build a focused capture page and shorten your form to convert more.' },
     speed: { group: null,
       why: 'The first business to reply usually wins the client — every hour of delay loses leads to a faster competitor.',
       quickWin: 'Turn on phone notifications and reply to every new lead within 5 minutes today.',
@@ -755,13 +755,25 @@
       ${cardsHtml}
     </div>`;
   }
+  // Your plan for the first 30 days: the three biggest things to fix,
+  // picked from the actual card results — heaviest-weighted gaps first
+  // (ties broken by the weakest score), not a generic scripted plan.
+  function topThirtyDayActions(scores) {
+    const order = ['content', 'paidads', 'outreach', 'referrals', 'reviews', 'website', 'directories', 'capture', 'speed', 'followup', 'show', 'sales'];
+    const gaps = order.map(key => {
+      const sec = SECTIONS.find(x => x.key === key); const s = scores.sections[key];
+      return { key, label: sec.label, weight: sec.weight, chip: s.chip, pct: s.pct };
+    }).filter(c => c.chip !== 'strong');
+    gaps.sort((x, y) => (y.weight - x.weight) || ((x.pct ?? -1) - (y.pct ?? -1)));
+    return gaps.slice(0, 3);
+  }
   function showReport() {
     const a = cur; const scores = computeScores(a); const rec = computeRecommendation(a, scores);
     const { ltv, gltv } = ltvMath(a);
     const group = CONFIG_GROUPS[rec.group];
     const targetClients = Number(a.answers.targetNewClients) || 4;
     const leadsNeeded = targetClients * 10;
-    const serviceCardName = { Setup: 'Software Setup', Content: 'Content', 'Brand OS': 'Brand OS', 'Ads Management': 'Lead Generation' }[rec.service] || rec.service;
+    const serviceCardName = { Setup: 'Software Setup', Content: 'Content', 'Brand OS': 'Brand OS', 'Ads Management': 'Ads Management' }[rec.service] || rec.service;
     const rc = name => serviceCardName === name ? 'price-card recommended' : 'price-card';
     const recTag = name => serviceCardName === name ? '<span class="rec-tag">Recommended for you</span><br>' : '';
     const funnel = rec.funnel;
@@ -787,6 +799,29 @@
           <div class="lbl">Overall score</div>
         </div>
       </div>
+    </div>`);
+
+    // Where you stand today — headline score, job bars, funnel vs benchmark.
+    // Shown right up top, before The Basics, so the client sees where they
+    // stand before reading the framework.
+    sections.push(`<div class="doc-section" style="margin-top:28px;">
+      <div class="eyebrow-sm">YOUR SCORECARD</div>
+      <h2 class="doc-h2">Where ${esc(a.businessName || 'you')} stand${a.businessName ? 's' : ''} today</h2>
+      <div class="job-bars">${Object.entries(JOBS).map(([key, job]) => {
+        const s = scores.jobs[key]; const pct = s.max ? s.score / s.max * 100 : 0;
+        const cls = pct >= 75 ? 'good' : pct >= 40 ? 'warn' : 'bad';
+        return `<div class="job-bar"><div class="jb-track"><div class="jb-fill ${cls}" style="height:${Math.max(3, pct)}%"></div></div><div class="jb-val">${s.score}/${s.max}</div><div class="jb-label">${esc(job.label)}</div></div>`;
+      }).join('')}</div>
+      <h2 class="doc-h2" style="margin-top:36px;">Your funnel today</h2>
+      <table class="funnel-table" style="margin-top:10px;">
+        <thead><tr><th>Stage</th><th>Your rate</th><th>Benchmark</th></tr></thead>
+        <tbody>
+          <tr><td>Leads (last month)</td><td colspan="2">${funnel.leads || '—'}</td></tr>
+          ${funnelRow('Booked', funnel.bookPct, 60)}
+          ${funnelRow('Showed', funnel.showPct, 60, 70)}
+          ${funnelRow('Closed', funnel.closePct, 30, 35)}
+        </tbody>
+      </table>
     </div>`);
 
     // The Basics
@@ -820,28 +855,8 @@
       <div class="slide-italic" style="text-align:center;">Want ${targetClients} new client${targetClients === 1 ? '' : 's'} a month? You need about ${leadsNeeded} leads a month.</div>
     </div>`);
 
-    // Where you stand today — headline score, job bars, funnel vs benchmark
-    sections.push(`<div class="doc-section">
-      <div class="eyebrow-sm">YOUR SCORECARD</div>
-      <h2 class="doc-h2">Where ${esc(a.businessName || 'you')} stand${a.businessName ? 's' : ''} today</h2>
-      <div class="job-bars">${Object.entries(JOBS).map(([key, job]) => {
-        const s = scores.jobs[key]; const pct = s.max ? s.score / s.max * 100 : 0;
-        const cls = pct >= 75 ? 'good' : pct >= 40 ? 'warn' : 'bad';
-        return `<div class="job-bar"><div class="jb-track"><div class="jb-fill ${cls}" style="height:${Math.max(3, pct)}%"></div></div><div class="jb-val">${s.score}/${s.max}</div><div class="jb-label">${esc(job.label)}</div></div>`;
-      }).join('')}</div>
-      <h2 class="doc-h2" style="margin-top:36px;">Your funnel today</h2>
-      <table class="funnel-table" style="margin-top:10px;">
-        <thead><tr><th>Stage</th><th>Your rate</th><th>Benchmark</th></tr></thead>
-        <tbody>
-          <tr><td>Leads (last month)</td><td colspan="2">${funnel.leads || '—'}</td></tr>
-          ${funnelRow('Booked', funnel.bookPct, 60)}
-          ${funnelRow('Showed', funnel.showPct, 60, 70)}
-          ${funnelRow('Closed', funnel.closePct, 30, 35)}
-        </tbody>
-      </table>
-    </div>`);
-
-    // Job 1 — Get found
+    // Job 1 — Get found (Job 2, Capture Interest, folds straight in below —
+    // colour coding tells them apart, no separate divider needed for it)
     sections.push(docBanner('JOB 1', 'Get found', null, true));
     sections.push(`<div class="doc-section" style="margin-top:0;">
       <div class="eyebrow-sm">JOB 1 &middot; GET FOUND</div>
@@ -866,11 +881,7 @@
           'Make it easy to share you.', 'You cannot force it, but you can earn it.',
         ], scores),
       ].join(''))}
-    </div>`);
-
-    // Job 2 — Capture interest
-    sections.push(docBanner('JOB 2', 'Capture interest', null, true));
-    sections.push(`<div class="doc-section" style="margin-top:0;">
+      <div class="eyebrow-sm" style="margin-top:36px;">JOB 2 &middot; CAPTURE INTEREST</div>
       ${docGroup('capture', null, channelCard('Turning interest into leads', 'capture', CHANNEL_BULLETS.capture, scores))}
     </div>`);
 
@@ -903,46 +914,28 @@
       <p style="margin-top:26px; font-size:15px;">More leads come from doing Jobs 1 and 2 better. Better book, show and close come from Job 3.</p>
     </div>`);
 
-    // The good news
-    sections.push(docBanner('THE GOOD NEWS', 'You do not need a dozen projects. You need one path, done in order.'));
-    sections.push(`<p style="color:#57524c; font-size:15px; max-width:640px; margin-top:-30px;">Almost everything you just saw comes back to one thing: your foundations are not fully built yet. So we build them, in the right order.</p>`);
-
-    // Your plan — first 90 days / next 90 days
+    // Your plan for the first 30 days — the biggest three things to fix,
+    // picked from the actual card results above, not a generic script.
+    const top3 = topThirtyDayActions(scores);
     sections.push(`<div class="doc-section">
-      <div class="eyebrow-sm">YOUR PLAN &middot; FIRST 90 DAYS</div>
-      <h2 class="doc-h2">The Basics: build the foundation</h2>
-      <p style="font-size:14.5px; color:#57524c;">This is what you should do first. Every job, set up properly, in order.</p>
+      <div class="eyebrow-sm">YOUR PLAN</div>
+      <h2 class="doc-h2">Your plan for the first 30 days</h2>
+      ${top3.length ? `
+      <p style="font-size:14.5px; color:#57524c;">Based on where you stand today, here are the three biggest things to fix first.</p>
       <ul class="plan-checklist">
-        <li><span class="chk"></span>Get found: your website, Google profile, directories and reviews.</li>
-        <li><span class="chk"></span>Capture: one landing page with a valuable first step.</li>
-        <li><span class="chk"></span>Sell: fast replies, a follow-up sequence, and a simple sales call.</li>
-        <li><span class="chk"></span>Measure: track leads, booked, showed and closed every month.</li>
-      </ul>
-      <div class="plan-close-line">You can do this yourself. Or we set it all up for you.</div>
-
-      <div class="eyebrow-sm" style="margin-top:36px;">YOUR PLAN &middot; NEXT 90 DAYS</div>
-      <h2 class="doc-h2">Ads: fill the funnel</h2>
-      <p style="font-size:14.5px; color:#57524c;">Once your foundation turns leads into clients, you turn up the volume.</p>
-      <ul class="plan-checklist">
-        <li><span class="chk"></span>Run paid ads to your landing page, with one clear offer.</li>
-        <li><span class="chk"></span>Start small, then scale what works.</li>
-        <li><span class="chk"></span>Judge every dollar on cost per booked client.</li>
-        <li><span class="chk"></span>Keep measuring, every month.</li>
-      </ul>
-      <div class="plan-close-line">You can do this yourself. Or we run your ads for you.</div>
+        ${top3.map(c => `<li><span class="chk"></span><span style="color:var(--dg-orange);">${esc(c.label)}:</span> ${esc(CHANNEL_META[c.key].quickWin)}</li>`).join('')}
+      </ul>` : `
+      <p style="font-size:14.5px; color:#57524c;">You're already doing the fundamentals well across every channel — nothing urgent to fix this month. Keep it up.</p>`}
     </div>`);
-
-    // You can do this yourself
-    sections.push(docBanner(null, 'You can do all of this yourself.'));
-    sections.push(`<p style="color:#57524c; font-size:15px; margin-top:-30px;">None of it is complicated. But it takes time, and time on marketing is time away from your clients.<br><br>If you would rather stay with your clients, this is exactly what we do.</p>`);
 
     // Ways to work with us
     sections.push(`<div class="doc-section">
       <div class="eyebrow-sm">HOW WE CAN HELP</div>
       <h2 class="doc-h2">Ways to work with us</h2>
+      <p style="font-size:14.5px; color:#57524c; max-width:640px;">None of this is complicated, but it takes time, and time on marketing is time away from your clients. You can do all of it yourself — or, if you'd rather stay with your clients, this is exactly what we do.</p>
       <div class="price-grid">
         <div class="${rc('Brand OS')}">${recTag('Brand OS')}<h4>Brand OS - $4500</h4><p>We set up your whole foundation. Your first 120 days, done for you.</p></div>
-        <div class="${rc('Lead Generation')}">${recTag('Lead Generation')}<h4>Lead Generation - $4500</h4><p>We run your ads and fill your funnel. The next 120 days.</p></div>
+        <div class="${rc('Ads Management')}">${recTag('Ads Management')}<h4>Ads Management</h4><p>We run your ads and fill your funnel. The next 120 days.</p></div>
       </div>
       <div class="price-subhead">Just want part of it?</div>
       <div class="price-grid">

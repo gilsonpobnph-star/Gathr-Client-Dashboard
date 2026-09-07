@@ -19,6 +19,10 @@
 #tab-diagnostic .tagline{font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--dg-dust);}
 #tab-diagnostic .g-main{max-width:980px; margin:0 auto; padding:28px 20px 90px;}
 #tab-diagnostic h1,#tab-diagnostic h2,#tab-diagnostic h3,#tab-diagnostic h4{font-family:var(--dg-serif); font-weight:400; margin:0;}
+/* Safety net for the intake questionnaire itself (not the report): force
+   every element to the regular weight so nothing renders unexpectedly
+   bold on a client's device, regardless of tag or browser default. */
+#tab-diagnostic #dg-formView, #tab-diagnostic #dg-formView *{font-weight:400 !important;}
 #tab-diagnostic h1{font-size:31px; line-height:1.15;}
 #tab-diagnostic h2{font-size:22px;}
 #tab-diagnostic .eyebrow{font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--dg-orange); margin-bottom:6px;}
@@ -219,8 +223,8 @@
 #tab-diagnostic .ch-badge.strong{background:#dcefe0; color:var(--dg-good);}
 #tab-diagnostic .ch-badge.needswork{background:#faf0da; color:var(--dg-warn);}
 #tab-diagnostic .ch-badge.missing{background:#fbe3dd; color:var(--dg-bad);}
-#tab-diagnostic .ch-block{margin-top:12px;}
-#tab-diagnostic .ch-block h4{font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:#7d766e; font-weight:700; margin-bottom:6px;}
+#tab-diagnostic .ch-block{margin-top:14px;}
+#tab-diagnostic .ch-block h4{font-size:13.5px; letter-spacing:.02em; text-transform:uppercase; color:#5c564e; font-weight:700; margin-bottom:7px;}
 #tab-diagnostic .ch-block ul{margin:0; padding-left:18px;}
 #tab-diagnostic .ch-block li{font-size:13.5px; margin-bottom:5px;}
 #tab-diagnostic .ch-block p{font-size:13.5px; color:#3a3632; margin:0;}
