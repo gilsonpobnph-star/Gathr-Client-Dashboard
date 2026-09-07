@@ -712,11 +712,12 @@
     }).join('');
   }
 
-  // ── Printable strategy report — a slide deck ──────────────────────────────
-  // Modeled on the "Your Marketing Strategy" presentation: one topic per
-  // slide, dark dividers between the three jobs, and a Strong/Needs work/
-  // Missing self-assessment row on each channel slide, filled in from the
-  // score this assessment already computed.
+  // ── Printable strategy report — a flowing document ────────────────────────
+  // Same content and copy as the "Your Marketing Strategy" reference deck,
+  // but read top to bottom as one document rather than slide by slide: dark
+  // banners mark each job, and each channel write-up carries a Strong/Needs
+  // work/Missing self-assessment row filled in from the score this
+  // assessment already computed.
   function chipRow(chip) {
     const states = [
       { key: 'strong', label: 'Strong', color: 'var(--dg-good)' },
@@ -729,45 +730,41 @@
         return `<span class="chip-choice" style="border-color:${s.color}; color:${filled ? '#fff' : s.color}; background:${filled ? s.color : 'transparent'};">${s.label}</span>`;
       }).join('') + `</div>`;
   }
-  function darkSlide(eyebrow, title, sub) {
-    return `<div class="slide dark">
+  function docBanner(eyebrow, title, sub, jobBanner) {
+    return `<div class="doc-banner${jobBanner ? ' job-banner' : ''}">
       ${eyebrow ? `<div class="eyebrow-sm">${esc(eyebrow)}</div>` : ''}
       <h1 class="slide-title">${esc(title)}</h1>
       ${sub ? `<div class="slide-sub">${esc(sub)}</div>` : ''}
     </div>`;
   }
-  function channelSlide(eyebrow, title, sectionKey, bullets, scores) {
+  function channelBlock(title, sectionKey, bullets, scores) {
     const chip = sectionKey ? scores.sections[sectionKey].chip : null;
-    return `<div class="slide">
-      <div class="eyebrow-sm">${esc(eyebrow)}</div>
-      <h1 class="slide-title">${esc(title)}</h1>
+    return `<div class="doc-channel">
+      <h3>${esc(title)}</h3>
       ${chipRow(chip === 'tooearly' ? null : chip)}
       <div class="channel-cols">
         <div><div class="wgl-title">What good looks like</div><ul class="wgl-list">${bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>
         <div><div class="notes-title">Notes</div><div class="notes-box"></div></div>
       </div>
-      <div class="slide-footer">GATHR GROW</div>
     </div>`;
   }
   // The combined quick-wins + 30-day playbook: every scored channel bucketed
   // by Strong / Needs work / Missing, Get Found sub-grouped Active then
-  // Passive, and one detailed slide per gap channel covering why it's not
-  // working, best practices, a free quick win, and where we can help.
-  function playbookDetailSlide(statusLabel, jobLabel, title, key, scores) {
+  // Passive, and one detailed write-up per gap channel covering why it's
+  // not working, best practices, a free quick win, and where we can help.
+  function playbookDetailItem(title, key, scores) {
     const s = scores.sections[key]; const meta = CHANNEL_META[key];
-    return `<div class="slide playbook">
-      <div class="eyebrow-sm">${esc(statusLabel)} &middot; ${esc(jobLabel)}</div>
-      <h1 class="slide-title">${esc(title)}${s.pct != null ? `<span class="pb-pct">${Math.round(s.pct)}% on this channel</span>` : ''}</h1>
+    return `<div class="doc-playbook-item">
+      <h4>${esc(title)}${s.pct != null ? `<span class="pb-pct">${Math.round(s.pct)}% on this channel</span>` : ''}</h4>
       <div class="pb-detail-grid">
         <div class="pb-block"><h4>Why it's not working</h4><p>${esc(meta.why)}</p></div>
         <div class="pb-block"><h4>Best practices</h4><ul>${(CHANNEL_BULLETS[key] || []).map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>
         <div class="pb-block"><h4>Quick win &mdash; free</h4><p>${esc(meta.quickWin)}</p></div>
         <div class="pb-block pb-help"><h4>What we can help with</h4><p>${esc(meta.serviceBlurb)} <span style="color:var(--dg-orange)">(${esc(meta.service)})</span></p></div>
       </div>
-      <div class="slide-footer">GATHR GROW</div>
     </div>`;
   }
-  function buildPlaybookSlides(scores) {
+  function buildPlaybookSection(scores) {
     const order = ['content', 'paidads', 'outreach', 'referrals', 'reviews', 'website', 'directories', 'capture', 'speed', 'followup', 'show', 'sales'];
     const buckets = { strong: [], needswork: [], missing: [] };
     order.forEach(key => {
@@ -776,9 +773,7 @@
       buckets[bucket].push({ key, label: sec.label, job: sec.job, pct: s.pct });
     });
 
-    const overview = `<div class="slide playbook">
-      <div class="eyebrow-sm">YOUR PLAYBOOK</div>
-      <h1 class="slide-title">Where you stand, channel by channel</h1>
+    const overview = `
       <div class="slide-italic" style="margin-top:0;">Quick wins you can do for free, and where we can help — based on your actual answers.</div>
       <div class="playbook-overview">
         ${['strong', 'needswork', 'missing'].map(b => {
@@ -790,24 +785,28 @@
             ${list.length ? `<ul>${list.map(c => `<li>${esc(c.label)}</li>`).join('')}</ul>` : '<div class="pb-empty">None yet</div>'}
           </div>`;
         }).join('')}
-      </div>
-      <div class="slide-footer">GATHR GROW</div>
-    </div>`;
+      </div>`;
 
-    const detailSlides = [];
+    const detailGroups = [];
     ['needswork', 'missing'].forEach(bucketKey => {
-      const statusLabel = bucketKey === 'needswork' ? 'NEEDS WORK' : 'MISSING';
+      const statusLabel = bucketKey === 'needswork' ? 'Needs work' : 'Missing';
       const list = buckets[bucketKey];
+      if (!list.length) return;
+      let body = '';
       ['active', 'passive'].forEach(g => {
-        list.filter(c => c.job === 'getfound' && CHANNEL_META[c.key]?.group === g).forEach(c => {
-          detailSlides.push(playbookDetailSlide(statusLabel, `Get Found · ${g === 'active' ? 'Active' : 'Passive'}`, c.label, c.key, scores));
-        });
+        const items = list.filter(c => c.job === 'getfound' && CHANNEL_META[c.key]?.group === g);
+        if (!items.length) return;
+        body += `<div class="doc-subgroup-label">Get Found &middot; ${g === 'active' ? 'Active' : 'Passive'}</div>`;
+        body += items.map(c => playbookDetailItem(c.label, c.key, scores)).join('');
       });
-      list.filter(c => c.job === 'capture').forEach(c => detailSlides.push(playbookDetailSlide(statusLabel, 'Capture Interest', c.label, c.key, scores)));
-      list.filter(c => c.job === 'sell').forEach(c => detailSlides.push(playbookDetailSlide(statusLabel, 'Sell', c.label, c.key, scores)));
+      const capture = list.filter(c => c.job === 'capture');
+      if (capture.length) { body += `<div class="doc-subgroup-label">Capture Interest</div>` + capture.map(c => playbookDetailItem(c.label, c.key, scores)).join(''); }
+      const sell = list.filter(c => c.job === 'sell');
+      if (sell.length) { body += `<div class="doc-subgroup-label">Sell</div>` + sell.map(c => playbookDetailItem(c.label, c.key, scores)).join(''); }
+      detailGroups.push(`<div class="doc-h3-status ${bucketKey}">${statusLabel}</div>${body}`);
     });
 
-    return [overview, ...detailSlides];
+    return overview + detailGroups.join('');
   }
   function showReport() {
     const a = cur; const scores = computeScores(a); const rec = computeRecommendation(a, scores);
@@ -818,35 +817,43 @@
     const serviceCardName = { Setup: 'Software Setup', Content: 'Content', 'Brand OS': 'Brand OS', 'Ads Management': 'Lead Generation' }[rec.service] || rec.service;
     const rc = name => serviceCardName === name ? 'price-card recommended' : 'price-card';
     const recTag = name => serviceCardName === name ? '<span class="rec-tag">Recommended for you</span><br>' : '';
+    const funnel = rec.funnel;
+    const funnelRow = (label, val, floor, healthy) => {
+      if (val == null) return `<tr><td>${label}</td><td colspan="2" class="muted">No data yet</td></tr>`;
+      const cls = val < floor ? 'low' : 'ok';
+      return `<tr><td>${label}</td><td class="${cls}">${Math.round(val)}%</td><td class="muted">floor ${floor}%${healthy ? `, healthy ${healthy}%+` : ''}</td></tr>`;
+    };
 
-    const slides = [];
+    const sections = [];
 
-    // 1 — Title
-    slides.push(`<div class="slide dark">
+    // Cover
+    sections.push(`<div class="doc-cover">
       <h1 class="slide-title">Your Marketing Strategy</h1>
       <div class="slide-sub">A clear plan to get found, win more clients, and grow.</div>
-      <div style="flex:1"></div>
-      <div style="font-size:14px;">Prepared for ${esc(a.businessName || '[ practice name ]')}</div>
-      <div style="font-size:12px; color:var(--dg-dust); margin-top:4px;">Gathr Grow</div>
+      <div class="doc-cover-meta">
+        <div>
+          <div style="font-size:14px;">Prepared for ${esc(a.businessName || '[ practice name ]')}</div>
+          <div style="font-size:12px; color:var(--dg-dust); margin-top:4px;">${esc(niceDate(todayStr()))} &middot; Gathr Grow</div>
+        </div>
+        <div class="doc-score-badge">
+          <div class="num">${scores.headline}<small style="font-size:16px; color:#7d766e;"> / 100</small></div>
+          <div class="lbl">Overall score</div>
+        </div>
+      </div>
     </div>`);
 
-    // 2 — The three jobs
-    slides.push(`<div class="slide">
+    // The Basics
+    sections.push(`<div class="doc-section">
       <div class="eyebrow-sm">THE BASICS</div>
-      <h1 class="slide-title">The three jobs every business has to do</h1>
+      <h2 class="doc-h2">The three jobs every business has to do</h2>
       <div class="card-grid-3">
         <div class="num-card"><div class="num">1</div><h4>Get found</h4><p>People need to know you exist.</p></div>
         <div class="num-card"><div class="num">2</div><h4>Capture interest</h4><p>Turn a stranger into a lead: someone who has shown interest and you can contact.</p></div>
         <div class="num-card"><div class="num">3</div><h4>Sell</h4><p>Turn that lead into a paying client.</p></div>
       </div>
       <div class="slide-italic">If one job is weak, growth slows. This plan checks all three.</div>
-      <div class="slide-footer">GATHR GROW</div>
-    </div>`);
 
-    // 3 — Measure the same four steps
-    slides.push(`<div class="slide">
-      <div class="eyebrow-sm">THE BASICS</div>
-      <h1 class="slide-title">Measure the same four steps every month</h1>
+      <h2 class="doc-h2" style="margin-top:40px;">Measure the same four steps every month</h2>
       <div class="funnel-steps">
         <div class="fstep"><h4>Leads</h4><p>show interest</p></div><div class="funnel-arrow">&gt;</div>
         <div class="fstep"><h4>Booked</h4><p>book a call</p></div><div class="funnel-arrow">&gt;</div>
@@ -855,13 +862,8 @@
       </div>
       <p style="margin-top:24px; font-size:15px;">Track these four every month. Also ask every new person: "How did you hear about us?"</p>
       <div class="slide-italic">You cannot fix what you do not measure. Most practices track nothing. Start here.</div>
-      <div class="slide-footer">GATHR GROW</div>
-    </div>`);
 
-    // 4 — Numbers to aim for
-    slides.push(`<div class="slide">
-      <div class="eyebrow-sm">THE BASICS</div>
-      <h1 class="slide-title">The numbers to aim for</h1>
+      <h2 class="doc-h2" style="margin-top:40px;">The numbers to aim for</h2>
       <div class="card-grid-3">
         <div class="num-card" style="text-align:center;"><div class="num">60%</div><h4>Book rate</h4><p>6 in 10 leads book</p></div>
         <div class="num-card" style="text-align:center;"><div class="num">60%</div><h4>Show rate</h4><p>6 in 10 who book turn up</p></div>
@@ -869,99 +871,78 @@
       </div>
       <div class="callout-box">At those rates, about 10 leads gets you 1 new client.</div>
       <div class="slide-italic" style="text-align:center;">Want ${targetClients} new client${targetClients === 1 ? '' : 's'} a month? You need about ${leadsNeeded} leads a month.</div>
-      <div class="slide-footer">GATHR GROW</div>
     </div>`);
 
-    // 5 — Job 1 divider
-    slides.push(darkSlide('JOB 1', 'Get found'));
+    // Where you stand today — headline score, job bars, funnel vs benchmark
+    sections.push(`<div class="doc-section">
+      <div class="eyebrow-sm">YOUR SCORECARD</div>
+      <h2 class="doc-h2">Where ${esc(a.businessName || 'you')} stand${a.businessName ? 's' : ''} today</h2>
+      <div class="job-bars">${Object.entries(JOBS).map(([key, job]) => {
+        const s = scores.jobs[key]; const pct = s.max ? s.score / s.max * 100 : 0;
+        const cls = pct >= 75 ? 'good' : pct >= 40 ? 'warn' : 'bad';
+        return `<div class="job-bar"><div class="jb-track"><div class="jb-fill ${cls}" style="height:${Math.max(3, pct)}%"></div></div><div class="jb-val">${s.score}/${s.max}</div><div class="jb-label">${esc(job.label)}</div></div>`;
+      }).join('')}</div>
+      <h2 class="doc-h2" style="margin-top:36px;">Your funnel today</h2>
+      <table class="funnel-table" style="margin-top:10px;">
+        <thead><tr><th>Stage</th><th>Your rate</th><th>Benchmark</th></tr></thead>
+        <tbody>
+          <tr><td>Leads (last month)</td><td colspan="2">${funnel.leads || '—'}</td></tr>
+          ${funnelRow('Booked', funnel.bookPct, 60)}
+          ${funnelRow('Showed', funnel.showPct, 60, 70)}
+          ${funnelRow('Closed', funnel.closePct, 30, 35)}
+        </tbody>
+      </table>
+    </div>`);
 
-    // 6 — Two ways to get found
-    slides.push(`<div class="slide">
+    // Job 1 — Get found
+    sections.push(docBanner('JOB 1', 'Get found', null, true));
+    sections.push(`<div class="doc-section" style="margin-top:0;">
       <div class="eyebrow-sm">JOB 1 &middot; GET FOUND</div>
-      <h1 class="slide-title">Two ways to get found. You need both.</h1>
+      <h2 class="doc-h2">Two ways to get found. You need both.</h2>
       <div class="twocol-grid">
         <div class="twocol-card active"><h3>Active</h3><p>You put in time or money, and more people find you.</p>
           <ul><li>Creating content</li><li>Paid ads</li><li>Outreach</li><li>Events and workshops</li></ul></div>
         <div class="twocol-card passive"><h3>Passive</h3><p>You set it up once, and it works in the background.</p>
           <ul><li>Referrals from clients and other businesses</li><li>Reviews and Google</li><li>Your website (search and AI)</li><li>Directory listings</li><li>Word of mouth</li></ul></div>
       </div>
-      <div class="slide-footer">GATHR GROW</div>
+      <div class="doc-subgroup-label" style="margin-top:30px;">Active</div>
+      ${channelBlock('Creating content', 'content', CHANNEL_BULLETS.content, scores)}
+      ${channelBlock('Paid ads', 'paidads', CHANNEL_BULLETS.paidads, scores)}
+      ${channelBlock('Outreach', 'outreach', CHANNEL_BULLETS.outreach, scores)}
+      ${channelBlock('Events and workshops', null, [
+        'Give a real experience, not a sales pitch.', 'Promote by email first, then social.',
+        'Let people bring a friend.', 'Use one booking link so you can track it.', 'Follow up with everyone who comes.',
+      ], scores)}
+      <div class="doc-subgroup-label" style="margin-top:10px;">Passive</div>
+      ${channelBlock('Referrals', 'referrals', CHANNEL_BULLETS.referrals, scores)}
+      ${channelBlock('Reviews and Google', 'reviews', CHANNEL_BULLETS.reviews, scores)}
+      ${channelBlock('Your website (search and AI)', 'website', CHANNEL_BULLETS.website, scores)}
+      ${channelBlock('Directory listings', 'directories', CHANNEL_BULLETS.directories, scores)}
+      ${channelBlock('Word of mouth', null, [
+        'The best marketing is a great experience.', 'Give people a simple story to pass on.',
+        'Make it easy to share you.', 'You cannot force it, but you can earn it.',
+      ], scores)}
     </div>`);
 
-    // 7-10 — Active Get Found channels
-    slides.push(channelSlide('JOB 1 · GET FOUND · ACTIVE', 'Creating content', 'content', [
-      'Post short, useful videos a few times a week.', 'Answer the real questions clients ask.',
-      'Hold attention, do not just chase views.', 'Always point people to a next step.', 'Reuse your best pieces as proof.',
-    ], scores));
-    slides.push(channelSlide('JOB 1 · GET FOUND · ACTIVE', 'Paid ads', 'paidads', [
-      'Start once your website and follow-up work.', 'One clear offer, sent to one landing page.',
-      'Let the creative do the work, not the budget.', 'Judge ads on cost per booked client.', 'Give each ad time before you change it.',
-    ], scores));
-    slides.push(channelSlide('JOB 1 · GET FOUND · ACTIVE', 'Outreach', 'outreach', [
-      'Start warm: people who already know you.', 'Lead with something useful, not a pitch.',
-      'Personalise every message. No mass blasts.', 'Ask past and lapsed clients to come back.', 'Keep it friendly, and stop if they ask.',
-    ], scores));
-    slides.push(channelSlide('JOB 1 · GET FOUND · ACTIVE', 'Events and workshops', null, [
-      'Give a real experience, not a sales pitch.', 'Promote by email first, then social.',
-      'Let people bring a friend.', 'Use one booking link so you can track it.', 'Follow up with everyone who comes.',
-    ], scores));
+    // Job 2 — Capture interest
+    sections.push(docBanner('JOB 2', 'Capture interest', null, true));
+    sections.push(`<div class="doc-section" style="margin-top:0;">
+      ${channelBlock('Turning interest into leads', 'capture', CHANNEL_BULLETS.capture, scores)}
+    </div>`);
 
-    // 11-15 — Passive Get Found channels
-    slides.push(channelSlide('JOB 1 · GET FOUND · PASSIVE', 'Referrals', 'referrals', [
-      'Ask happy clients at their best moment.', 'Ask for an introduction, not just a name.',
-      'Build steady links with GPs and partners.', 'Make it easy, and thank them each time.', 'Follow the rules for your profession.',
-    ], scores));
-    slides.push(channelSlide('JOB 1 · GET FOUND · PASSIVE', 'Reviews and Google', 'reviews', [
-      'Fill in your Google profile completely.', 'Keep it active with posts and photos.',
-      'Ask happy clients for a fresh review often.', 'Reply to every review.', 'Keep your name, address and phone the same everywhere.',
-    ], scores));
-    slides.push(channelSlide('JOB 1 · GET FOUND · PASSIVE', 'Your website (search and AI)', 'website', [
-      'A simple, fast site with one clear next step.', 'One page for each service you offer.',
-      'Use the plain words people search for.', 'Add your details so AI can read them.', 'Works well on a phone.',
-    ], scores));
-    slides.push(channelSlide('JOB 1 · GET FOUND · PASSIVE', 'Directory listings', 'directories', [
-      'List on the directories for your profession.', 'Many are free with your membership.',
-      'Keep every listing the same.', 'Point each one back to your website.',
-    ], scores));
-    slides.push(channelSlide('JOB 1 · GET FOUND · PASSIVE', 'Word of mouth', null, [
-      'The best marketing is a great experience.', 'Give people a simple story to pass on.',
-      'Make it easy to share you.', 'You cannot force it, but you can earn it.',
-    ], scores));
+    // Job 3 — Sell
+    sections.push(docBanner('JOB 3', 'Sell', null, true));
+    sections.push(`<div class="doc-section" style="margin-top:0;">
+      ${channelBlock('Speed to reply', 'speed', CHANNEL_BULLETS.speed, scores)}
+      ${channelBlock('Follow-up', 'followup', CHANNEL_BULLETS.followup, scores)}
+      ${channelBlock('Show rate', 'show', CHANNEL_BULLETS.show, scores)}
+      ${channelBlock('The sales call', 'sales', CHANNEL_BULLETS.sales, scores)}
+    </div>`);
 
-    // 16 — Job 2 divider
-    slides.push(darkSlide('JOB 2', 'Capture interest'));
-
-    // 17 — Turning interest into leads
-    slides.push(channelSlide('JOB 2 · CAPTURE INTEREST', 'Turning interest into leads', 'capture', [
-      'Send campaign traffic to one focused landing page.', 'One page, one action, no other links.',
-      'Offer a valuable first step, like a named assessment.', 'Not just a "free consult".', 'Keep the form short.', 'Reply the moment a lead arrives.',
-    ], scores));
-
-    // 18 — Job 3 divider
-    slides.push(darkSlide('JOB 3', 'Sell'));
-
-    // 19-22 — Sell channels
-    slides.push(channelSlide('JOB 3 · SELL', 'Speed to reply', 'speed', [
-      'Reply to every new lead within 5 minutes.', 'If you cannot call, send a text.',
-      'Ask a question to start a conversation.', 'The first to reply usually wins.',
-    ], scores));
-    slides.push(channelSlide('JOB 3 · SELL', 'Follow-up', 'followup', [
-      'Follow up 5 to 8 times, not once.', 'Use call, text, and email.',
-      'Space it over 2 to 3 weeks.', 'End with a clear last message.', 'Stay friendly, never pushy.',
-    ], scores));
-    slides.push(channelSlide('JOB 3 · SELL', 'Show rate', 'show', [
-      'Book calls within 3 to 4 days.', 'Send reminders by text and email.',
-      'Ask them to reply to confirm.', 'Make it easy to rebook.',
-    ], scores));
-    slides.push(channelSlide('JOB 3 · SELL', 'The sales call', 'sales', [
-      'Set the plan for the call up front.', 'Understand their problem and their goal.',
-      'Ask for the sale, clearly.', 'Have a smaller first step ready.', 'Keep it helpful, not pushy.',
-    ], scores));
-
-    // 23 — Putting it together
-    slides.push(`<div class="slide">
+    // Putting it together
+    sections.push(`<div class="doc-section">
       <div class="eyebrow-sm">PUTTING IT TOGETHER</div>
-      <h1 class="slide-title">How the jobs make your numbers</h1>
+      <h2 class="doc-h2">How the jobs make your numbers</h2>
       <div class="funnel-steps">
         <div class="fstep"><h4>Leads</h4></div><div class="funnel-arrow">&gt;</div>
         <div class="fstep"><h4>Booked</h4></div><div class="funnel-arrow">&gt;</div>
@@ -974,36 +955,54 @@
         <div style="flex:2.6; border-top:3px solid var(--dg-good); padding-top:8px; font-size:13px; color:var(--dg-good); text-align:center;">Job 3: the sell</div>
       </div>
       <p style="margin-top:26px; font-size:15px;">More leads come from doing Jobs 1 and 2 better. Better book, show and close come from Job 3.</p>
-      <div class="slide-footer">GATHR GROW</div>
     </div>`);
 
-    // 24 — The good news
-    slides.push(`<div class="slide dark">
-      <div class="eyebrow-sm">THE GOOD NEWS</div>
-      <div style="flex:1"></div>
-      <h1 class="slide-title">You do not need a dozen projects. You need one path, done in order.</h1>
-      <p style="color:var(--dg-dust); font-size:15px; max-width:900px; margin-top:14px;">Almost everything you just saw comes back to one thing: your foundations are not fully built yet. So we build them, in the right order.</p>
-      <div style="flex:1"></div>
+    // The good news
+    sections.push(docBanner('THE GOOD NEWS', 'You do not need a dozen projects. You need one path, done in order.'));
+    sections.push(`<p style="color:#57524c; font-size:15px; max-width:640px; margin-top:-30px;">Almost everything you just saw comes back to one thing: your foundations are not fully built yet. So we build them, in the right order.</p>`);
+
+    // The Playbook: combined quick-wins + 30-day plan, grouped by status
+    // (Strong / Needs work / Missing), Get Found sub-grouped Active then
+    // Passive, one detailed write-up per gap channel.
+    sections.push(`<div class="doc-section">
+      <div class="eyebrow-sm">YOUR PLAYBOOK</div>
+      <h2 class="doc-h2">Where you stand, channel by channel</h2>
+      ${buildPlaybookSection(scores)}
     </div>`);
 
-    // 25+ — The Playbook: combined quick-wins + 30-day plan, grouped by
-    // status (Strong / Needs work / Missing), Get Found sub-grouped Active
-    // then Passive, one detailed slide per gap channel.
-    slides.push(...buildPlaybookSlides(scores));
+    // Your plan — first 90 days / next 90 days
+    sections.push(`<div class="doc-section">
+      <div class="eyebrow-sm">YOUR PLAN &middot; FIRST 90 DAYS</div>
+      <h2 class="doc-h2">The Basics: build the foundation</h2>
+      <p style="font-size:14.5px; color:#57524c;">This is what you should do first. Every job, set up properly, in order.</p>
+      <ul class="plan-checklist">
+        <li><span class="chk"></span>Get found: your website, Google profile, directories and reviews.</li>
+        <li><span class="chk"></span>Capture: one landing page with a valuable first step.</li>
+        <li><span class="chk"></span>Sell: fast replies, a follow-up sequence, and a simple sales call.</li>
+        <li><span class="chk"></span>Measure: track leads, booked, showed and closed every month.</li>
+      </ul>
+      <div class="plan-close-line">You can do this yourself. Or we set it all up for you.</div>
 
-    // 27 — You can do this yourself
-    slides.push(`<div class="slide dark">
-      <div style="flex:1"></div>
-      <h1 class="slide-title">You can do all of this yourself.</h1>
-      <p style="color:var(--dg-dust); font-size:15px; margin-top:10px;">None of it is complicated. But it takes time, and time on marketing is time away from your clients.</p>
-      <p style="font-size:15.5px; margin-top:18px;">If you would rather stay with your clients, this is exactly what we do.</p>
-      <div style="flex:1"></div>
+      <div class="eyebrow-sm" style="margin-top:36px;">YOUR PLAN &middot; NEXT 90 DAYS</div>
+      <h2 class="doc-h2">Ads: fill the funnel</h2>
+      <p style="font-size:14.5px; color:#57524c;">Once your foundation turns leads into clients, you turn up the volume.</p>
+      <ul class="plan-checklist">
+        <li><span class="chk"></span>Run paid ads to your landing page, with one clear offer.</li>
+        <li><span class="chk"></span>Start small, then scale what works.</li>
+        <li><span class="chk"></span>Judge every dollar on cost per booked client.</li>
+        <li><span class="chk"></span>Keep measuring, every month.</li>
+      </ul>
+      <div class="plan-close-line">You can do this yourself. Or we run your ads for you.</div>
     </div>`);
 
-    // 28 — Ways to work with us
-    slides.push(`<div class="slide">
+    // You can do this yourself
+    sections.push(docBanner(null, 'You can do all of this yourself.'));
+    sections.push(`<p style="color:#57524c; font-size:15px; margin-top:-30px;">None of it is complicated. But it takes time, and time on marketing is time away from your clients.<br><br>If you would rather stay with your clients, this is exactly what we do.</p>`);
+
+    // Ways to work with us
+    sections.push(`<div class="doc-section">
       <div class="eyebrow-sm">HOW WE CAN HELP</div>
-      <h1 class="slide-title">Ways to work with us</h1>
+      <h2 class="doc-h2">Ways to work with us</h2>
       <div class="price-grid">
         <div class="${rc('Brand OS')}">${recTag('Brand OS')}<h4>Brand OS - $4500</h4><p>We set up your whole foundation. Your first 120 days, done for you.</p></div>
         <div class="${rc('Lead Generation')}">${recTag('Lead Generation')}<h4>Lead Generation - $4500</h4><p>We run your ads and fill your funnel. The next 120 days.</p></div>
@@ -1013,18 +1012,14 @@
         <div class="${rc('Software Setup')}">${recTag('Software Setup')}<h4>Software Setup - $1500</h4><p>We set up your systems, then hand you the keys.</p></div>
         <div class="${rc('Content')}">${recTag('Content')}<h4>Content - $1000/$1500</h4><p>We create your content, so you show up without the effort.</p></div>
       </div>
-      <div class="slide-footer">GATHR GROW</div>
     </div>`);
 
-    // 29 — Closing
-    slides.push(`<div class="slide dark">
-      <div style="flex:1"></div>
-      <h1 class="slide-title">Either way, you now have the plan.</h1>
-      <div class="slide-sub">Let us help you decide where to start.</div>
-      <div style="flex:1"></div>
-    </div>`);
+    // Closing
+    sections.push(docBanner(null, 'Either way, you now have the plan.', 'Let us help you decide where to start.'));
 
-    $('reportInner').innerHTML = `<div class="deck">${slides.join('')}</div>`;
+    sections.push(`<div class="doc-footer">Gathr Grow</div>`);
+
+    $('reportInner').innerHTML = `<div class="doc-wrap">${sections.join('')}</div>`;
     $('formView').classList.add('hidden'); $('reportSection').classList.remove('hidden');
     document.getElementById('tab-diagnostic')?.scrollIntoView({ behavior: 'auto', block: 'start' });
   }
