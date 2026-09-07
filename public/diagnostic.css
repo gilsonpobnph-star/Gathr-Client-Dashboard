@@ -66,13 +66,13 @@
 #tab-diagnostic .part-body{padding:18px 20px;}
 #tab-diagnostic .q-block{padding:14px 0; border-bottom:1px solid var(--dg-lightgrey);}
 #tab-diagnostic .q-block:last-child{border-bottom:none;}
-#tab-diagnostic .q-text{font-size:14.5px; margin-bottom:10px; font-weight:600;}
+#tab-diagnostic .q-text{font-size:14.5px; margin-bottom:10px; font-weight:400;}
 #tab-diagnostic .q-sub{font-size:12.5px; color:#7d766e; margin:-6px 0 10px;}
 #tab-diagnostic .q-options{display:flex; gap:8px; flex-wrap:wrap;}
 #tab-diagnostic .q-opt{display:flex; align-items:flex-start; gap:8px; background:var(--dg-lightgrey); border:1.5px solid transparent; border-radius:4px; padding:8px 12px; cursor:pointer; font-size:13.5px; flex:1; min-width:200px;}
 #tab-diagnostic .q-opt:has(input:checked){border-color:var(--dg-orange); background:var(--dg-cream);}
 #tab-diagnostic .q-opt input{width:auto; margin-top:2px; accent-color:var(--dg-orange);}
-#tab-diagnostic .q-opt .qo-label{font-weight:700; color:var(--dg-orange); flex-shrink:0;}
+#tab-diagnostic .q-opt .qo-label{font-weight:400; color:var(--dg-orange); flex-shrink:0;}
 #tab-diagnostic .q-context{max-width:420px;}
 #tab-diagnostic .q-inline-num{max-width:120px;}
 #tab-diagnostic .funnel-inputs{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-top:10px;}
@@ -118,12 +118,12 @@
 #tab-diagnostic .funnel-table th,#tab-diagnostic .funnel-table td{padding:8px 10px; text-align:center; border-bottom:1px solid var(--dg-lightgrey);}
 #tab-diagnostic .funnel-table th{font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:#7d766e; font-weight:normal;}
 #tab-diagnostic .funnel-table td:first-child, #tab-diagnostic .funnel-table th:first-child{text-align:left;}
-#tab-diagnostic .funnel-table td.ok{color:var(--dg-good); font-weight:700;}
-#tab-diagnostic .funnel-table td.low{color:var(--dg-bad); font-weight:700;}
+#tab-diagnostic .funnel-table td.ok{color:var(--dg-good); font-weight:400;}
+#tab-diagnostic .funnel-table td.low{color:var(--dg-bad); font-weight:400;}
 #tab-diagnostic .plan-priority{background:var(--dg-cream); border-radius:4px; padding:16px 20px; margin-bottom:16px;}
 #tab-diagnostic .plan-priority h3{font-size:20px; color:var(--dg-orange);}
 #tab-diagnostic .plan-action{border-top:1px solid var(--dg-warmgrey); padding:12px 0;}
-#tab-diagnostic .plan-action .pa-title{font-weight:700; font-size:14.5px;}
+#tab-diagnostic .plan-action .pa-title{font-weight:400; font-size:14.5px; color:var(--dg-orange);}
 #tab-diagnostic .plan-action .pa-dll{font-size:13px; color:#57524c; margin-top:4px;}
 #tab-diagnostic .plan-action .pa-page{font-size:11.5px; color:var(--dg-orange); margin-top:4px;}
 #tab-diagnostic .close-options{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:12px;}

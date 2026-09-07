@@ -65,14 +65,27 @@
   // Every scored question: {id, text, sub, options:[{v,l}], na:{label} or null}
   // v: 0/1/2 or 'na'. Section weight and job come from SECTIONS below.
   const Q = {
-    C1: { text: "Right now, roughly: last month, how many leads, how many booked, how many showed, how many became clients?", sub: 'A capability test, not a survey question — score what they can actually produce.',
-      options: [{ v: 2, l: '2 · Produces all four, even approximate, from a system or a sheet' }, { v: 1, l: '1 · Knows some, or can reconstruct roughly' }, { v: 0, l: '0 · Cannot produce them' }] },
-    C2: { text: 'Do you ask every new client how they heard about you, and document it somewhere?',
-      options: [{ v: 2, l: '2 · Asked and recorded every time' }, { v: 1, l: '1 · Asks sometimes, or asks but never records' }, { v: 0, l: '0 · No' }] },
-    C3: { text: 'Do you know what an average client is worth to you in dollars?',
-      options: [{ v: 2, l: '2 · Has a number without help' }, { v: 1, l: '1 · Gets there with a shortcut (package price, or session price × typical sessions)' }, { v: 0, l: '0 · No idea' }] },
-    C4: { text: 'Is there one place where every lead and their status lives?',
-      options: [{ v: 2, l: '2 · One system, statuses kept current' }, { v: 1, l: '1 · Scattered — notes, phone, memory' }, { v: 0, l: '0 · Nowhere' }] },
+    C_LTV: { text: 'Did they know their client LTV?', max: 2,
+      options: [{ v: 2, l: '2 · Yes, confidently' }, { v: 1, l: '1 · Can figure it out with estimates' }, { v: 0, l: '0 · No' }] },
+    C_LEADSKNOWN: { text: 'Did they know their lead count without having to think hard?', max: 1,
+      options: [{ v: 1, l: '1 · Yes' }, { v: 0, l: '0 · No' }] },
+    C_BOOKEDKNOWN: { text: 'Did they know how many booked without having to think hard?', max: 1,
+      options: [{ v: 1, l: '1 · Yes' }, { v: 0, l: '0 · No' }] },
+    C_SHOWEDKNOWN: { text: 'Did they know how many showed without having to think hard?', max: 1,
+      options: [{ v: 1, l: '1 · Yes' }, { v: 0, l: '0 · No' }] },
+    C_CLOSEDKNOWN: { text: 'Did they know how many they closed without having to think hard?', max: 1,
+      options: [{ v: 1, l: '1 · Yes' }, { v: 0, l: '0 · No' }] },
+    C_HEARD: { text: 'Do you ask every new client how they heard about you, and document it somewhere?', max: 1,
+      options: [{ v: 1, l: '1 · Yes' }, { v: 0, l: '0 · No' }] },
+    C_REASONSNO: { text: 'Do you track the reasons clients say no to you?', max: 1,
+      options: [{ v: 1, l: '1 · Yes' }, { v: 0, l: '0 · No' }] },
+    C_TRAFFIC: { text: 'Do you track the traffic on your landing page or website?', max: 1,
+      options: [{ v: 1, l: '1 · Yes' }, { v: 0, l: '0 · No' }] },
+    C_OPTIN: { text: 'Do you track the opt-in rate on your landing page or website?', max: 1,
+      options: [{ v: 1, l: '1 · Yes' }, { v: 0, l: '0 · No' }] },
+
+    D_ADS: { text: 'Are you running paid ads, and are they reliably producing leads?',
+      options: [{ v: 2, l: '2 · Yes, running and reliably producing leads' }, { v: 1, l: '1 · Running, but inconsistent or unclear results' }, { v: 0, l: '0 · Not running, or running and producing nothing' }, { v: 'na', l: 'N/A · Not running ads' }] },
 
     D2: { text: 'Have you reached out to past or lapsed clients in the last 90 days?',
       options: [{ v: 2, l: '2 · Yes, personally and systematically — most of the list, personalised' }, { v: 1, l: '1 · A few, ad hoc' }, { v: 0, l: '0 · No' }, { v: 'na', l: 'N/A · No past clients yet (brand new)' }] },
@@ -154,13 +167,16 @@
   };
 
   const SECTIONS = [
-    { key: 'measure', label: 'Measure', weight: 10, job: 'measure', qids: ['C1', 'C2', 'C3', 'C4'] },
-    { key: 'outreach', label: 'Outreach & Reactivation', weight: 10, job: 'getfound', qids: ['D2', 'D3', 'D4'] },
-    { key: 'referrals', label: 'Referrals', weight: 4, job: 'getfound', qids: ['D5', 'D6'] },
-    { key: 'reviews', label: 'Reviews & Google', weight: 9, job: 'getfound', qids: ['D7', 'D8', 'D9', 'D10', 'D11'] },
-    { key: 'website', label: 'Website', weight: 8, job: 'getfound', qids: ['D12', 'D13', 'D14', 'D15'] },
-    { key: 'directories', label: 'Directories', weight: 4, job: 'getfound', qids: ['D16', 'D17'] },
-    { key: 'content', label: 'Content & Social', weight: 5, job: 'getfound', qids: ['D18', 'D19', 'D20'] },
+    { key: 'measure', label: 'Measure', weight: 10, job: 'measure', qids: ['C_LTV', 'C_LEADSKNOWN', 'C_BOOKEDKNOWN', 'C_SHOWEDKNOWN', 'C_CLOSEDKNOWN', 'C_HEARD', 'C_REASONSNO', 'C_TRAFFIC', 'C_OPTIN'] },
+    // Get Found — Active (20 pts) and Passive (20 pts). Sub-weights below are an
+    // even placeholder split pending the finalised breakdown for Part D.
+    { key: 'content', label: 'Creating Content', weight: 7, job: 'getfound', qids: ['D18', 'D19', 'D20'] },
+    { key: 'paidads', label: 'Paid Ads', weight: 7, job: 'getfound', qids: ['D_ADS'] },
+    { key: 'outreach', label: 'Outreach', weight: 6, job: 'getfound', qids: ['D2', 'D3', 'D4'] },
+    { key: 'referrals', label: 'Referrals', weight: 5, job: 'getfound', qids: ['D5', 'D6'] },
+    { key: 'reviews', label: 'Social Proof / Reviews', weight: 5, job: 'getfound', qids: ['D7', 'D8', 'D9', 'D10', 'D11'] },
+    { key: 'website', label: 'Website', weight: 5, job: 'getfound', qids: ['D12', 'D13', 'D14', 'D15'] },
+    { key: 'directories', label: 'Directory Listings', weight: 5, job: 'getfound', qids: ['D16', 'D17'] },
     { key: 'capture', label: 'Capture Interest', weight: 15, job: 'capture', qids: ['E1', 'E2', 'E3', 'E4'] },
     { key: 'speed', label: 'Speed to Reply', weight: 10, job: 'sell', qids: ['F1', 'F2'] },
     { key: 'followup', label: 'Follow-up', weight: 10, job: 'sell', qids: ['F3', 'F4', 'F5'] },
@@ -174,17 +190,17 @@
     measure: { label: 'Measure', max: 10 },
   };
   // Active vs passive split, for the client-facing "Get Found" page.
-  const GETFOUND_ACTIVE = ['outreach', 'referrals'];
-  const GETFOUND_PASSIVE = ['reviews', 'website', 'directories', 'content'];
+  const GETFOUND_ACTIVE = ['content', 'paidads', 'outreach'];
+  const GETFOUND_PASSIVE = ['referrals', 'reviews', 'website', 'directories'];
 
   function fresh() {
     return {
       businessName: '', contactName: '', createdAt: todayStr(),
       answers: {
         practitionerType: '', nurseFlag: false, businessAge: '', teamSize: '', servesArea: '', runningAds: '',
-        idealClient: '', mainOffer: '', avgClientValue: '', activeClients: '', targetNewClients: '',
+        idealClient: '', mainOffer: '', avgClientValue: '', activeClients: '', targetNewClients: '', targetDate: '',
         funnel: { leads: '', booked: '', showed: '', closed: '' },
-        outreachListSize: '', ranEvents: '',
+        outreachReachCount: '', ranEvents: '',
         biggestGap: '',
         ads: { landing: '', qualifies: '', creatives: '', knowsCost: '', platforms: '', cadence: '' },
         q: {}, // scored question answers, keyed by question id
@@ -194,14 +210,15 @@
 
   // ── Scoring ────────────────────────────────────────────────────────────────
   function sectionScore(a, sec) {
-    let earned = 0, applicableRaw = 0;
+    let earned = 0, applicableRaw = 0, maxRaw = 0;
     sec.qids.forEach(qid => {
+      const qmax = Q[qid].max || 2;
+      maxRaw += qmax;
       const v = a.answers.q[qid];
       if (v === undefined || v === null || v === '' || v === 'na') return;
-      applicableRaw += 2;
+      applicableRaw += qmax;
       earned += Number(v);
     });
-    const maxRaw = sec.qids.length * 2;
     if (applicableRaw === 0) return { earned: 0, applicableRaw: 0, maxRaw, weighted: null, pct: null, chip: 'tooearly' };
     const pct = earned / applicableRaw * 100;
     const weighted = Math.round(pct / 100 * sec.weight);
@@ -238,6 +255,7 @@
   function serviceFor(sectionKey) {
     if (sectionKey === 'measure' || sectionKey === 'website' || sectionKey === 'directories' || sectionKey === 'reviews' || sectionKey === 'capture') return 'Setup';
     if (sectionKey === 'content') return 'Content';
+    if (sectionKey === 'paidads') return 'Ads Management';
     if (['speed', 'followup', 'show', 'sales'].includes(sectionKey)) return 'Brand OS';
     return 'Setup';
   }
@@ -266,7 +284,7 @@
   }
   function computeRecommendation(a, scores) {
     const funnel = funnelPcts(a.answers.funnel);
-    const cantMeasure = a.answers.q.C1 === 0 || a.answers.q.C1 === '0' || !funnel.hasData;
+    const cantMeasure = !funnel.hasData;
     const group = groupFor(a.answers.practitionerType, a.answers.nurseFlag);
     const compliance = CONFIG_GROUPS[group]?.compliance || '';
     let priorityLabel, priorityBlurb, actions = [], mode = '';
@@ -414,8 +432,8 @@
 
     const host = $('formHost'); host.innerHTML = '';
 
-    // Part A — setup
-    host.appendChild(partCard('Part A · Setup', '', `
+    // Part A — Context
+    host.appendChild(partCard('Part A · Context', '', `
       <div class="q-block">
         <div class="q-text">What kind of practitioner are you?</div>
         <select id="dg-f-practType" class="q-context">
@@ -449,48 +467,65 @@
       </div>
     `));
 
-    // Part B — offer & value
-    host.appendChild(partCard('Part B · Offer & Value', 'context — feeds the money math', `
+    // Part B — WIG
+    const ltvVal = Number(a.answers.avgClientValue) || 0;
+    host.appendChild(partCard('Part B · WIG', 'the wildly important goal — feeds the money math', `
       <div class="q-block"><div class="q-text">Describe your ideal client, in your own words.</div>
         <textarea id="dg-f-idealClient" placeholder="A specific person and problem, not everyone with a body.">${esc(a.answers.idealClient)}</textarea></div>
       <div class="q-block"><div class="q-text">What is your main offer, and what does it cost?</div>
         <textarea id="dg-f-mainOffer">${esc(a.answers.mainOffer)}</textarea></div>
       <div class="row">
-        <div class="q-block"><div class="q-text">Average client value, all in ($)</div>
+        <div class="q-block"><div class="q-text">Client LTV ($)</div>
           <input id="dg-f-avgClientValue" type="number" min="0" class="q-context" value="${esc(a.answers.avgClientValue)}" placeholder="Package price, or session price × typical sessions"></div>
-        <div class="q-block"><div class="q-text">Active clients now</div>
+        <div class="q-block"><div class="q-text">Gross LTV</div>
+          <div class="q-context" id="dg-gltvDisplay" style="background:var(--dg-lightgrey); border-radius:3px; padding:8px 10px;">$${Math.round(ltvVal * 0.7).toLocaleString()}</div>
+          <div class="q-sub">Calculated — 70% of client LTV.</div></div>
+      </div>
+      <div class="row">
+        <div class="q-block"><div class="q-text">Current number of active clients</div>
           <input id="dg-f-activeClients" type="number" min="0" class="q-context" value="${esc(a.answers.activeClients)}"></div>
-        <div class="q-block"><div class="q-text">Target new clients / month</div>
+        <div class="q-block"><div class="q-text">Target number of clients</div>
           <input id="dg-f-targetNewClients" type="number" min="0" class="q-context" value="${esc(a.answers.targetNewClients)}"></div>
+        <div class="q-block"><div class="q-text">By what date</div>
+          <input id="dg-f-targetDate" type="date" class="q-context" value="${esc(a.answers.targetDate)}"></div>
       </div>
     `));
 
-    // Part C — Measure
-    host.appendChild(partCard('Part C · Measure', '10 points', `
-      ${qBlock('C1')}
-      <div class="funnel-inputs">
-        <div><label>Leads (last month)</label><input type="number" min="0" id="dg-f-fLeads" value="${esc(a.answers.funnel.leads)}"></div>
-        <div><label>Booked</label><input type="number" min="0" id="dg-f-fBooked" value="${esc(a.answers.funnel.booked)}"></div>
-        <div><label>Showed</label><input type="number" min="0" id="dg-f-fShowed" value="${esc(a.answers.funnel.showed)}"></div>
-        <div><label>Became clients</label><input type="number" min="0" id="dg-f-fClosed" value="${esc(a.answers.funnel.closed)}"></div>
-      </div>
-      ${qBlock('C2')}${qBlock('C3')}${qBlock('C4')}
+    // Part C — Measurement
+    host.appendChild(partCard('Part C · Measurement', '10 points', `
+      ${qBlock('C_LTV')}
+      ${funnelKnownBlock('How many leads did you get last month?', 'fLeads', 'funnel.leads', a.answers.funnel.leads, 'C_LEADSKNOWN')}
+      ${funnelKnownBlock('How many booked to speak to you?', 'fBooked', 'funnel.booked', a.answers.funnel.booked, 'C_BOOKEDKNOWN')}
+      ${funnelKnownBlock('How many showed?', 'fShowed', 'funnel.showed', a.answers.funnel.showed, 'C_SHOWEDKNOWN')}
+      ${funnelKnownBlock('How many did you close?', 'fClosed', 'funnel.closed', a.answers.funnel.closed, 'C_CLOSEDKNOWN')}
+      ${qBlock('C_HEARD')}${qBlock('C_REASONSNO')}${qBlock('C_TRAFFIC')}${qBlock('C_OPTIN')}
     `));
 
-    // Part D — Get found
-    host.appendChild(partCard('Part D · Get Found', '40 points', `
-      <h4 style="margin:6px 0 4px;">Outreach & Reactivation <span class="muted" style="font-size:12px;">(10 pts)</span></h4>
-      ${qBlock('D2')}${qBlock('D3')}${qBlock('D4')}
-      <h4 style="margin:16px 0 4px;">Referrals <span class="muted" style="font-size:12px;">(4 pts)</span></h4>
-      ${qBlock('D5')}${qBlock('D6')}
-      <h4 style="margin:16px 0 4px;">Reviews & Google <span class="muted" style="font-size:12px;">(9 pts)</span></h4>
-      ${qBlock('D7')}${qBlock('D8')}${qBlock('D9')}${qBlock('D10')}${qBlock('D11')}
-      <h4 style="margin:16px 0 4px;">Website <span class="muted" style="font-size:12px;">(8 pts)</span></h4>
-      ${qBlock('D12')}${qBlock('D13')}${qBlock('D14')}${qBlock('D15')}
-      <h4 style="margin:16px 0 4px;">Directories <span class="muted" style="font-size:12px;">(4 pts)</span></h4>
-      ${qBlock('D16')}${qBlock('D17')}
-      <h4 style="margin:16px 0 4px;">Content & Social <span class="muted" style="font-size:12px;">(5 pts)</span></h4>
+    // Part D — Get Found (Active 20 / Passive 20)
+    host.appendChild(partCard('Part D · Get Found', '40 points — Active 20, Passive 20', `
+      <h4 style="margin:6px 0 4px;">Active <span class="muted" style="font-size:12px;">(20 pts)</span></h4>
+      <div class="q-sub" style="margin-top:-2px;">Creating content, paid ads, and outreach — things you have to actively do.</div>
+      <h4 style="margin:14px 0 4px; font-size:13px;">Creating Content</h4>
       ${qBlock('D18')}${qBlock('D19')}${qBlock('D20')}
+      <h4 style="margin:14px 0 4px; font-size:13px;">Paid Ads</h4>
+      ${qBlock('D_ADS')}
+      <h4 style="margin:14px 0 4px; font-size:13px;">Outreach</h4>
+      <div class="q-block">
+        <div class="q-text">How many people could you reach out to right now to offer a free session?</div>
+        <input type="number" min="0" id="dg-f-outreachReachCount" class="q-inline-num" value="${esc(a.answers.outreachReachCount)}">
+      </div>
+      ${qBlock('D2')}${qBlock('D3')}${qBlock('D4')}
+
+      <h4 style="margin:20px 0 4px;">Passive <span class="muted" style="font-size:12px;">(20 pts)</span></h4>
+      <div class="q-sub" style="margin-top:-2px;">Referrals, social proof, website and directory listings — set up once, work in the background.</div>
+      <h4 style="margin:14px 0 4px; font-size:13px;">Referrals</h4>
+      ${qBlock('D5')}${qBlock('D6')}
+      <h4 style="margin:14px 0 4px; font-size:13px;">Social Proof / Reviews</h4>
+      ${qBlock('D7')}${qBlock('D8')}${qBlock('D9')}${qBlock('D10')}${qBlock('D11')}
+      <h4 style="margin:14px 0 4px; font-size:13px;">Your Website</h4>
+      ${qBlock('D12')}${qBlock('D13')}${qBlock('D14')}${qBlock('D15')}
+      <h4 style="margin:14px 0 4px; font-size:13px;">Directory Listings</h4>
+      ${qBlock('D16')}${qBlock('D17')}
     `));
 
     // Part E — Capture
@@ -526,24 +561,29 @@
         <textarea id="dg-f-biggestGap">${esc(a.answers.biggestGap)}</textarea></div>
     `));
 
-    // Wire up events
-    $('f-practType').onchange = e => { setField('practitionerType', e.target.value); document.getElementById('dg-nurseFlagBlock').style.display = e.target.value === 'beauty' ? '' : 'none'; };
-    const nurseEl = document.getElementById('dg-f-nurseFlag'); if (nurseEl) nurseEl.onchange = e => setField('nurseFlag', e.target.checked);
-    $('f-businessAge').onchange = e => setField('businessAge', e.target.value);
-    $('f-teamSize').onchange = e => setField('teamSize', e.target.value);
+    // Wire up events. `on()` is defensive on purpose: a single missing/
+    // mismatched id must never throw and silently kill every wiring line
+    // after it (that exact bug once broke every scored question on the form).
+    const on = (id, handler) => { const el = $(id); if (el) el.onchange = handler; else console.warn('[Diagnostic] missing form field: dg-' + id); };
+    on('f-practType', e => { setField('practitionerType', e.target.value); const b = document.getElementById('dg-nurseFlagBlock'); if (b) b.style.display = e.target.value === 'beauty' ? '' : 'none'; });
+    on('f-nurseFlag', e => setField('nurseFlag', e.target.checked));
+    on('f-businessAge', e => setField('businessAge', e.target.value));
+    on('f-teamSize', e => setField('teamSize', e.target.value));
     document.querySelectorAll('input[name="dg-runningAds"]').forEach(el => el.onchange = e => { setField('runningAds', e.target.value); renderForm(); });
-    $('f-idealClient').onchange = e => setField('idealClient', e.target.value);
-    $('f-mainOffer').onchange = e => setField('mainOffer', e.target.value);
-    $('f-avgClientValue').onchange = e => setField('avgClientValue', e.target.value);
-    $('f-activeClients').onchange = e => setField('activeClients', e.target.value);
-    $('f-targetNewClients').onchange = e => setField('targetNewClients', e.target.value);
-    $('f-fLeads').onchange = e => setField('funnel.leads', e.target.value);
-    $('f-fBooked').onchange = e => setField('funnel.booked', e.target.value);
-    $('f-fShowed').onchange = e => setField('funnel.showed', e.target.value);
-    $('f-fClosed').onchange = e => setField('funnel.closed', e.target.value);
-    $('f-biggestGap').onchange = e => setField('biggestGap', e.target.value);
+    on('f-idealClient', e => setField('idealClient', e.target.value));
+    on('f-mainOffer', e => setField('mainOffer', e.target.value));
+    on('f-avgClientValue', e => { setField('avgClientValue', e.target.value); const g = document.getElementById('dg-gltvDisplay'); if (g) g.textContent = '$' + Math.round((Number(e.target.value) || 0) * 0.7).toLocaleString(); });
+    on('f-activeClients', e => setField('activeClients', e.target.value));
+    on('f-targetNewClients', e => setField('targetNewClients', e.target.value));
+    on('f-targetDate', e => setField('targetDate', e.target.value));
+    on('f-outreachReachCount', e => setField('outreachReachCount', e.target.value));
+    on('f-fLeads', e => setField('funnel.leads', e.target.value));
+    on('f-fBooked', e => setField('funnel.booked', e.target.value));
+    on('f-fShowed', e => setField('funnel.showed', e.target.value));
+    on('f-fClosed', e => setField('funnel.closed', e.target.value));
+    on('f-biggestGap', e => setField('biggestGap', e.target.value));
     const adsIds = ['adsLanding', 'adsQualifies', 'adsCreatives', 'adsKnowsCost', 'adsPlatforms', 'adsCadence'];
-    adsIds.forEach(id => { const el = $('f-' + id); if (el) el.onchange = e => setField('ads.' + id.replace('ads', '').replace(/^./, c => c.toLowerCase()), e.target.value); });
+    adsIds.forEach(id => on('f-' + id, e => setField('ads.' + id.replace('ads', '').replace(/^./, c => c.toLowerCase()), e.target.value)));
     Object.keys(Q).forEach(qid => {
       document.querySelectorAll(`input[name="dg-q-${qid}"]`).forEach(el => el.onchange = e => setQ(qid, e.target.value === 'na' ? 'na' : Number(e.target.value)));
     });
@@ -556,10 +596,27 @@
   function qBlock(qid) {
     const q = Q[qid]; const val = cur.answers.q[qid];
     return `<div class="q-block">
-      <div class="q-text">${esc(qid)}. ${esc(q.text)}</div>
+      <div class="q-text">${esc(q.text)}</div>
       ${q.sub ? `<div class="q-sub">${esc(q.sub)}</div>` : ''}
       <div class="q-options">
         ${q.options.map(o => `<label class="q-opt"><input type="radio" name="dg-q-${qid}" value="${o.v}" ${String(val) === String(o.v) ? 'checked' : ''}><span>${esc(o.l)}</span></label>`).join('')}
+      </div>
+    </div>`;
+  }
+  // Number entry (the actual funnel count) paired with a Yes/No "did they know
+  // this without having to think about it" toggle, worth 1 point.
+  function funnelKnownBlock(label, numFieldId, numPath, numVal, qid) {
+    const val = cur.answers.q[qid];
+    return `<div class="q-block">
+      <div class="q-text">${esc(label)}</div>
+      <div class="row" style="align-items:flex-end;">
+        <div style="max-width:140px;"><label>Number</label><input type="number" min="0" id="dg-f-${numFieldId}" value="${esc(numVal)}"></div>
+        <div>
+          <label>Did they know this straight away?</label>
+          <div class="q-options">
+            ${Q[qid].options.map(o => `<label class="q-opt"><input type="radio" name="dg-q-${qid}" value="${o.v}" ${String(val) === String(o.v) ? 'checked' : ''}><span>${esc(o.l)}</span></label>`).join('')}
+          </div>
+        </div>
       </div>
     </div>`;
   }
@@ -607,7 +664,7 @@
     const actionsHtml = rec.actions.map(act => `
       <div class="plan-action">
         <div class="pa-title">${esc(act.title)}</div>
-        <div class="pa-dll"><strong>Done looks like:</strong> ${esc(act.doneLooksLike)}</div>
+        <div class="pa-dll"><span style="color:var(--dg-orange)">Done looks like:</span> ${esc(act.doneLooksLike)}</div>
         <div class="pa-page">${esc(act.pageRef)}</div>
       </div>`).join('') || '<p class="muted">No specific gaps flagged — steady as she goes.</p>';
 
@@ -677,9 +734,9 @@
         <h2>How we can help</h2>
         <div class="close-options">
           <div class="close-option"><h4>Do it yourself</h4><p style="font-size:13.5px;">Everything above is in the free guide we're sending along with this report. Work through the priority action first.</p></div>
-          <div class="close-option"><h4>Here's what we'd do</h4><p style="font-size:13.5px;">Based on where you're at, our <strong>${esc(rec.service)}</strong> program is the fastest path to closing this gap.</p></div>
+          <div class="close-option"><h4>Here's what we'd do</h4><p style="font-size:13.5px;">Based on where you're at, our <span style="color:var(--dg-orange)">${esc(rec.service)}</span> program is the fastest path to closing this gap.</p></div>
         </div>
-        ${group ? `<p class="muted" style="margin-top:14px; font-size:12px;"><strong>${esc(group.label)}:</strong> ${esc(group.compliance)}</p>` : ''}
+        ${group ? `<p class="muted" style="margin-top:14px; font-size:12px;"><span style="color:var(--dg-orange)">${esc(group.label)}:</span> ${esc(group.compliance)}</p>` : ''}
       </div>
 
       <div class="report-footer"><div>Prepared by Gathr Grow · gathrspace.com.au</div><div>309 George Street, Sydney CBD</div></div>
