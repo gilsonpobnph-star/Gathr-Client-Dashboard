@@ -275,6 +275,11 @@
         outreachReachCount: '', ranEvents: '',
         biggestGap: '',
         ads: { landing: '', qualifies: '', creatives: '', knowsCost: '', platforms: '', cadence: '' },
+        // Free-text notes at the bottom of each part — the team's own
+        // observations/recommendations while running the session live,
+        // not a client-facing question. Surfaced in the report's Special
+        // Notes section.
+        partNotes: { context: '', wig: '', measure: '', getfound: '', capture: '', sell: '' },
         q: {}, // scored question answers, keyed by question id
       },
     };
@@ -468,6 +473,7 @@
     if (!cur.answers.q) cur.answers.q = {};
     if (!cur.answers.funnel) cur.answers.funnel = { leads: '', booked: '', showed: '', closed: '' };
     if (!cur.answers.ads) cur.answers.ads = { landing: '', qualifies: '', creatives: '', knowsCost: '', platforms: '', cadence: '' };
+    if (!cur.answers.partNotes) cur.answers.partNotes = { context: '', wig: '', measure: '', getfound: '', capture: '', sell: '' };
     $('dashView').classList.add('hidden'); $('reportSection').classList.add('hidden'); $('formView').classList.remove('hidden');
     renderForm();
   }
@@ -537,7 +543,7 @@
           <label class="q-opt"><input type="radio" name="dg-runningAds" value="no" ${a.answers.runningAds === 'no' ? 'checked' : ''}> No</label>
         </div>
       </div>
-    `));
+    `, 'context'));
 
     // Part B — WIG
     const ltvVal = Number(a.answers.avgClientValue) || 0;
@@ -561,7 +567,7 @@
         <div class="q-block"><div class="q-text">By what date</div>
           <input id="dg-f-targetDate" type="date" class="q-context" value="${esc(a.answers.targetDate)}"></div>
       </div>
-    `));
+    `, 'wig'));
 
     // Part C — Measurement
     host.appendChild(partCard('Part C · Measurement', '10 points', `
@@ -571,7 +577,7 @@
       ${funnelKnownBlock('How many showed?', 'fShowed', 'funnel.showed', a.answers.funnel.showed, 'C_SHOWEDKNOWN')}
       ${funnelKnownBlock('How many did you close?', 'fClosed', 'funnel.closed', a.answers.funnel.closed, 'C_CLOSEDKNOWN')}
       ${qBlock('C_HEARD')}${qBlock('C_REASONSNO')}${qBlock('C_TRAFFIC')}${qBlock('C_OPTIN')}
-    `));
+    `, 'measure'));
 
     // Part D — Get Found (Active 20 / Passive 20)
     host.appendChild(partCard('Part D · Get Found', '40 points — Active 20, Passive 20', `
@@ -598,10 +604,10 @@
       ${qBlock('D12')}${qBlock('D13')}${qBlock('D14')}${qBlock('D15')}
       <h4 style="margin:14px 0 4px; font-size:13px;">Directory Listings</h4>
       ${qBlock('D16')}${qBlock('D17')}
-    `));
+    `, 'getfound'));
 
     // Part E — Capture
-    host.appendChild(partCard('Part E · Capture Interest', '15 points', `${qBlock('E1')}${qBlock('E2')}${qBlock('E3')}${qBlock('E4')}`));
+    host.appendChild(partCard('Part E · Capture Interest', '15 points', `${qBlock('E1')}${qBlock('E2')}${qBlock('E3')}${qBlock('E4')}`, 'capture'));
 
     // Part F — Sell
     host.appendChild(partCard('Part F · Sell', '35 points', `
@@ -613,7 +619,7 @@
       ${qBlock('F6')}${qBlock('F7')}
       <h4 style="margin:16px 0 4px;">Sales Conversation <span class="muted" style="font-size:12px;">(8 pts)</span></h4>
       ${qBlock('F8')}${qBlock('F9')}${qBlock('F10')}
-    `));
+    `, 'sell'));
 
     // Part G — Ads (conditional)
     if (a.answers.runningAds === 'yes') {
@@ -654,16 +660,30 @@
     on('f-fShowed', e => setField('funnel.showed', e.target.value));
     on('f-fClosed', e => setField('funnel.closed', e.target.value));
     on('f-biggestGap', e => setField('biggestGap', e.target.value));
+    ['context', 'wig', 'measure', 'getfound', 'capture', 'sell'].forEach(key => {
+      on('f-notes-' + key, e => setField('partNotes.' + key, e.target.value));
+    });
     const adsIds = ['adsLanding', 'adsQualifies', 'adsCreatives', 'adsKnowsCost', 'adsPlatforms', 'adsCadence'];
     adsIds.forEach(id => on('f-' + id, e => setField('ads.' + id.replace('ads', '').replace(/^./, c => c.toLowerCase()), e.target.value)));
     Object.keys(Q).forEach(qid => {
       document.querySelectorAll(`input[name="dg-q-${qid}"]`).forEach(el => el.onchange = e => setQ(qid, e.target.value === 'na' ? 'na' : Number(e.target.value)));
     });
   }
-  function partCard(title, pts, bodyHtml) {
+  function partCard(title, pts, bodyHtml, notesKey) {
     const div = document.createElement('div'); div.className = 'part-card';
-    div.innerHTML = `<div class="part-head"><h3>${esc(title)}</h3><span class="part-pts">${esc(pts)}</span></div><div class="part-body">${bodyHtml}</div>`;
+    div.innerHTML = `<div class="part-head"><h3>${esc(title)}</h3><span class="part-pts">${esc(pts)}</span></div>
+      <div class="part-body">${bodyHtml}${notesKey ? notesBlock(notesKey) : ''}</div>`;
     return div;
+  }
+  // A free-text notes field at the bottom of a part — the team's own
+  // observations or recommendations while running the session live, not
+  // a client-facing question. Feeds the report's Special Notes section.
+  function notesBlock(key) {
+    return `<div class="q-block dg-notes-block">
+      <div class="q-text">Notes &amp; recommendations</div>
+      <div class="q-sub">Your own observations for this part — shown in the report's Special Notes section.</div>
+      <textarea id="dg-f-notes-${key}" placeholder="e.g. Client mentioned wanting to raise prices next quarter...">${esc(cur.answers.partNotes[key] || '')}</textarea>
+    </div>`;
   }
   function qBlock(qid) {
     const q = Q[qid]; const val = cur.answers.q[qid];
@@ -927,6 +947,21 @@
       </ul>` : `
       <p style="font-size:14.5px; color:#57524c;">You're already doing the fundamentals well across every channel — nothing urgent to fix this month. Keep it up.</p>`}
     </div>`);
+
+    // Special notes — the client's own answer on their biggest gap, plus
+    // whatever the team jotted down at the bottom of each part while
+    // running the session live. Only shows parts that actually have
+    // something written; disappears entirely if none do.
+    const notesLabels = { context: 'Context', wig: 'WIG', measure: 'Measurement', getfound: 'Get Found', capture: 'Capture Interest', sell: 'Sell' };
+    const partNoteItems = Object.entries(a.answers.partNotes || {}).filter(([, v]) => (v || '').trim());
+    if (a.answers.biggestGap?.trim() || partNoteItems.length) {
+      sections.push(`<div class="doc-section">
+        <div class="eyebrow-sm">SPECIAL NOTES</div>
+        <h2 class="doc-h2">Notes &amp; recommendations</h2>
+        ${a.answers.biggestGap?.trim() ? `<div class="note-item"><h4>Biggest gap, in their own words</h4><p>${esc(a.answers.biggestGap)}</p></div>` : ''}
+        ${partNoteItems.map(([key, v]) => `<div class="note-item"><h4>${esc(notesLabels[key] || key)}</h4><p>${esc(v)}</p></div>`).join('')}
+      </div>`);
+    }
 
     // Ways to work with us
     sections.push(`<div class="doc-section">

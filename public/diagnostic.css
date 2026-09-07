@@ -172,6 +172,10 @@
 #tab-diagnostic .doc-banner .slide-sub{ color:var(--dg-dust); margin-bottom:0; }
 #tab-diagnostic .doc-banner.job-banner{ padding:22px 30px; margin:44px 0 26px; }
 #tab-diagnostic .doc-footer{ margin-top:56px; padding-top:16px; border-top:1px solid var(--dg-lightgrey); font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--dg-dust); text-align:center; }
+#tab-diagnostic .note-item{ background:var(--dg-cream); border-radius:8px; padding:16px 20px; margin-top:14px; }
+#tab-diagnostic .note-item:first-of-type{ margin-top:20px; }
+#tab-diagnostic .note-item h4{ font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:var(--dg-orange); font-weight:700; margin-bottom:6px; }
+#tab-diagnostic .note-item p{ font-size:14px; color:#3a3632; white-space:pre-wrap; margin:0; }
 
 #tab-diagnostic .card-grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-top:24px;}
 #tab-diagnostic .num-card{background:var(--dg-lightgrey); border-radius:6px; padding:26px 22px;}
@@ -286,7 +290,8 @@
   #tab-diagnostic .job-page{grid-template-columns:1fr 1fr;}
   #tab-diagnostic .doc-wrap{ box-shadow:none; border-radius:0; padding:0; max-width:none; }
   #tab-diagnostic .ch-card, #tab-diagnostic .doc-group,
-  #tab-diagnostic .num-card, #tab-diagnostic .twocol-card, #tab-diagnostic .price-card, #tab-diagnostic .doc-banner{
+  #tab-diagnostic .num-card, #tab-diagnostic .twocol-card, #tab-diagnostic .price-card, #tab-diagnostic .doc-banner,
+  #tab-diagnostic .note-item{
     page-break-inside:avoid; break-inside:avoid;
   }
   @page{ size:8.5in 11in; margin:0.75in; }
