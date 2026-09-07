@@ -714,22 +714,13 @@
 
   // ── Printable strategy report — a flowing document ────────────────────────
   // Same content and copy as the "Your Marketing Strategy" reference deck,
-  // but read top to bottom as one document rather than slide by slide: dark
-  // banners mark each job, and each channel write-up carries a Strong/Needs
-  // work/Missing self-assessment row filled in from the score this
-  // assessment already computed.
-  function chipRow(chip) {
-    const states = [
-      { key: 'strong', label: 'Strong', color: 'var(--dg-good)' },
-      { key: 'needswork', label: 'Needs work', color: 'var(--dg-warn)' },
-      { key: 'missing', label: 'Missing', color: 'var(--dg-bad)' },
-    ];
-    return `<div class="where-row"><span class="where-label">Where you are:</span>` +
-      states.map(s => {
-        const filled = chip === s.key;
-        return `<span class="chip-choice" style="border-color:${s.color}; color:${filled ? '#fff' : s.color}; background:${filled ? s.color : 'transparent'};">${s.label}</span>`;
-      }).join('') + `</div>`;
-  }
+  // but read top to bottom as one document. Each channel is a single
+  // self-contained card: a title, one status badge (Strong / Needs work /
+  // Missing), what good looks like, a free 30-day quick win, and what we
+  // can help with — no separate education pass and playbook pass, no
+  // notes area. Cards sit inside a light, colour-coded band per
+  // job/category so Active vs Passive (and Get Found vs Capture vs Sell)
+  // read clearly at a glance.
   function docBanner(eyebrow, title, sub, jobBanner) {
     return `<div class="doc-banner${jobBanner ? ' job-banner' : ''}">
       ${eyebrow ? `<div class="eyebrow-sm">${esc(eyebrow)}</div>` : ''}
@@ -737,76 +728,32 @@
       ${sub ? `<div class="slide-sub">${esc(sub)}</div>` : ''}
     </div>`;
   }
-  function channelBlock(title, sectionKey, bullets, scores) {
-    const chip = sectionKey ? scores.sections[sectionKey].chip : null;
-    return `<div class="doc-channel">
-      <h3>${esc(title)}</h3>
-      ${chipRow(chip === 'tooearly' ? null : chip)}
-      <div class="channel-cols">
-        <div><div class="wgl-title">What good looks like</div><ul class="wgl-list">${bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>
-        <div><div class="notes-title">Notes</div><div class="notes-box"></div></div>
+  // One card per channel. sectionKey drives the status badge and (via
+  // CHANNEL_META) the quick win / help blocks; channels with no score
+  // yet (or that score Strong) skip the quick-win/help blocks and show
+  // just the badge and what-good-looks-like reference.
+  function channelCard(title, sectionKey, bullets, scores) {
+    const s = sectionKey ? scores.sections[sectionKey] : null;
+    const chip = s ? s.chip : null;
+    const badgeCls = chip === 'strong' ? 'strong' : chip === 'needswork' ? 'needswork' : chip ? 'missing' : null;
+    const showGap = badgeCls && badgeCls !== 'strong';
+    const meta = sectionKey ? CHANNEL_META[sectionKey] : null;
+    return `<div class="ch-card">
+      <div class="ch-card-head">
+        <h3>${esc(title)}</h3>
+        ${badgeCls ? `<span class="ch-badge ${badgeCls}">${esc(chipLabel(chip))}</span>` : ''}
       </div>
+      <div class="ch-block"><h4>What good looks like</h4><ul>${bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>
+      ${showGap && meta ? `
+      <div class="ch-block"><h4>Quick win &mdash; free, next 30 days</h4><p>${esc(meta.quickWin)}</p></div>
+      <div class="ch-block ch-help"><h4>What we can help with</h4><p>${esc(meta.serviceBlurb)} <span style="color:var(--dg-orange)">(${esc(meta.service)})</span></p></div>` : ''}
     </div>`;
   }
-  // The combined quick-wins + 30-day playbook: every scored channel bucketed
-  // by Strong / Needs work / Missing, Get Found sub-grouped Active then
-  // Passive, and one detailed write-up per gap channel covering why it's
-  // not working, best practices, a free quick win, and where we can help.
-  function playbookDetailItem(title, key, scores) {
-    const s = scores.sections[key]; const meta = CHANNEL_META[key];
-    return `<div class="doc-playbook-item">
-      <h4>${esc(title)}${s.pct != null ? `<span class="pb-pct">${Math.round(s.pct)}% on this channel</span>` : ''}</h4>
-      <div class="pb-detail-grid">
-        <div class="pb-block"><h4>Why it's not working</h4><p>${esc(meta.why)}</p></div>
-        <div class="pb-block"><h4>Best practices</h4><ul>${(CHANNEL_BULLETS[key] || []).map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>
-        <div class="pb-block"><h4>Quick win &mdash; free</h4><p>${esc(meta.quickWin)}</p></div>
-        <div class="pb-block pb-help"><h4>What we can help with</h4><p>${esc(meta.serviceBlurb)} <span style="color:var(--dg-orange)">(${esc(meta.service)})</span></p></div>
-      </div>
+  function docGroup(cls, title, cardsHtml) {
+    return `<div class="doc-group ${cls}">
+      ${title ? `<div class="doc-group-title">${esc(title)}</div>` : ''}
+      ${cardsHtml}
     </div>`;
-  }
-  function buildPlaybookSection(scores) {
-    const order = ['content', 'paidads', 'outreach', 'referrals', 'reviews', 'website', 'directories', 'capture', 'speed', 'followup', 'show', 'sales'];
-    const buckets = { strong: [], needswork: [], missing: [] };
-    order.forEach(key => {
-      const sec = SECTIONS.find(x => x.key === key); const s = scores.sections[key];
-      const bucket = s.chip === 'strong' ? 'strong' : s.chip === 'needswork' ? 'needswork' : 'missing'; // 'missing' and 'tooearly' both land here — unassessed reads as a gap
-      buckets[bucket].push({ key, label: sec.label, job: sec.job, pct: s.pct });
-    });
-
-    const overview = `
-      <div class="slide-italic" style="margin-top:0;">Quick wins you can do for free, and where we can help — based on your actual answers.</div>
-      <div class="playbook-overview">
-        ${['strong', 'needswork', 'missing'].map(b => {
-          const titleMap = { strong: "What's working", needswork: 'Needs work', missing: 'Missing' };
-          const list = buckets[b];
-          return `<div class="pb-col pb-${b}">
-            <h3>${titleMap[b]}</h3>
-            <div class="pb-count">${list.length}</div>
-            ${list.length ? `<ul>${list.map(c => `<li>${esc(c.label)}</li>`).join('')}</ul>` : '<div class="pb-empty">None yet</div>'}
-          </div>`;
-        }).join('')}
-      </div>`;
-
-    const detailGroups = [];
-    ['needswork', 'missing'].forEach(bucketKey => {
-      const statusLabel = bucketKey === 'needswork' ? 'Needs work' : 'Missing';
-      const list = buckets[bucketKey];
-      if (!list.length) return;
-      let body = '';
-      ['active', 'passive'].forEach(g => {
-        const items = list.filter(c => c.job === 'getfound' && CHANNEL_META[c.key]?.group === g);
-        if (!items.length) return;
-        body += `<div class="doc-subgroup-label">Get Found &middot; ${g === 'active' ? 'Active' : 'Passive'}</div>`;
-        body += items.map(c => playbookDetailItem(c.label, c.key, scores)).join('');
-      });
-      const capture = list.filter(c => c.job === 'capture');
-      if (capture.length) { body += `<div class="doc-subgroup-label">Capture Interest</div>` + capture.map(c => playbookDetailItem(c.label, c.key, scores)).join(''); }
-      const sell = list.filter(c => c.job === 'sell');
-      if (sell.length) { body += `<div class="doc-subgroup-label">Sell</div>` + sell.map(c => playbookDetailItem(c.label, c.key, scores)).join(''); }
-      detailGroups.push(`<div class="doc-h3-status ${bucketKey}">${statusLabel}</div>${body}`);
-    });
-
-    return overview + detailGroups.join('');
   }
   function showReport() {
     const a = cur; const scores = computeScores(a); const rec = computeRecommendation(a, scores);
@@ -899,44 +846,43 @@
     sections.push(`<div class="doc-section" style="margin-top:0;">
       <div class="eyebrow-sm">JOB 1 &middot; GET FOUND</div>
       <h2 class="doc-h2">Two ways to get found. You need both.</h2>
-      <div class="twocol-grid">
-        <div class="twocol-card active"><h3>Active</h3><p>You put in time or money, and more people find you.</p>
-          <ul><li>Creating content</li><li>Paid ads</li><li>Outreach</li><li>Events and workshops</li></ul></div>
-        <div class="twocol-card passive"><h3>Passive</h3><p>You set it up once, and it works in the background.</p>
-          <ul><li>Referrals from clients and other businesses</li><li>Reviews and Google</li><li>Your website (search and AI)</li><li>Directory listings</li><li>Word of mouth</li></ul></div>
-      </div>
-      <div class="doc-subgroup-label" style="margin-top:30px;">Active</div>
-      ${channelBlock('Creating content', 'content', CHANNEL_BULLETS.content, scores)}
-      ${channelBlock('Paid ads', 'paidads', CHANNEL_BULLETS.paidads, scores)}
-      ${channelBlock('Outreach', 'outreach', CHANNEL_BULLETS.outreach, scores)}
-      ${channelBlock('Events and workshops', null, [
-        'Give a real experience, not a sales pitch.', 'Promote by email first, then social.',
-        'Let people bring a friend.', 'Use one booking link so you can track it.', 'Follow up with everyone who comes.',
-      ], scores)}
-      <div class="doc-subgroup-label" style="margin-top:10px;">Passive</div>
-      ${channelBlock('Referrals', 'referrals', CHANNEL_BULLETS.referrals, scores)}
-      ${channelBlock('Reviews and Google', 'reviews', CHANNEL_BULLETS.reviews, scores)}
-      ${channelBlock('Your website (search and AI)', 'website', CHANNEL_BULLETS.website, scores)}
-      ${channelBlock('Directory listings', 'directories', CHANNEL_BULLETS.directories, scores)}
-      ${channelBlock('Word of mouth', null, [
-        'The best marketing is a great experience.', 'Give people a simple story to pass on.',
-        'Make it easy to share you.', 'You cannot force it, but you can earn it.',
-      ], scores)}
+      <p style="font-size:14.5px; color:#57524c; max-width:640px;">Active: you put in time or money, and more people find you. Passive: you set it up once, and it works in the background. You need both.</p>
+      ${docGroup('active', 'Active', [
+        channelCard('Creating content', 'content', CHANNEL_BULLETS.content, scores),
+        channelCard('Paid ads', 'paidads', CHANNEL_BULLETS.paidads, scores),
+        channelCard('Outreach', 'outreach', CHANNEL_BULLETS.outreach, scores),
+        channelCard('Events and workshops', null, [
+          'Give a real experience, not a sales pitch.', 'Promote by email first, then social.',
+          'Let people bring a friend.', 'Use one booking link so you can track it.', 'Follow up with everyone who comes.',
+        ], scores),
+      ].join(''))}
+      ${docGroup('passive', 'Passive', [
+        channelCard('Referrals', 'referrals', CHANNEL_BULLETS.referrals, scores),
+        channelCard('Reviews and Google', 'reviews', CHANNEL_BULLETS.reviews, scores),
+        channelCard('Your website (search and AI)', 'website', CHANNEL_BULLETS.website, scores),
+        channelCard('Directory listings', 'directories', CHANNEL_BULLETS.directories, scores),
+        channelCard('Word of mouth', null, [
+          'The best marketing is a great experience.', 'Give people a simple story to pass on.',
+          'Make it easy to share you.', 'You cannot force it, but you can earn it.',
+        ], scores),
+      ].join(''))}
     </div>`);
 
     // Job 2 — Capture interest
     sections.push(docBanner('JOB 2', 'Capture interest', null, true));
     sections.push(`<div class="doc-section" style="margin-top:0;">
-      ${channelBlock('Turning interest into leads', 'capture', CHANNEL_BULLETS.capture, scores)}
+      ${docGroup('capture', null, channelCard('Turning interest into leads', 'capture', CHANNEL_BULLETS.capture, scores))}
     </div>`);
 
     // Job 3 — Sell
     sections.push(docBanner('JOB 3', 'Sell', null, true));
     sections.push(`<div class="doc-section" style="margin-top:0;">
-      ${channelBlock('Speed to reply', 'speed', CHANNEL_BULLETS.speed, scores)}
-      ${channelBlock('Follow-up', 'followup', CHANNEL_BULLETS.followup, scores)}
-      ${channelBlock('Show rate', 'show', CHANNEL_BULLETS.show, scores)}
-      ${channelBlock('The sales call', 'sales', CHANNEL_BULLETS.sales, scores)}
+      ${docGroup('sell', null, [
+        channelCard('Speed to reply', 'speed', CHANNEL_BULLETS.speed, scores),
+        channelCard('Follow-up', 'followup', CHANNEL_BULLETS.followup, scores),
+        channelCard('Show rate', 'show', CHANNEL_BULLETS.show, scores),
+        channelCard('The sales call', 'sales', CHANNEL_BULLETS.sales, scores),
+      ].join(''))}
     </div>`);
 
     // Putting it together
@@ -960,15 +906,6 @@
     // The good news
     sections.push(docBanner('THE GOOD NEWS', 'You do not need a dozen projects. You need one path, done in order.'));
     sections.push(`<p style="color:#57524c; font-size:15px; max-width:640px; margin-top:-30px;">Almost everything you just saw comes back to one thing: your foundations are not fully built yet. So we build them, in the right order.</p>`);
-
-    // The Playbook: combined quick-wins + 30-day plan, grouped by status
-    // (Strong / Needs work / Missing), Get Found sub-grouped Active then
-    // Passive, one detailed write-up per gap channel.
-    sections.push(`<div class="doc-section">
-      <div class="eyebrow-sm">YOUR PLAYBOOK</div>
-      <h2 class="doc-h2">Where you stand, channel by channel</h2>
-      ${buildPlaybookSection(scores)}
-    </div>`);
 
     // Your plan — first 90 days / next 90 days
     sections.push(`<div class="doc-section">
