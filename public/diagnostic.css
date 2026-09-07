@@ -273,6 +273,14 @@
   body *{ visibility:hidden !important; }
   #tab-diagnostic #dg-reportView, #tab-diagnostic #dg-reportView *{ visibility:visible !important; }
   #tab-diagnostic #dg-reportView{ position:absolute; top:0; left:0; width:100%; margin:0; border:none; }
+  /* Browsers drop background colours/images on print by default unless
+     told otherwise, which would wash out every bit of colour in the
+     report — the job-bar chart fills, the Strong/Needs work/Missing
+     badges, the orange/green/blue/purple category bands, the score
+     colour. Force them to print exactly as shown on screen. */
+  #tab-diagnostic #dg-reportView, #tab-diagnostic #dg-reportView *{
+    -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; color-adjust:exact !important;
+  }
   #tab-diagnostic .report-actions, #tab-diagnostic .toast{ visibility:hidden !important; display:none !important; }
   #tab-diagnostic .report-inner{padding:0;}
   #tab-diagnostic .job-page{grid-template-columns:1fr 1fr;}
