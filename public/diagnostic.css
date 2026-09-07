@@ -156,6 +156,12 @@
    Get Found vs Capture vs Sell) are obvious at a glance — no separate
    notes area, no duplicate write-up elsewhere in the report. */
 #tab-diagnostic .doc-wrap{ max-width:820px; margin:0 auto; background:#fff; color:var(--dg-charcoal); padding:56px 64px 72px; box-shadow:0 2px 14px rgba(0,0,0,.1); border-radius:8px; }
+/* Edit mode: the whole report becomes contenteditable so the team can fix
+   wording or add a missing detail before printing — window.print() prints
+   the live DOM, so edits made here are exactly what lands in the PDF. */
+#tab-diagnostic .doc-wrap.editing{ outline:2px dashed var(--dg-orange); outline-offset:10px; cursor:text; }
+#tab-diagnostic .doc-wrap.editing *:hover{ background:rgba(205,95,57,.07); border-radius:3px; }
+#tab-diagnostic .dg-edit-hint{ max-width:820px; margin:14px auto 0; padding:10px 16px; background:var(--dg-cream); border-radius:6px; font-size:13px; color:#5c564e; text-align:center; }
 #tab-diagnostic .doc-cover{ padding-bottom:26px; border-bottom:2px solid var(--dg-orange); margin-bottom:8px; }
 #tab-diagnostic .doc-cover-meta{ display:flex; align-items:flex-end; justify-content:space-between; gap:20px; flex-wrap:wrap; margin-top:18px; }
 #tab-diagnostic .doc-score-badge{ text-align:right; }

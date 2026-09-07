@@ -686,9 +686,11 @@
           <div id="dg-reportView">
             <div class="report-inner" id="dg-reportInner"></div>
             <div class="report-actions no-print">
+              <button class="secondary" id="dg-editToggle" onclick="Diagnostic.toggleReportEdit()">Edit details</button>
               <button class="accent" onclick="window.print()">Print / save as PDF</button>
               <button class="secondary" onclick="Diagnostic.backToForm()">Back</button>
             </div>
+            <div class="dg-edit-hint no-print hidden" id="dg-editHint">Editing on — click any text in the report to fix wording or fill in missing detail. Turn editing off (or just print) when you're done.</div>
           </div>
         </section>
 

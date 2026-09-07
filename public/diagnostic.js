@@ -779,13 +779,32 @@
   // Your plan for the first 30 days: the three biggest things to fix,
   // picked from the actual card results — heaviest-weighted gaps first
   // (ties broken by the weakest score), not a generic scripted plan.
-  function topThirtyDayActions(scores) {
+  // Which channels feed the actual funnel bottleneck computeRecommendation
+  // already identified (rec.mode) — fixing the real constraint compounds
+  // through the rest of the funnel, so those channels get first claim on
+  // the plan's 3 slots regardless of their raw section weight.
+  const IMPACT_SECTIONS_BY_MODE = {
+    measure: ['measure'],
+    book: ['capture', 'speed'],
+    show: ['followup', 'show'],
+    close: ['sales'],
+    growth: ['content'],
+  };
+  function topThirtyDayActions(scores, rec) {
     const order = ['content', 'paidads', 'outreach', 'referrals', 'reviews', 'website', 'directories', 'capture', 'speed', 'followup', 'show', 'sales'];
+    const boosted = new Set(IMPACT_SECTIONS_BY_MODE[rec?.mode] || []);
     const gaps = order.map(key => {
       const sec = SECTIONS.find(x => x.key === key); const s = scores.sections[key];
-      return { key, label: sec.label, weight: sec.weight, chip: s.chip, pct: s.pct };
+      // Points actually recoverable by fixing this channel — a low-weight
+      // channel that's completely missing can matter more than a
+      // high-weight one that's only slightly behind. Unmeasured/too-early
+      // counts as full severity: it's unproven, not given the benefit of
+      // the doubt.
+      const severity = s.pct == null ? 1 : (100 - s.pct) / 100;
+      const impact = sec.weight * severity;
+      return { key, label: sec.label, weight: sec.weight, chip: s.chip, pct: s.pct, impact, bottleneck: boosted.has(key) };
     }).filter(c => c.chip !== 'strong');
-    gaps.sort((x, y) => (y.weight - x.weight) || ((x.pct ?? -1) - (y.pct ?? -1)));
+    gaps.sort((x, y) => (y.bottleneck - x.bottleneck) || (y.impact - x.impact) || (y.weight - x.weight));
     return gaps.slice(0, 3);
   }
   function showReport() {
@@ -936,17 +955,21 @@
     </div>`);
 
     // Your plan for the first 30 days — the biggest three things to fix,
-    // picked from the actual card results above, not a generic script.
-    // Directory listings uses the practitioner-specific list (which
-    // directories actually apply to a chiro vs. a PT, say) instead of the
-    // generic quick win, same as the channel card above.
+    // weighted by actual business impact: whichever funnel stage is the
+    // real bottleneck (computeRecommendation's mode) claims priority,
+    // since fixing the true constraint compounds through the rest of the
+    // funnel; remaining slots go to whichever channels have the most
+    // points genuinely recoverable (weight x how far below good they
+    // are), not just the highest-weight section. Directory listings uses
+    // the practitioner-specific list instead of the generic quick win,
+    // same as the channel card above.
     const quickWinFor = key => (key === 'directories' && group?.directories) || CHANNEL_META[key].quickWin;
-    const top3 = topThirtyDayActions(scores);
+    const top3 = topThirtyDayActions(scores, rec);
     sections.push(`<div class="doc-section">
       <div class="eyebrow-sm">YOUR PLAN</div>
       <h2 class="doc-h2">Your plan for the first 30 days</h2>
       ${top3.length ? `
-      <p style="font-size:14.5px; color:#57524c;">Based on where you stand today, here are the three biggest things to fix first.</p>
+      <p style="font-size:14.5px; color:#57524c;">${esc(rec.priorityBlurb || 'Based on where you stand today, here are the three biggest things to fix first.')}</p>
       <ul class="plan-checklist">
         ${top3.map(c => `<li><span class="chk"></span><span style="color:var(--dg-orange);">${esc(c.label)}:</span> ${esc(quickWinFor(c.key))}</li>`).join('')}
       </ul>` : `
@@ -994,11 +1017,27 @@
 
     $('reportInner').innerHTML = `<div class="doc-wrap">${sections.join('')}</div>`;
     $('formView').classList.add('hidden'); $('reportSection').classList.remove('hidden');
+    // Every fresh render starts read-only — editing is opt-in per view, so
+    // re-generating the report never silently leaves stale edits editable.
+    const editBtn = $('editToggle'); if (editBtn) editBtn.textContent = 'Edit details';
+    const editHint = $('editHint'); if (editHint) editHint.classList.add('hidden');
     document.getElementById('tab-diagnostic')?.scrollIntoView({ behavior: 'auto', block: 'start' });
   }
   function backToForm() { $('reportSection').classList.add('hidden'); $('formView').classList.remove('hidden'); }
+  // Let the team fix wording or fill in a missing detail directly in the
+  // rendered report before printing/saving as PDF — window.print() prints
+  // the live DOM, so anything typed here is what ends up in the PDF.
+  function toggleReportEdit() {
+    const wrap = document.querySelector('#dg-reportInner .doc-wrap');
+    if (!wrap) return;
+    const turningOn = wrap.getAttribute('contenteditable') !== 'true';
+    wrap.setAttribute('contenteditable', turningOn ? 'true' : 'false');
+    wrap.classList.toggle('editing', turningOn);
+    const btn = $('editToggle'); if (btn) btn.textContent = turningOn ? 'Done editing' : 'Edit details';
+    const hint = $('editHint'); if (hint) hint.classList.toggle('hidden', !turningOn);
+  }
 
   window.Diagnostic = {
-    onOpen, showDash, newAssessment, openAssessment, deleteAssessment, showReport, backToForm,
+    onOpen, showDash, newAssessment, openAssessment, deleteAssessment, showReport, backToForm, toggleReportEdit,
   };
 })();
