@@ -139,15 +139,123 @@
 #tab-diagnostic .g-tab{padding:10px 20px; font-size:14px; background:var(--dg-warmgrey); border:none; border-radius:4px 4px 0 0; color:#57524c; cursor:pointer;}
 #tab-diagnostic .g-tab.active{background:var(--dg-charcoal); color:var(--dg-cream);}
 
+@media (max-width:700px){
+  #tab-diagnostic .job-bars{grid-template-columns:repeat(2,1fr);}
+  #tab-diagnostic .job-page,#tab-diagnostic .close-options{grid-template-columns:1fr;}
+}
+
+/* ── Slide-deck strategy report ───────────────────────────────────────────
+   Modeled on the "Your Marketing Strategy" presentation: one topic per
+   16:9 slide, dark full-bleed dividers, light content slides with an
+   eyebrow breadcrumb, a bold serif title, and (on channel slides) a
+   Strong/Needs work/Missing self-assessment row driven by the computed
+   score, "what good looks like" bullets, and a blank notes area. */
+#tab-diagnostic .deck{ display:flex; flex-direction:column; gap:24px; background:#d9d3c7; padding:24px; border-radius:6px; }
+#tab-diagnostic .slide{
+  min-height:600px; width:100%; max-width:1100px; margin:0 auto; background:#fff; color:var(--dg-charcoal);
+  padding:56px 64px 80px; box-shadow:0 2px 10px rgba(0,0,0,.12); position:relative; display:flex; flex-direction:column;
+}
+#tab-diagnostic .slide.dark{ background:var(--dg-charcoal); color:#fff; justify-content:center; }
+#tab-diagnostic .slide .eyebrow-sm{font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--dg-orange); margin-bottom:16px;}
+#tab-diagnostic .slide h1.slide-title{font-family:var(--dg-serif); font-size:38px; font-weight:700; margin-bottom:10px; line-height:1.1;}
+#tab-diagnostic .slide.dark h1.slide-title{font-size:44px;}
+#tab-diagnostic .slide-sub{font-size:16px; color:#7d766e; margin-bottom:6px;}
+#tab-diagnostic .slide.dark .slide-sub{color:var(--dg-dust);}
+#tab-diagnostic .slide-footer{position:absolute; bottom:26px; left:64px; font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--dg-dust);}
+
+#tab-diagnostic .card-grid-3{display:grid; grid-template-columns:repeat(3,1fr); gap:20px; margin-top:24px;}
+#tab-diagnostic .num-card{background:var(--dg-lightgrey); border-radius:6px; padding:26px 22px;}
+#tab-diagnostic .num-card .num{font-family:var(--dg-serif); font-size:38px; font-weight:700; color:var(--dg-orange); line-height:1;}
+#tab-diagnostic .num-card h4{font-size:17px; font-weight:700; margin:12px 0 8px;}
+#tab-diagnostic .num-card p{font-size:13.5px; color:#57524c;}
+#tab-diagnostic .slide-italic{font-style:italic; color:#7d766e; margin-top:20px; font-size:14.5px;}
+
+#tab-diagnostic .funnel-steps{display:flex; align-items:center; gap:12px; margin-top:24px;}
+#tab-diagnostic .funnel-steps .fstep{flex:1; background:var(--dg-lightgrey); border-radius:6px; padding:22px 14px; text-align:center;}
+#tab-diagnostic .funnel-steps .fstep.highlight{background:var(--dg-orange); color:#fff;}
+#tab-diagnostic .funnel-steps .fstep h4{font-size:16px; font-weight:700;}
+#tab-diagnostic .funnel-steps .fstep p{font-size:12px; color:#7d766e; margin-top:4px;}
+#tab-diagnostic .funnel-steps .fstep.highlight p{color:rgba(255,255,255,.8);}
+#tab-diagnostic .funnel-arrow{color:var(--dg-dust); font-size:20px;}
+
+#tab-diagnostic .callout-box{background:var(--dg-cream); border-radius:6px; padding:18px 22px; text-align:center; font-family:var(--dg-serif); font-size:19px; font-weight:700; margin-top:20px;}
+
+#tab-diagnostic .twocol-grid{display:grid; grid-template-columns:1fr 1fr; gap:22px; margin-top:24px;}
+#tab-diagnostic .twocol-card{background:var(--dg-lightgrey); border-radius:6px; padding:22px 24px;}
+#tab-diagnostic .twocol-card h3{font-weight:700; font-size:19px; margin-bottom:8px;}
+#tab-diagnostic .twocol-card.active h3{color:var(--dg-orange);}
+#tab-diagnostic .twocol-card.passive h3{color:var(--dg-good);}
+#tab-diagnostic .twocol-card p{font-size:13.5px; color:#57524c; margin-bottom:10px;}
+#tab-diagnostic .twocol-card ul{margin:0; padding-left:18px;}
+#tab-diagnostic .twocol-card li{margin-bottom:7px; font-size:14px;}
+
+#tab-diagnostic .where-row{display:flex; align-items:center; gap:12px; margin-bottom:24px; flex-wrap:wrap;}
+#tab-diagnostic .where-label{font-size:13px; color:#7d766e;}
+#tab-diagnostic .chip-choice{border:1.5px solid; border-radius:6px; padding:6px 15px; font-size:13px; font-weight:700; background:transparent; white-space:nowrap;}
+
+#tab-diagnostic .channel-cols{display:grid; grid-template-columns:1.6fr 1fr; gap:36px; flex:1; min-height:0;}
+#tab-diagnostic .wgl-title, #tab-diagnostic .notes-title{color:var(--dg-orange); font-weight:700; margin-bottom:12px; font-size:15px;}
+#tab-diagnostic .wgl-list{list-style:disc; padding-left:20px; margin:0;}
+#tab-diagnostic .wgl-list li{margin-bottom:11px; font-size:14.5px;}
+#tab-diagnostic .notes-box{border:1px solid var(--dg-dust); background:#faf6ee; border-radius:6px; flex:1; min-height:140px; padding:14px; font-size:13px; white-space:pre-wrap; color:#57524c;}
+
+#tab-diagnostic .plan-checklist{list-style:none; padding:0; margin:22px 0 0;}
+#tab-diagnostic .plan-checklist li{display:flex; gap:14px; align-items:flex-start; margin-bottom:16px; font-size:16px;}
+#tab-diagnostic .plan-checklist .chk{width:19px; height:19px; border:1.5px solid var(--dg-charcoal); border-radius:3px; flex-shrink:0; margin-top:3px;}
+#tab-diagnostic .plan-close-line{font-weight:700; margin-top:22px; font-size:15.5px;}
+
+#tab-diagnostic .price-grid{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:22px;}
+#tab-diagnostic .price-card{background:var(--dg-lightgrey); border-radius:6px; padding:20px 22px;}
+#tab-diagnostic .price-card.recommended{background:#fdf1ea; border:2px solid var(--dg-orange);}
+#tab-diagnostic .price-card .rec-tag{display:inline-block; background:var(--dg-orange); color:#fff; font-size:10px; letter-spacing:.06em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;}
+#tab-diagnostic .price-card h4{color:var(--dg-orange); font-weight:700; font-size:18px; margin-bottom:6px;}
+#tab-diagnostic .price-card p{font-size:13.5px; color:#57524c;}
+#tab-diagnostic .price-subhead{font-weight:700; margin-top:22px; font-size:14px;}
+
+/* Playbook: the combined quick-wins + 30-day plan, grouped by score status */
+#tab-diagnostic .slide.playbook{ aspect-ratio:unset; min-height:600px; }
+#tab-diagnostic .playbook-overview{display:grid; grid-template-columns:1fr 1fr 1fr; gap:18px; margin-top:22px; flex:1;}
+#tab-diagnostic .pb-col{border-radius:6px; padding:20px 20px; background:var(--dg-lightgrey);}
+#tab-diagnostic .pb-col.pb-strong{background:#eef4ee; border-top:4px solid var(--dg-good);}
+#tab-diagnostic .pb-col.pb-needswork{background:#fbf3e6; border-top:4px solid var(--dg-warn);}
+#tab-diagnostic .pb-col.pb-missing{background:#f8ece7; border-top:4px solid var(--dg-bad);}
+#tab-diagnostic .pb-col h3{font-size:16px; font-weight:700; margin-bottom:4px;}
+#tab-diagnostic .pb-col .pb-count{font-family:var(--dg-serif); font-size:30px; font-weight:700; margin-bottom:10px;}
+#tab-diagnostic .pb-col.pb-strong .pb-count{color:var(--dg-good);}
+#tab-diagnostic .pb-col.pb-needswork .pb-count{color:var(--dg-warn);}
+#tab-diagnostic .pb-col.pb-missing .pb-count{color:var(--dg-bad);}
+#tab-diagnostic .pb-col ul{list-style:none; padding:0; margin:0;}
+#tab-diagnostic .pb-col li{font-size:13.5px; padding:5px 0; border-bottom:1px solid rgba(0,0,0,.06);}
+#tab-diagnostic .pb-col li:last-child{border-bottom:none;}
+#tab-diagnostic .pb-col .pb-empty{font-size:13px; color:#7d766e; font-style:italic;}
+#tab-diagnostic .pb-subhead{font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#7d766e; margin:22px 0 10px; padding-top:14px; border-top:1px solid var(--dg-warmgrey);}
+#tab-diagnostic .pb-subhead:first-of-type{border-top:none; margin-top:0; padding-top:0;}
+#tab-diagnostic .pb-detail-grid{display:grid; grid-template-columns:1fr 1fr; gap:22px; margin-top:20px;}
+#tab-diagnostic .pb-block h4{font-size:13px; letter-spacing:.04em; text-transform:uppercase; color:var(--dg-orange); font-weight:700; margin-bottom:8px;}
+#tab-diagnostic .pb-block p, #tab-diagnostic .pb-block li{font-size:14px; color:#3a3632;}
+#tab-diagnostic .pb-block ul{margin:0; padding-left:18px;}
+#tab-diagnostic .pb-block li{margin-bottom:7px;}
+#tab-diagnostic .pb-block.pb-help{background:var(--dg-cream); border-radius:6px; padding:14px 16px;}
+#tab-diagnostic .pb-pct{font-size:12.5px; color:#7d766e; margin-left:10px;}
+
 @media print{
   body *{ visibility:hidden !important; }
   #tab-diagnostic #dg-reportView, #tab-diagnostic #dg-reportView *{ visibility:visible !important; }
   #tab-diagnostic #dg-reportView{ position:absolute; top:0; left:0; width:100%; margin:0; border:none; }
   #tab-diagnostic .report-actions, #tab-diagnostic .toast{ visibility:hidden !important; display:none !important; }
-  #tab-diagnostic .report-inner{padding:8mm 5mm;}
+  #tab-diagnostic .report-inner{padding:0;}
   #tab-diagnostic .job-page{grid-template-columns:1fr 1fr;}
+  #tab-diagnostic .deck{ background:none; padding:0; gap:0; }
+  #tab-diagnostic .slide{
+    aspect-ratio:unset; max-width:none; width:13.333in; min-height:7.5in; box-shadow:none;
+    page-break-after:always; break-after:page;
+  }
+  @page{ size:13.333in 7.5in; margin:0; }
 }
 @media (max-width:700px){
   #tab-diagnostic .job-bars{grid-template-columns:repeat(2,1fr);}
   #tab-diagnostic .job-page,#tab-diagnostic .close-options{grid-template-columns:1fr;}
+  #tab-diagnostic .slide{aspect-ratio:unset; padding:32px 26px;}
+  #tab-diagnostic .card-grid-3, #tab-diagnostic .twocol-grid, #tab-diagnostic .channel-cols, #tab-diagnostic .price-grid{grid-template-columns:1fr;}
+  #tab-diagnostic .funnel-steps{flex-direction:column;}
 }

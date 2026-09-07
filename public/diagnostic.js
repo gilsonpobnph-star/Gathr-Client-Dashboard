@@ -193,6 +193,78 @@
   const GETFOUND_ACTIVE = ['content', 'paidads', 'outreach'];
   const GETFOUND_PASSIVE = ['referrals', 'reviews', 'website', 'directories'];
 
+  // The playbook: for every scored channel, why a low score usually happens,
+  // the specific free thing they can do about it (the "quick win"), and the
+  // Gathr service that closes the gap for them. Feeds the combined Quick
+  // Wins + 30-Day playbook section of the report — grouped by Strong/Needs
+  // work/Missing, then Active/Passive within Get Found.
+  const CHANNEL_META = {
+    content: { group: 'active',
+      why: 'Posting inconsistently means you disappear from feeds between posts, and the algorithm stops showing you to new people.',
+      quickWin: 'Post 3 short videos this week answering real questions your clients actually ask — no editing required.',
+      service: 'Content', serviceBlurb: 'We plan, film and edit a month of content for you.' },
+    paidads: { group: 'active',
+      why: "Ads without a working website and follow-up in place just burn budget on leads nobody actions.",
+      quickWin: 'If your foundation is not ready, pause ads for now — save the budget until leads can actually convert.',
+      service: 'Ads Management', serviceBlurb: 'We build the funnel first, then run and optimise your ads.' },
+    outreach: { group: 'active',
+      why: "Past clients and your warm network do not know you are taking on new clients right now — silence reads as unavailable.",
+      quickWin: 'Message 10 past or lapsed clients today with a genuine check-in, not a pitch.',
+      service: 'Setup', serviceBlurb: 'We build your reactivation and referral-ask sequences.' },
+    referrals: { group: 'passive',
+      why: "If you never ask, happy clients assume you do not need more — referrals need a specific, well-timed ask.",
+      quickWin: 'Ask your next 3 happy clients for an introduction to someone specific, not just "tell your friends."',
+      service: 'Setup', serviceBlurb: 'We build a referral-ask system triggered at the right moment.' },
+    reviews: { group: 'passive',
+      why: 'A thin or inconsistent Google profile with few recent reviews makes you invisible against competitors who show up first.',
+      quickWin: 'Send your last 5 happy clients your Google review link today.',
+      service: 'Setup', serviceBlurb: 'We set up your profile properly and build an always-on review-ask flow.' },
+    website: { group: 'passive',
+      why: 'A slow site, a buried call-to-action, or a vague headline loses visitors before they see what you offer.',
+      quickWin: 'Add one clear button above the fold: "Book now" or "Get started."',
+      service: 'Setup', serviceBlurb: 'We build a fast, clear, mobile-first website.' },
+    directories: { group: 'passive',
+      why: 'Missing or inconsistent directory listings mean you are invisible on the exact platforms your ideal clients search.',
+      quickWin: 'List your business on the 2-3 directories that matter most for your profession today — most are free.',
+      service: 'Setup', serviceBlurb: 'We audit and set up every directory that matters for your type.' },
+    capture: { group: null,
+      why: 'Sending traffic to a generic page or a long form loses interested people before they become a lead.',
+      quickWin: 'Build one simple, focused landing page for your main offer this week — even a single page with a short form.',
+      service: 'Setup', serviceBlurb: 'We build a focused capture page and shorten your form to convert more.' },
+    speed: { group: null,
+      why: 'The first business to reply usually wins the client — every hour of delay loses leads to a faster competitor.',
+      quickWin: 'Turn on phone notifications and reply to every new lead within 5 minutes today.',
+      service: 'Brand OS', serviceBlurb: 'We set up instant auto-replies and lead alerts.' },
+    followup: { group: null,
+      why: 'Most leads do not buy on the first touch — stopping after one or two attempts leaves easy sales on the table.',
+      quickWin: 'Pick 3 leads who went quiet and follow up today, on a different channel than last time.',
+      service: 'Brand OS', serviceBlurb: 'We build a 5-to-8-touch follow-up sequence across call, text and email.' },
+    show: { group: null,
+      why: 'Bookings made too far out, with no reminders, means people simply forget or deprioritise the appointment.',
+      quickWin: 'Send a text reminder the day before every booked call this week.',
+      service: 'Brand OS', serviceBlurb: 'We set up automatic reminders and a one-tap reschedule flow.' },
+    sales: { group: null,
+      why: 'Without a clear structure or a direct ask, good conversations end in "let me think about it" instead of a decision.',
+      quickWin: 'On your next call, end with a direct ask: "Here’s what I recommend, how does that sit with you?"',
+      service: 'Brand OS', serviceBlurb: 'We script and train your team on a simple, repeatable sales conversation.' },
+  };
+  // Same "what good looks like" bullets shown on each channel's education
+  // slide, reused inside the playbook's "Best practices" block per channel.
+  const CHANNEL_BULLETS = {
+    content: ['Post short, useful videos a few times a week.', 'Answer the real questions clients ask.', 'Hold attention, do not just chase views.', 'Always point people to a next step.', 'Reuse your best pieces as proof.'],
+    paidads: ['Start once your website and follow-up work.', 'One clear offer, sent to one landing page.', 'Let the creative do the work, not the budget.', 'Judge ads on cost per booked client.', 'Give each ad time before you change it.'],
+    outreach: ['Start warm: people who already know you.', 'Lead with something useful, not a pitch.', 'Personalise every message. No mass blasts.', 'Ask past and lapsed clients to come back.', 'Keep it friendly, and stop if they ask.'],
+    referrals: ['Ask happy clients at their best moment.', 'Ask for an introduction, not just a name.', 'Build steady links with GPs and partners.', 'Make it easy, and thank them each time.', 'Follow the rules for your profession.'],
+    reviews: ['Fill in your Google profile completely.', 'Keep it active with posts and photos.', 'Ask happy clients for a fresh review often.', 'Reply to every review.', 'Keep your name, address and phone the same everywhere.'],
+    website: ['A simple, fast site with one clear next step.', 'One page for each service you offer.', 'Use the plain words people search for.', 'Add your details so AI can read them.', 'Works well on a phone.'],
+    directories: ['List on the directories for your profession.', 'Many are free with your membership.', 'Keep every listing the same.', 'Point each one back to your website.'],
+    capture: ['Send campaign traffic to one focused landing page.', 'One page, one action, no other links.', 'Offer a valuable first step, like a named assessment.', 'Not just a "free consult".', 'Keep the form short.', 'Reply the moment a lead arrives.'],
+    speed: ['Reply to every new lead within 5 minutes.', 'If you cannot call, send a text.', 'Ask a question to start a conversation.', 'The first to reply usually wins.'],
+    followup: ['Follow up 5 to 8 times, not once.', 'Use call, text, and email.', 'Space it over 2 to 3 weeks.', 'End with a clear last message.', 'Stay friendly, never pushy.'],
+    show: ['Book calls within 3 to 4 days.', 'Send reminders by text and email.', 'Ask them to reply to confirm.', 'Make it easy to rebook.'],
+    sales: ['Set the plan for the call up front.', 'Understand their problem and their goal.', 'Ask for the sale, clearly.', 'Have a smaller first step ready.', 'Keep it helpful, not pushy.'],
+  };
+
   function fresh() {
     return {
       businessName: '', contactName: '', createdAt: todayStr(),
@@ -640,108 +712,319 @@
     }).join('');
   }
 
-  // ── Printable strategy report ──────────────────────────────────────────────
+  // ── Printable strategy report — a slide deck ──────────────────────────────
+  // Modeled on the "Your Marketing Strategy" presentation: one topic per
+  // slide, dark dividers between the three jobs, and a Strong/Needs work/
+  // Missing self-assessment row on each channel slide, filled in from the
+  // score this assessment already computed.
+  function chipRow(chip) {
+    const states = [
+      { key: 'strong', label: 'Strong', color: 'var(--dg-good)' },
+      { key: 'needswork', label: 'Needs work', color: 'var(--dg-warn)' },
+      { key: 'missing', label: 'Missing', color: 'var(--dg-bad)' },
+    ];
+    return `<div class="where-row"><span class="where-label">Where you are:</span>` +
+      states.map(s => {
+        const filled = chip === s.key;
+        return `<span class="chip-choice" style="border-color:${s.color}; color:${filled ? '#fff' : s.color}; background:${filled ? s.color : 'transparent'};">${s.label}</span>`;
+      }).join('') + `</div>`;
+  }
+  function darkSlide(eyebrow, title, sub) {
+    return `<div class="slide dark">
+      ${eyebrow ? `<div class="eyebrow-sm">${esc(eyebrow)}</div>` : ''}
+      <h1 class="slide-title">${esc(title)}</h1>
+      ${sub ? `<div class="slide-sub">${esc(sub)}</div>` : ''}
+    </div>`;
+  }
+  function channelSlide(eyebrow, title, sectionKey, bullets, scores) {
+    const chip = sectionKey ? scores.sections[sectionKey].chip : null;
+    return `<div class="slide">
+      <div class="eyebrow-sm">${esc(eyebrow)}</div>
+      <h1 class="slide-title">${esc(title)}</h1>
+      ${chipRow(chip === 'tooearly' ? null : chip)}
+      <div class="channel-cols">
+        <div><div class="wgl-title">What good looks like</div><ul class="wgl-list">${bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>
+        <div><div class="notes-title">Notes</div><div class="notes-box"></div></div>
+      </div>
+      <div class="slide-footer">GATHR GROW</div>
+    </div>`;
+  }
+  // The combined quick-wins + 30-day playbook: every scored channel bucketed
+  // by Strong / Needs work / Missing, Get Found sub-grouped Active then
+  // Passive, and one detailed slide per gap channel covering why it's not
+  // working, best practices, a free quick win, and where we can help.
+  function playbookDetailSlide(statusLabel, jobLabel, title, key, scores) {
+    const s = scores.sections[key]; const meta = CHANNEL_META[key];
+    return `<div class="slide playbook">
+      <div class="eyebrow-sm">${esc(statusLabel)} &middot; ${esc(jobLabel)}</div>
+      <h1 class="slide-title">${esc(title)}${s.pct != null ? `<span class="pb-pct">${Math.round(s.pct)}% on this channel</span>` : ''}</h1>
+      <div class="pb-detail-grid">
+        <div class="pb-block"><h4>Why it's not working</h4><p>${esc(meta.why)}</p></div>
+        <div class="pb-block"><h4>Best practices</h4><ul>${(CHANNEL_BULLETS[key] || []).map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>
+        <div class="pb-block"><h4>Quick win &mdash; free</h4><p>${esc(meta.quickWin)}</p></div>
+        <div class="pb-block pb-help"><h4>What we can help with</h4><p>${esc(meta.serviceBlurb)} <span style="color:var(--dg-orange)">(${esc(meta.service)})</span></p></div>
+      </div>
+      <div class="slide-footer">GATHR GROW</div>
+    </div>`;
+  }
+  function buildPlaybookSlides(scores) {
+    const order = ['content', 'paidads', 'outreach', 'referrals', 'reviews', 'website', 'directories', 'capture', 'speed', 'followup', 'show', 'sales'];
+    const buckets = { strong: [], needswork: [], missing: [] };
+    order.forEach(key => {
+      const sec = SECTIONS.find(x => x.key === key); const s = scores.sections[key];
+      const bucket = s.chip === 'strong' ? 'strong' : s.chip === 'needswork' ? 'needswork' : 'missing'; // 'missing' and 'tooearly' both land here — unassessed reads as a gap
+      buckets[bucket].push({ key, label: sec.label, job: sec.job, pct: s.pct });
+    });
+
+    const overview = `<div class="slide playbook">
+      <div class="eyebrow-sm">YOUR PLAYBOOK</div>
+      <h1 class="slide-title">Where you stand, channel by channel</h1>
+      <div class="slide-italic" style="margin-top:0;">Quick wins you can do for free, and where we can help — based on your actual answers.</div>
+      <div class="playbook-overview">
+        ${['strong', 'needswork', 'missing'].map(b => {
+          const titleMap = { strong: "What's working", needswork: 'Needs work', missing: 'Missing' };
+          const list = buckets[b];
+          return `<div class="pb-col pb-${b}">
+            <h3>${titleMap[b]}</h3>
+            <div class="pb-count">${list.length}</div>
+            ${list.length ? `<ul>${list.map(c => `<li>${esc(c.label)}</li>`).join('')}</ul>` : '<div class="pb-empty">None yet</div>'}
+          </div>`;
+        }).join('')}
+      </div>
+      <div class="slide-footer">GATHR GROW</div>
+    </div>`;
+
+    const detailSlides = [];
+    ['needswork', 'missing'].forEach(bucketKey => {
+      const statusLabel = bucketKey === 'needswork' ? 'NEEDS WORK' : 'MISSING';
+      const list = buckets[bucketKey];
+      ['active', 'passive'].forEach(g => {
+        list.filter(c => c.job === 'getfound' && CHANNEL_META[c.key]?.group === g).forEach(c => {
+          detailSlides.push(playbookDetailSlide(statusLabel, `Get Found · ${g === 'active' ? 'Active' : 'Passive'}`, c.label, c.key, scores));
+        });
+      });
+      list.filter(c => c.job === 'capture').forEach(c => detailSlides.push(playbookDetailSlide(statusLabel, 'Capture Interest', c.label, c.key, scores)));
+      list.filter(c => c.job === 'sell').forEach(c => detailSlides.push(playbookDetailSlide(statusLabel, 'Sell', c.label, c.key, scores)));
+    });
+
+    return [overview, ...detailSlides];
+  }
   function showReport() {
     const a = cur; const scores = computeScores(a); const rec = computeRecommendation(a, scores);
     const { ltv, gltv } = ltvMath(a);
     const group = CONFIG_GROUPS[rec.group];
-    const funnel = rec.funnel;
+    const targetClients = Number(a.answers.targetNewClients) || 4;
+    const leadsNeeded = targetClients * 10;
+    const serviceCardName = { Setup: 'Software Setup', Content: 'Content', 'Brand OS': 'Brand OS', 'Ads Management': 'Lead Generation' }[rec.service] || rec.service;
+    const rc = name => serviceCardName === name ? 'price-card recommended' : 'price-card';
+    const recTag = name => serviceCardName === name ? '<span class="rec-tag">Recommended for you</span><br>' : '';
 
-    const jobPageHtml = (title, activeKeys, passiveKeys) => {
-      const col = (keys, label) => keys.length ? `<div class="job-page-col"><h4>${label}</h4>${keys.map(k => {
-        const sec = SECTIONS.find(s => s.key === k); const s = scores.sections[k];
-        return `<div style="margin-bottom:8px;"><span class="chip ${s.chip}">${esc(sec.label)}: ${chipLabel(s.chip)}</span></div>`;
-      }).join('')}</div>` : '';
-      return `<div class="report-section"><h2>${esc(title)}</h2><div class="job-page">${col(activeKeys, 'Active')}${col(passiveKeys, 'Passive / foundational')}</div></div>`;
-    };
+    const slides = [];
 
-    const funnelRow = (label, val, floor, healthy) => {
-      if (val == null) return `<tr><td>${label}</td><td colspan="2" class="muted">No data yet</td></tr>`;
-      const cls = val < floor ? 'low' : 'ok';
-      return `<tr><td>${label}</td><td class="${cls}">${Math.round(val)}%</td><td class="muted">floor ${floor}%${healthy ? `, healthy ${healthy}%+` : ''}</td></tr>`;
-    };
+    // 1 — Title
+    slides.push(`<div class="slide dark">
+      <h1 class="slide-title">Your Marketing Strategy</h1>
+      <div class="slide-sub">A clear plan to get found, win more clients, and grow.</div>
+      <div style="flex:1"></div>
+      <div style="font-size:14px;">Prepared for ${esc(a.businessName || '[ practice name ]')}</div>
+      <div style="font-size:12px; color:var(--dg-dust); margin-top:4px;">Gathr Grow</div>
+    </div>`);
 
-    const actionsHtml = rec.actions.map(act => `
-      <div class="plan-action">
-        <div class="pa-title">${esc(act.title)}</div>
-        <div class="pa-dll"><span style="color:var(--dg-orange)">Done looks like:</span> ${esc(act.doneLooksLike)}</div>
-        <div class="pa-page">${esc(act.pageRef)}</div>
-      </div>`).join('') || '<p class="muted">No specific gaps flagged — steady as she goes.</p>';
-
-    const quickWinsHtml = rec.quickWins.length ? `
-      <div class="report-section"><h2>Quick wins</h2><p class="muted" style="margin-bottom:10px;">Cheap, same-day items, independent of the main priority.</p>
-      ${rec.quickWins.map(qw => `<div class="plan-action"><div class="pa-title">${esc(qw.title)}</div><div class="pa-dll">${esc(qw.doneLooksLike)}</div></div>`).join('')}
-      </div>` : '';
-
-    const html = `
-      <div class="report-masthead">
-        <div><div class="wm">GATHR <span>GROW</span></div><div class="sub">The Scoreboard — Strategy Report</div></div>
-        <div class="report-for"><div class="c-name">${esc(a.businessName)}</div><div class="c-date">${niceDate(a.createdAt)}</div></div>
+    // 2 — The three jobs
+    slides.push(`<div class="slide">
+      <div class="eyebrow-sm">THE BASICS</div>
+      <h1 class="slide-title">The three jobs every business has to do</h1>
+      <div class="card-grid-3">
+        <div class="num-card"><div class="num">1</div><h4>Get found</h4><p>People need to know you exist.</p></div>
+        <div class="num-card"><div class="num">2</div><h4>Capture interest</h4><p>Turn a stranger into a lead: someone who has shown interest and you can contact.</p></div>
+        <div class="num-card"><div class="num">3</div><h4>Sell</h4><p>Turn that lead into a paying client.</p></div>
       </div>
+      <div class="slide-italic">If one job is weak, growth slows. This plan checks all three.</div>
+      <div class="slide-footer">GATHR GROW</div>
+    </div>`);
 
-      <div class="report-section">
-        <h2>Every business does three jobs</h2>
-        <p>Get found, capture interest, and sell. In the real world these show up as leads, booked, showed and closed. This scorecard shows how well ${esc(a.businessName)} is doing each job today, then gives a plan for the next 30 days.</p>
+    // 3 — Measure the same four steps
+    slides.push(`<div class="slide">
+      <div class="eyebrow-sm">THE BASICS</div>
+      <h1 class="slide-title">Measure the same four steps every month</h1>
+      <div class="funnel-steps">
+        <div class="fstep"><h4>Leads</h4><p>show interest</p></div><div class="funnel-arrow">&gt;</div>
+        <div class="fstep"><h4>Booked</h4><p>book a call</p></div><div class="funnel-arrow">&gt;</div>
+        <div class="fstep"><h4>Showed</h4><p>turn up</p></div><div class="funnel-arrow">&gt;</div>
+        <div class="fstep highlight"><h4>Closed</h4><p>become clients</p></div>
       </div>
+      <p style="margin-top:24px; font-size:15px;">Track these four every month. Also ask every new person: "How did you hear about us?"</p>
+      <div class="slide-italic">You cannot fix what you do not measure. Most practices track nothing. Start here.</div>
+      <div class="slide-footer">GATHR GROW</div>
+    </div>`);
 
-      <div class="report-section">
-        <h2>Your score</h2>
-        <div class="headline-score">
-          <div class="headline-num">${scores.headline}<small> / 100</small></div>
-          <div class="headline-anchor">Healthy practices sit at 75 or higher. This score updates every time we re-run the scorecard together.</div>
-        </div>
-        <div class="job-bars">${Object.entries(JOBS).map(([key, job]) => {
-          const s = scores.jobs[key]; const pct = s.max ? s.score / s.max * 100 : 0;
-          const cls = pct >= 75 ? 'good' : pct >= 40 ? 'warn' : 'bad';
-          return `<div class="job-bar"><div class="jb-track"><div class="jb-fill ${cls}" style="height:${Math.max(3, pct)}%"></div></div><div class="jb-val">${s.score}/${s.max}</div><div class="jb-label">${esc(job.label)}</div></div>`;
-        }).join('')}</div>
+    // 4 — Numbers to aim for
+    slides.push(`<div class="slide">
+      <div class="eyebrow-sm">THE BASICS</div>
+      <h1 class="slide-title">The numbers to aim for</h1>
+      <div class="card-grid-3">
+        <div class="num-card" style="text-align:center;"><div class="num">60%</div><h4>Book rate</h4><p>6 in 10 leads book</p></div>
+        <div class="num-card" style="text-align:center;"><div class="num">60%</div><h4>Show rate</h4><p>6 in 10 who book turn up</p></div>
+        <div class="num-card" style="text-align:center;"><div class="num">30%</div><h4>Close rate</h4><p>3 in 10 who show buy</p></div>
       </div>
+      <div class="callout-box">At those rates, about 10 leads gets you 1 new client.</div>
+      <div class="slide-italic" style="text-align:center;">Want ${targetClients} new client${targetClients === 1 ? '' : 's'} a month? You need about ${leadsNeeded} leads a month.</div>
+      <div class="slide-footer">GATHR GROW</div>
+    </div>`);
 
-      ${jobPageHtml('Get Found', GETFOUND_ACTIVE, GETFOUND_PASSIVE)}
-      ${jobPageHtml('Capture Interest', ['capture'], [])}
-      ${jobPageHtml('Sell', ['speed', 'followup', 'show', 'sales'], [])}
+    // 5 — Job 1 divider
+    slides.push(darkSlide('JOB 1', 'Get found'));
 
-      <div class="report-section">
-        <h2>How this is measured</h2>
-        <table class="funnel-table">
-          <thead><tr><th>Stage</th><th>Your rate</th><th>Benchmark</th></tr></thead>
-          <tbody>
-            <tr><td>Leads (last month)</td><td colspan="2">${funnel.leads || '—'}</td></tr>
-            ${funnelRow('Booked', funnel.bookPct, 60)}
-            ${funnelRow('Showed', funnel.showPct, 60, 70)}
-            ${funnelRow('Closed', funnel.closePct, 30, 35)}
-          </tbody>
-        </table>
+    // 6 — Two ways to get found
+    slides.push(`<div class="slide">
+      <div class="eyebrow-sm">JOB 1 &middot; GET FOUND</div>
+      <h1 class="slide-title">Two ways to get found. You need both.</h1>
+      <div class="twocol-grid">
+        <div class="twocol-card active"><h3>Active</h3><p>You put in time or money, and more people find you.</p>
+          <ul><li>Creating content</li><li>Paid ads</li><li>Outreach</li><li>Events and workshops</li></ul></div>
+        <div class="twocol-card passive"><h3>Passive</h3><p>You set it up once, and it works in the background.</p>
+          <ul><li>Referrals from clients and other businesses</li><li>Reviews and Google</li><li>Your website (search and AI)</li><li>Directory listings</li><li>Word of mouth</li></ul></div>
       </div>
+      <div class="slide-footer">GATHR GROW</div>
+    </div>`);
 
-      <div class="report-section">
-        <h2>What a client is worth to you</h2>
-        <div class="ltv-box">
-          <div class="ltv-stat"><div class="lv-lbl">Client value (LTV)</div><div class="lv-val">$${ltv ? ltv.toLocaleString() : '—'}</div></div>
-          <div class="ltv-stat"><div class="lv-lbl">Max profitable cost to buy a client (GLTV)</div><div class="lv-val">$${gltv ? Math.round(gltv).toLocaleString() : '—'}</div></div>
-        </div>
-        <p class="muted" style="margin-top:10px; font-size:12.5px;">GLTV assumes roughly 30% margin comes out before you count it as profit. Anything you pay to acquire a client under this number is a profitable trade.</p>
+    // 7-10 — Active Get Found channels
+    slides.push(channelSlide('JOB 1 · GET FOUND · ACTIVE', 'Creating content', 'content', [
+      'Post short, useful videos a few times a week.', 'Answer the real questions clients ask.',
+      'Hold attention, do not just chase views.', 'Always point people to a next step.', 'Reuse your best pieces as proof.',
+    ], scores));
+    slides.push(channelSlide('JOB 1 · GET FOUND · ACTIVE', 'Paid ads', 'paidads', [
+      'Start once your website and follow-up work.', 'One clear offer, sent to one landing page.',
+      'Let the creative do the work, not the budget.', 'Judge ads on cost per booked client.', 'Give each ad time before you change it.',
+    ], scores));
+    slides.push(channelSlide('JOB 1 · GET FOUND · ACTIVE', 'Outreach', 'outreach', [
+      'Start warm: people who already know you.', 'Lead with something useful, not a pitch.',
+      'Personalise every message. No mass blasts.', 'Ask past and lapsed clients to come back.', 'Keep it friendly, and stop if they ask.',
+    ], scores));
+    slides.push(channelSlide('JOB 1 · GET FOUND · ACTIVE', 'Events and workshops', null, [
+      'Give a real experience, not a sales pitch.', 'Promote by email first, then social.',
+      'Let people bring a friend.', 'Use one booking link so you can track it.', 'Follow up with everyone who comes.',
+    ], scores));
+
+    // 11-15 — Passive Get Found channels
+    slides.push(channelSlide('JOB 1 · GET FOUND · PASSIVE', 'Referrals', 'referrals', [
+      'Ask happy clients at their best moment.', 'Ask for an introduction, not just a name.',
+      'Build steady links with GPs and partners.', 'Make it easy, and thank them each time.', 'Follow the rules for your profession.',
+    ], scores));
+    slides.push(channelSlide('JOB 1 · GET FOUND · PASSIVE', 'Reviews and Google', 'reviews', [
+      'Fill in your Google profile completely.', 'Keep it active with posts and photos.',
+      'Ask happy clients for a fresh review often.', 'Reply to every review.', 'Keep your name, address and phone the same everywhere.',
+    ], scores));
+    slides.push(channelSlide('JOB 1 · GET FOUND · PASSIVE', 'Your website (search and AI)', 'website', [
+      'A simple, fast site with one clear next step.', 'One page for each service you offer.',
+      'Use the plain words people search for.', 'Add your details so AI can read them.', 'Works well on a phone.',
+    ], scores));
+    slides.push(channelSlide('JOB 1 · GET FOUND · PASSIVE', 'Directory listings', 'directories', [
+      'List on the directories for your profession.', 'Many are free with your membership.',
+      'Keep every listing the same.', 'Point each one back to your website.',
+    ], scores));
+    slides.push(channelSlide('JOB 1 · GET FOUND · PASSIVE', 'Word of mouth', null, [
+      'The best marketing is a great experience.', 'Give people a simple story to pass on.',
+      'Make it easy to share you.', 'You cannot force it, but you can earn it.',
+    ], scores));
+
+    // 16 — Job 2 divider
+    slides.push(darkSlide('JOB 2', 'Capture interest'));
+
+    // 17 — Turning interest into leads
+    slides.push(channelSlide('JOB 2 · CAPTURE INTEREST', 'Turning interest into leads', 'capture', [
+      'Send campaign traffic to one focused landing page.', 'One page, one action, no other links.',
+      'Offer a valuable first step, like a named assessment.', 'Not just a "free consult".', 'Keep the form short.', 'Reply the moment a lead arrives.',
+    ], scores));
+
+    // 18 — Job 3 divider
+    slides.push(darkSlide('JOB 3', 'Sell'));
+
+    // 19-22 — Sell channels
+    slides.push(channelSlide('JOB 3 · SELL', 'Speed to reply', 'speed', [
+      'Reply to every new lead within 5 minutes.', 'If you cannot call, send a text.',
+      'Ask a question to start a conversation.', 'The first to reply usually wins.',
+    ], scores));
+    slides.push(channelSlide('JOB 3 · SELL', 'Follow-up', 'followup', [
+      'Follow up 5 to 8 times, not once.', 'Use call, text, and email.',
+      'Space it over 2 to 3 weeks.', 'End with a clear last message.', 'Stay friendly, never pushy.',
+    ], scores));
+    slides.push(channelSlide('JOB 3 · SELL', 'Show rate', 'show', [
+      'Book calls within 3 to 4 days.', 'Send reminders by text and email.',
+      'Ask them to reply to confirm.', 'Make it easy to rebook.',
+    ], scores));
+    slides.push(channelSlide('JOB 3 · SELL', 'The sales call', 'sales', [
+      'Set the plan for the call up front.', 'Understand their problem and their goal.',
+      'Ask for the sale, clearly.', 'Have a smaller first step ready.', 'Keep it helpful, not pushy.',
+    ], scores));
+
+    // 23 — Putting it together
+    slides.push(`<div class="slide">
+      <div class="eyebrow-sm">PUTTING IT TOGETHER</div>
+      <h1 class="slide-title">How the jobs make your numbers</h1>
+      <div class="funnel-steps">
+        <div class="fstep"><h4>Leads</h4></div><div class="funnel-arrow">&gt;</div>
+        <div class="fstep"><h4>Booked</h4></div><div class="funnel-arrow">&gt;</div>
+        <div class="fstep"><h4>Showed</h4></div><div class="funnel-arrow">&gt;</div>
+        <div class="fstep"><h4>Closed</h4></div>
       </div>
-
-      <div class="report-section plan-priority">
-        <h3>Next 30 days: ${esc(rec.priorityLabel)}</h3>
-        <p>${esc(rec.priorityBlurb)}</p>
-        ${actionsHtml}
+      <div style="display:flex; gap:12px; margin-top:8px;">
+        <div style="flex:1; border-top:3px solid var(--dg-orange); padding-top:8px; font-size:13px; color:var(--dg-orange);">Jobs 1 and 2: get found and capture</div>
+        <div style="width:20px;"></div>
+        <div style="flex:2.6; border-top:3px solid var(--dg-good); padding-top:8px; font-size:13px; color:var(--dg-good); text-align:center;">Job 3: the sell</div>
       </div>
-      ${quickWinsHtml}
+      <p style="margin-top:26px; font-size:15px;">More leads come from doing Jobs 1 and 2 better. Better book, show and close come from Job 3.</p>
+      <div class="slide-footer">GATHR GROW</div>
+    </div>`);
 
-      <div class="report-section">
-        <h2>How we can help</h2>
-        <div class="close-options">
-          <div class="close-option"><h4>Do it yourself</h4><p style="font-size:13.5px;">Everything above is in the free guide we're sending along with this report. Work through the priority action first.</p></div>
-          <div class="close-option"><h4>Here's what we'd do</h4><p style="font-size:13.5px;">Based on where you're at, our <span style="color:var(--dg-orange)">${esc(rec.service)}</span> program is the fastest path to closing this gap.</p></div>
-        </div>
-        ${group ? `<p class="muted" style="margin-top:14px; font-size:12px;"><span style="color:var(--dg-orange)">${esc(group.label)}:</span> ${esc(group.compliance)}</p>` : ''}
+    // 24 — The good news
+    slides.push(`<div class="slide dark">
+      <div class="eyebrow-sm">THE GOOD NEWS</div>
+      <div style="flex:1"></div>
+      <h1 class="slide-title">You do not need a dozen projects. You need one path, done in order.</h1>
+      <p style="color:var(--dg-dust); font-size:15px; max-width:900px; margin-top:14px;">Almost everything you just saw comes back to one thing: your foundations are not fully built yet. So we build them, in the right order.</p>
+      <div style="flex:1"></div>
+    </div>`);
+
+    // 25+ — The Playbook: combined quick-wins + 30-day plan, grouped by
+    // status (Strong / Needs work / Missing), Get Found sub-grouped Active
+    // then Passive, one detailed slide per gap channel.
+    slides.push(...buildPlaybookSlides(scores));
+
+    // 27 — You can do this yourself
+    slides.push(`<div class="slide dark">
+      <div style="flex:1"></div>
+      <h1 class="slide-title">You can do all of this yourself.</h1>
+      <p style="color:var(--dg-dust); font-size:15px; margin-top:10px;">None of it is complicated. But it takes time, and time on marketing is time away from your clients.</p>
+      <p style="font-size:15.5px; margin-top:18px;">If you would rather stay with your clients, this is exactly what we do.</p>
+      <div style="flex:1"></div>
+    </div>`);
+
+    // 28 — Ways to work with us
+    slides.push(`<div class="slide">
+      <div class="eyebrow-sm">HOW WE CAN HELP</div>
+      <h1 class="slide-title">Ways to work with us</h1>
+      <div class="price-grid">
+        <div class="${rc('Brand OS')}">${recTag('Brand OS')}<h4>Brand OS - $4500</h4><p>We set up your whole foundation. Your first 120 days, done for you.</p></div>
+        <div class="${rc('Lead Generation')}">${recTag('Lead Generation')}<h4>Lead Generation - $4500</h4><p>We run your ads and fill your funnel. The next 120 days.</p></div>
       </div>
+      <div class="price-subhead">Just want part of it?</div>
+      <div class="price-grid">
+        <div class="${rc('Software Setup')}">${recTag('Software Setup')}<h4>Software Setup - $1500</h4><p>We set up your systems, then hand you the keys.</p></div>
+        <div class="${rc('Content')}">${recTag('Content')}<h4>Content - $1000/$1500</h4><p>We create your content, so you show up without the effort.</p></div>
+      </div>
+      <div class="slide-footer">GATHR GROW</div>
+    </div>`);
 
-      <div class="report-footer"><div>Prepared by Gathr Grow · gathrspace.com.au</div><div>309 George Street, Sydney CBD</div></div>
-    `;
-    $('reportInner').innerHTML = html;
+    // 29 — Closing
+    slides.push(`<div class="slide dark">
+      <div style="flex:1"></div>
+      <h1 class="slide-title">Either way, you now have the plan.</h1>
+      <div class="slide-sub">Let us help you decide where to start.</div>
+      <div style="flex:1"></div>
+    </div>`);
+
+    $('reportInner').innerHTML = `<div class="deck">${slides.join('')}</div>`;
     $('formView').classList.add('hidden'); $('reportSection').classList.remove('hidden');
     document.getElementById('tab-diagnostic')?.scrollIntoView({ behavior: 'auto', block: 'start' });
   }
