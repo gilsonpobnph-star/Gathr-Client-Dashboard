@@ -752,12 +752,13 @@
   // CHANNEL_META) the quick win / help blocks; channels with no score
   // yet (or that score Strong) skip the quick-win/help blocks and show
   // just the badge and what-good-looks-like reference.
-  function channelCard(title, sectionKey, bullets, scores) {
+  function channelCard(title, sectionKey, bullets, scores, quickWinOverride) {
     const s = sectionKey ? scores.sections[sectionKey] : null;
     const chip = s ? s.chip : null;
     const badgeCls = chip === 'strong' ? 'strong' : chip === 'needswork' ? 'needswork' : chip ? 'missing' : null;
     const showGap = badgeCls && badgeCls !== 'strong';
     const meta = sectionKey ? CHANNEL_META[sectionKey] : null;
+    const quickWin = quickWinOverride || meta?.quickWin;
     return `<div class="ch-card">
       <div class="ch-card-head">
         <h3>${esc(title)}</h3>
@@ -765,7 +766,7 @@
       </div>
       <div class="ch-block"><h4>What good looks like</h4><ul>${bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>
       ${showGap && meta ? `
-      <div class="ch-block"><h4>Quick win &mdash; free, next 30 days</h4><p>${esc(meta.quickWin)}</p></div>
+      <div class="ch-block"><h4>Quick win &mdash; free, next 30 days</h4><p>${esc(quickWin)}</p></div>
       <div class="ch-block ch-help"><h4>What we can help with</h4><p>${esc(meta.serviceBlurb)} <span style="color:var(--dg-orange)">(${esc(meta.service)})</span></p></div>` : ''}
     </div>`;
   }
@@ -895,7 +896,7 @@
         channelCard('Referrals', 'referrals', CHANNEL_BULLETS.referrals, scores),
         channelCard('Reviews and Google', 'reviews', CHANNEL_BULLETS.reviews, scores),
         channelCard('Your website (search and AI)', 'website', CHANNEL_BULLETS.website, scores),
-        channelCard('Directory listings', 'directories', CHANNEL_BULLETS.directories, scores),
+        channelCard('Directory listings', 'directories', CHANNEL_BULLETS.directories, scores, group?.directories),
         channelCard('Word of mouth', null, [
           'The best marketing is a great experience.', 'Give people a simple story to pass on.',
           'Make it easy to share you.', 'You cannot force it, but you can earn it.',
@@ -936,6 +937,10 @@
 
     // Your plan for the first 30 days — the biggest three things to fix,
     // picked from the actual card results above, not a generic script.
+    // Directory listings uses the practitioner-specific list (which
+    // directories actually apply to a chiro vs. a PT, say) instead of the
+    // generic quick win, same as the channel card above.
+    const quickWinFor = key => (key === 'directories' && group?.directories) || CHANNEL_META[key].quickWin;
     const top3 = topThirtyDayActions(scores);
     sections.push(`<div class="doc-section">
       <div class="eyebrow-sm">YOUR PLAN</div>
@@ -943,21 +948,24 @@
       ${top3.length ? `
       <p style="font-size:14.5px; color:#57524c;">Based on where you stand today, here are the three biggest things to fix first.</p>
       <ul class="plan-checklist">
-        ${top3.map(c => `<li><span class="chk"></span><span style="color:var(--dg-orange);">${esc(c.label)}:</span> ${esc(CHANNEL_META[c.key].quickWin)}</li>`).join('')}
+        ${top3.map(c => `<li><span class="chk"></span><span style="color:var(--dg-orange);">${esc(c.label)}:</span> ${esc(quickWinFor(c.key))}</li>`).join('')}
       </ul>` : `
       <p style="font-size:14.5px; color:#57524c;">You're already doing the fundamentals well across every channel — nothing urgent to fix this month. Keep it up.</p>`}
     </div>`);
 
-    // Special notes — the client's own answer on their biggest gap, plus
-    // whatever the team jotted down at the bottom of each part while
-    // running the session live. Only shows parts that actually have
-    // something written; disappears entirely if none do.
+    // Special notes — the practitioner-type compliance note (always
+    // relevant, e.g. what a chiro can and can't say in marketing), the
+    // client's own answer on their biggest gap, plus whatever the team
+    // jotted down at the bottom of each part while running the session
+    // live. Only shows parts that actually have something written.
     const notesLabels = { context: 'Context', wig: 'WIG', measure: 'Measurement', getfound: 'Get Found', capture: 'Capture Interest', sell: 'Sell' };
     const partNoteItems = Object.entries(a.answers.partNotes || {}).filter(([, v]) => (v || '').trim());
-    if (a.answers.biggestGap?.trim() || partNoteItems.length) {
+    const complianceNote = rec.compliance || group?.compliance;
+    if (complianceNote || a.answers.biggestGap?.trim() || partNoteItems.length) {
       sections.push(`<div class="doc-section">
         <div class="eyebrow-sm">SPECIAL NOTES</div>
         <h2 class="doc-h2">Notes &amp; recommendations</h2>
+        ${complianceNote ? `<div class="note-item"><h4>A note on compliance</h4><p>${esc(complianceNote)}</p></div>` : ''}
         ${a.answers.biggestGap?.trim() ? `<div class="note-item"><h4>Biggest gap, in their own words</h4><p>${esc(a.answers.biggestGap)}</p></div>` : ''}
         ${partNoteItems.map(([key, v]) => `<div class="note-item"><h4>${esc(notesLabels[key] || key)}</h4><p>${esc(v)}</p></div>`).join('')}
       </div>`);
