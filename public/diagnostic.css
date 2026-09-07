@@ -244,6 +244,32 @@
 #tab-diagnostic .price-subhead{font-weight:700; margin-top:22px; font-size:14px;}
 
 @media print{
+  /* #tab-diagnostic is a fixed-height, overflow-y:auto scroll pane (it's
+     the app shell's scrollable tab body), and its ancestors (.main,
+     .tab-section) are fixed-height flex containers with overflow:hidden.
+     Left alone, that clips the absolutely-positioned report below to
+     whatever fit in one screen's height — the whole report past "page 1"
+     never entered the print flow. Force the whole ancestor chain open so
+     the full document lays out and paginates. */
+  html, body{ height:auto !important; overflow:visible !important; }
+  body:has(#tab-diagnostic:not(.hidden)) .main,
+  body:has(#tab-diagnostic:not(.hidden)) .tab-section{ overflow:visible !important; height:auto !important; }
+  #tab-diagnostic{ overflow:visible !important; height:auto !important; position:static !important; }
+  /* The sidebar keeps its layout width even once hidden (visibility:hidden
+     doesn't collapse the box), which left an empty gap on the left of
+     every printed page showing the app's decorative dark background
+     through it. Remove it from layout entirely for print. */
+  body:has(#tab-diagnostic:not(.hidden)) .sidebar{ display:none !important; }
+  /* body::before paints the app's decorative dark background fixed to
+     the page bounds — it isn't matched by "body *" (pseudo-elements
+     aren't real descendants), so on any page where the report content
+     runs out before the page's physical bottom it showed through as a
+     solid dark block. body's own background is the same story: body
+     itself isn't a descendant of body, so "body *" never touches it.
+     Print doesn't need any of this — force plain white. */
+  body::before{ display:none !important; }
+  body{ background:#fff !important; }
+
   body *{ visibility:hidden !important; }
   #tab-diagnostic #dg-reportView, #tab-diagnostic #dg-reportView *{ visibility:visible !important; }
   #tab-diagnostic #dg-reportView{ position:absolute; top:0; left:0; width:100%; margin:0; border:none; }
