@@ -1025,6 +1025,20 @@ app.delete('/api/diagnostic/assessments/:id', requireAuth, (req, res) => {
   writeStore(store);
   res.json({ ok: true });
 });
+// One-off maintenance action: clears the saved AI recommendation off every
+// assessment (never touches the assessment itself or its answers) so the
+// next "Generate strategy report" on each one does a genuine fresh AI pass
+// instead of reusing whatever was cached under an older prompt/schema.
+app.post('/api/diagnostic/clear-ai-cache', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureDiagnostic(store);
+  let cleared = 0;
+  Object.values(store.diagnostic.assessments).forEach(a => {
+    if (a.aiRecommendation) { delete a.aiRecommendation; cleared++; }
+  });
+  writeStore(store);
+  res.json({ ok: true, cleared });
+});
 
 // ── Diagnostic: AI-sharpened recommendations (Claude) ────────────────────────
 // The deterministic scoring engine in diagnostic.js (computeRecommendation /
@@ -1111,7 +1125,7 @@ Write:
   - quick_win: one concrete, free, doable-in-30-days action tailored to THIS business's actual score and gap on this channel — specific enough that a solo practitioner could just go do it, not "improve your X"
   - help_service + help_reason: whichever one Gathr service is the smart fit, naming the actual deliverable that closes this specific gap (reasoning about the service overlaps above rather than a fixed mapping) — the "action" in quick_win must always be free and independent of any paid service
 
-Be concrete and specific throughout — this should read like a strategist who actually looked at this business's numbers, not a template applied to every client. Reference the business's own numbers where it strengthens the case.${customInstruction ? `\n\nThe team has this additional instruction for you — follow it, but do not violate any rule above (still one entry per channel, still free quick wins, still real Gathr services and their actual deliverables) unless the instruction explicitly says otherwise:\n"${String(customInstruction).slice(0, 1000)}"` : ''}`;
+Be concrete and specific throughout, and write like a person talking to a colleague, not a report generator. Plain sentences only: no em dashes or en dashes, no semicolons used as a dash substitute, no "Label: description" or "Label - description" fragments, no bullet-speak crammed into one sentence. If a sentence needs a pause, use a period or "and"/"so"/"which means" instead of a dash. This should read like a strategist who actually looked at this business's numbers, not a template applied to every client. Reference the business's own numbers where it strengthens the case.${customInstruction ? `\n\nThe team has this additional instruction for you — follow it, but do not violate any rule above (still one entry per channel, still free quick wins, still real Gathr services and their actual deliverables, still plain human sentences with no dashes) unless the instruction explicitly says otherwise:\n"${String(customInstruction).slice(0, 1000)}"` : ''}`;
     // Cost-efficient model on purpose: Sonnet, not Opus. Effort 'medium'
     // since this now runs once per assessment and is saved (see
     // /api/diagnostic/assessments persistence) rather than on every report

@@ -652,13 +652,22 @@
         <section id="dg-dashView">
           <div class="list-head">
             <div><div class="eyebrow">Diagnostic</div><h1>Assessments</h1></div>
-            <button class="accent" onclick="Diagnostic.newAssessment()">+ New assessment</button>
+            <div style="display:flex; gap:10px;">
+              <button class="secondary small" onclick="Diagnostic.clearAICache()" title="Clears the saved AI recommendation off every assessment below, so the next Generate on each one does a genuine fresh AI pass">Clear AI cache</button>
+              <button class="accent" onclick="Diagnostic.newAssessment()">+ New assessment</button>
+            </div>
           </div>
           <div id="dg-assessGrid" class="assess-grid"></div>
           <div id="dg-dashEmpty" class="empty-state hidden"><h2>No assessments yet</h2><p class="muted">Run one during a discovery call to see where a practitioner stands and what to recommend.</p></div>
         </section>
 
         <section id="dg-formView" class="hidden">
+          <!-- Sticky so the generate action is reachable from anywhere in a
+               long questionnaire, not just after scrolling all the way down. -->
+          <div class="dg-generate-sticky">
+            <button class="accent" onclick="Diagnostic.showReport()">Generate strategy report</button>
+          </div>
+
           <div class="crumb"><a onclick="Diagnostic.showDash()">&larr; All assessments</a></div>
           <div class="list-head" style="margin-bottom:16px;">
             <div><div class="eyebrow" id="dg-formSub"></div><h1 id="dg-formTitle"></h1></div>

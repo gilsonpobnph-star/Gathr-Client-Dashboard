@@ -536,6 +536,18 @@
     assessments = assessments.filter(x => x.id !== cur.id); cur = null;
     showDash(); toast('Assessment deleted');
   }
+  // One-off maintenance: wipes the saved AI recommendation off every
+  // assessment (not the assessments themselves) so the next "Generate
+  // strategy report" on each one does a genuine fresh AI pass instead of
+  // reusing something cached under an older prompt or schema.
+  async function clearAICache() {
+    if (!confirm('Clear the saved AI recommendation from every assessment? Each one will do a fresh AI generation next time it\'s opened. This does not delete any assessment or its answers.')) return;
+    const result = await apiSend('/api/diagnostic/clear-ai-cache', 'POST', {});
+    if (!result) { toast('Could not clear AI cache'); return; }
+    assessments.forEach(a => { delete a.aiRecommendation; });
+    if (cur) delete cur.aiRecommendation;
+    toast(`Cleared AI cache on ${result.cleared} assessment${result.cleared === 1 ? '' : 's'}.`);
+  }
   async function setField(path, value) {
     if (!cur) return;
     const parts = path.split('.'); let obj = cur.answers;
@@ -1065,7 +1077,7 @@
       ${top3.length ? `
       <p style="font-size:14.5px; color:#57524c;">${esc(aiData?.priority_summary || rec.priorityBlurb || 'Based on where you stand today, here are the three biggest things to fix first.')}</p>
       <ul class="plan-checklist">
-        ${top3.map(c => `<li><span class="chk"></span><span style="color:var(--dg-orange);">${esc(c.label)}:</span> ${esc(quickWinFor(c.key))}</li>`).join('')}
+        ${top3.map(c => `<li><span class="chk"></span><span class="plan-item-label">${esc(c.label)}</span> ${esc(quickWinFor(c.key))}</li>`).join('')}
       </ul>
       ${aiData ? `<div style="font-size:11px; color:#a89f8f; margin-top:10px; letter-spacing:.03em;">Sharpened by AI, based on this business's own numbers and goals.</div>` : ''}` : `
       <p style="font-size:14.5px; color:#57524c;">You're already doing the fundamentals well across every channel — nothing urgent to fix this month. Keep it up.</p>`}
@@ -1100,14 +1112,13 @@
       const ch = aiCh(sec.key);
       const svcName = ch?.help_service || CHANNEL_META[sec.key]?.service;
       if (!svcName) return;
-      const text = ch?.help_reason ? `${sec.label}: ${ch.help_reason}` : sec.label;
-      (serviceGapBullets[svcName] = serviceGapBullets[svcName] || []).push(text);
+      (serviceGapBullets[svcName] = serviceGapBullets[svcName] || []).push({ label: sec.label, text: ch?.help_reason || '' });
     });
     const priceCard = name => {
       const svc = GATHR_SERVICES.find(s => s.name === name);
       const bullets = serviceGapBullets[name];
       return `<div class="${rc(name)}">${recTag(name)}<h4>${esc(svc.name)}${svc.price ? ' - ' + esc(svc.price) : ''}</h4><p>${esc(svc.blurb)}</p>
-        ${bullets?.length ? `<ul class="price-card-bullets">${bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
+        ${bullets?.length ? `<ul class="price-card-bullets">${bullets.map(b => `<li><strong>${esc(b.label)}</strong>${b.text ? ' ' + esc(b.text) : ''}</li>`).join('')}</ul>` : ''}
       </div>`;
     };
     sections.push(`<div class="doc-section">
@@ -1276,6 +1287,6 @@
   }
 
   window.Diagnostic = {
-    onOpen, showDash, newAssessment, openAssessment, deleteAssessment, showReport, backToForm, toggleReportEdit, refinePlanWithPrompt, regenerateAIRecommendation,
+    onOpen, showDash, newAssessment, openAssessment, deleteAssessment, showReport, backToForm, toggleReportEdit, refinePlanWithPrompt, regenerateAIRecommendation, clearAICache,
   };
 })();

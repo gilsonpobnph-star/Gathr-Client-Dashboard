@@ -18,6 +18,9 @@
 #tab-diagnostic .wordmark span{color:var(--dg-orange);}
 #tab-diagnostic .tagline{font-size:11px; letter-spacing:.18em; text-transform:uppercase; color:var(--dg-dust);}
 #tab-diagnostic .g-main{max-width:980px; margin:0 auto; padding:28px 20px 90px;}
+/* Sticky "Generate strategy report" — reachable from anywhere in a long
+   questionnaire, not just after scrolling to the bottom. */
+#tab-diagnostic .dg-generate-sticky{position:sticky; top:0; z-index:50; background:var(--dg-lightgrey); padding:10px 0 14px; margin-bottom:6px; text-align:right; box-shadow:0 6px 10px -8px rgba(0,0,0,.2);}
 #tab-diagnostic h1,#tab-diagnostic h2,#tab-diagnostic h3,#tab-diagnostic h4{font-family:var(--dg-serif); font-weight:400; margin:0;}
 /* Safety net for the intake questionnaire itself (not the report): force
    every element to the regular weight so nothing renders unexpectedly
@@ -243,11 +246,14 @@
 #tab-diagnostic .plan-checklist{list-style:none; padding:0; margin:22px 0 0;}
 #tab-diagnostic .plan-checklist li{display:flex; gap:14px; align-items:flex-start; margin-bottom:16px; font-size:16px;}
 #tab-diagnostic .plan-checklist .chk{width:19px; height:19px; border:1.5px solid var(--dg-charcoal); border-radius:3px; flex-shrink:0; margin-top:3px;}
+#tab-diagnostic .plan-item-label{color:var(--dg-orange); font-weight:700; margin-right:4px;}
 #tab-diagnostic .plan-close-line{font-weight:700; margin-top:22px; font-size:15.5px;}
 
 /* AI console: a team-only control panel above the report (not inside it —
    sibling of #dg-reportView, so it's never part of what prints). */
-#tab-diagnostic .dg-ai-console{ margin:0 0 24px; padding:18px 20px; background:linear-gradient(135deg, var(--dg-lightgrey), #f8f4ec); border:1px solid var(--dg-warmgrey); border-radius:10px; transition:background .3s, border-color .3s; }
+/* Sticky — stays reachable while scrolling through a long report, so a
+   change can be prompted for from wherever something looks off. */
+#tab-diagnostic .dg-ai-console{ position:sticky; top:0; z-index:50; margin:0 0 24px; padding:18px 20px; background:linear-gradient(135deg, var(--dg-lightgrey), #f8f4ec); border:1px solid var(--dg-warmgrey); border-radius:10px; transition:background .3s, border-color .3s; box-shadow:0 6px 10px -8px rgba(0,0,0,.2); }
 #tab-diagnostic .dg-ai-console.busy{ background:linear-gradient(135deg, #fdf1ea, #fbe6d8); border-color:var(--dg-orange); animation:dg-ai-pulse 1.6s ease-in-out infinite; }
 @keyframes dg-ai-pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.72; } }
 #tab-diagnostic .dg-ai-console-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
