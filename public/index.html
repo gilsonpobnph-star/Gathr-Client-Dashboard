@@ -683,6 +683,23 @@
 
         <section id="dg-reportSection" class="hidden">
           <div class="crumb no-print"><a onclick="Diagnostic.backToForm()">&larr; Back to assessment</a></div>
+
+          <!-- Team-only control panel — never part of the printed/PDF report
+               (it's a sibling of #dg-reportView, and print already hides
+               everything outside that view). -->
+          <div class="dg-ai-console">
+            <div class="dg-ai-console-head">
+              <label for="dg-aiPromptInput">&#10024; AI Recommendations Control</label>
+              <button class="secondary small" type="button" onclick="Diagnostic.regenerateAIRecommendation()">Regenerate</button>
+            </div>
+            <div class="dg-ai-console-sub">Rewrites the best practices, quick win and "what we can help with" on every channel card, the 30-day plan, and the field best-practices list below. Generated once and saved — this panel is for your team only and is never included in the report or the PDF.</div>
+            <div class="dg-ai-console-row">
+              <input type="text" id="dg-aiPromptInput" placeholder="e.g. they mentioned wanting to expand into telehealth, weight that in">
+              <button class="accent" type="button" onclick="Diagnostic.refinePlanWithPrompt()">Ask AI</button>
+            </div>
+            <div id="dg-aiPromptStatus"></div>
+          </div>
+
           <div id="dg-reportView">
             <div class="report-inner" id="dg-reportInner"></div>
             <div class="report-actions no-print">
@@ -694,6 +711,19 @@
           </div>
         </section>
 
+      </div>
+
+      <!-- Full-screen blocking modal while the AI writes the report the first
+           time — the report only appears once this resolves (success or
+           failure), per explicit instruction not to show a stale/half-baked
+           report while generation is still running. -->
+      <div id="dg-aiModal" class="dg-ai-modal hidden">
+        <div class="dg-ai-modal-card">
+          <div class="dg-ai-modal-spinner">&#10024;</div>
+          <h3>Cooking up your strategy&hellip;</h3>
+          <p id="dg-aiModalMsg">Analysing every channel for the smartest plan.</p>
+          <div class="dg-ai-modal-timer"><span id="dg-aiModalTimer">0s</span> elapsed</div>
+        </div>
       </div>
       <div class="toast" id="dg-toast"></div>
     </section>

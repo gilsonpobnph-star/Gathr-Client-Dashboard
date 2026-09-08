@@ -1047,6 +1047,10 @@ function aiRecommendationSchema(serviceNames, channelKeys) {
     type: 'object',
     properties: {
       priority_summary: { type: 'string', description: "Two to three sentences summarizing your holistic read of this business's whole diagnostic — where it genuinely stands right now and what matters most. Reference their actual numbers, not generic advice." },
+      field_best_practices: {
+        type: 'array', items: { type: 'string' },
+        description: "5 to 8 real, specific marketing tactics that the best, highest-performing practitioners in THIS EXACT profession (practitionerType, not just the broader compliance group) actually do — named platforms, habits, and proof formats, not generic advice. E.g. a chiropractor's list should differ from a psychologist's or a personal trainer's even though they may share a compliance group.",
+      },
       channels: {
         type: 'array',
         description: `Exactly one entry for EVERY one of these channel keys, no more, no fewer, none skipped: ${channelKeys.join(', ')}.`,
@@ -1060,14 +1064,14 @@ function aiRecommendationSchema(serviceNames, channelKeys) {
             },
             quick_win: { type: 'string', description: "A specific, free, doable-in-30-days action for THIS business on this channel, tailored to their actual score and gap here — concrete and a real step up from generic advice ('post more content' is not acceptable; name what to post, to whom, how often). Still write one even for a channel scored Strong — the client only shows it when relevant." },
             help_service: { type: 'string', enum: serviceNames, description: "Which ONE Gathr service is the smart fit for closing this specific gap. Reason about overlaps between services (see their notes) rather than a fixed one-to-one mapping — e.g. don't recommend a narrower service when a broader one that already includes that work is the better fit for this business's overall situation." },
-            help_reason: { type: 'string', description: 'One sentence on why this specific service is the smart fit here, for this business — not a generic service blurb.' },
+            help_reason: { type: 'string', description: "One to two sentences on why this specific service is the smart fit here — name the ACTUAL deliverable from that service's 'deliverables' field that addresses this exact gap (e.g. for Speed to Reply, name the automations/instant-reply setup; for Show Rate, name the booking-reminder automation). Never write generic filler like a repeated blurb or a vague 'this service will help' — be concrete about what gets built." },
           },
           required: ['channel_key', 'best_practices', 'quick_win', 'help_service', 'help_reason'],
           additionalProperties: false,
         },
       },
     },
-    required: ['priority_summary', 'channels'],
+    required: ['priority_summary', 'field_best_practices', 'channels'],
     additionalProperties: false,
   };
 }
@@ -1090,22 +1094,24 @@ app.post('/api/diagnostic/ai-recommendations', requireAuth, async (req, res) => 
   try {
     const prompt = `You are a senior marketing strategist for Gathr Grow, holistically rewriting the marketing-strategy report for a health/fitness/beauty practitioner business right after a diagnostic assessment.
 
-Keep in mind the report's scores, funnel numbers, and structure are already fixed and correct — your job is ONLY to write the content that goes inside each channel's card: best practices, a quick win, and which Gathr service helps. Analyse the ENTIRE business context below holistically before writing anything — every channel's score together, the funnel numbers as a whole, client LTV against their target, and their own words on their biggest gap. Don't treat each channel in isolation.
+Keep in mind the report's scores, funnel numbers, and structure are already fixed and correct — your job is ONLY to write the content that goes inside each channel's card (best practices, a quick win, which Gathr service helps) plus a field-specific best-practices list. Analyse the ENTIRE business context below holistically before writing anything — every channel's score together, the funnel numbers as a whole, client LTV against their target, and their own words on their biggest gap. Don't treat each channel in isolation.
 
 Business context (JSON):
 ${JSON.stringify(context, null, 2)}
 
-Each entry in "channels" is a marketing/sales function already scored 0-100 by a fixed rubric (higher = healthier), with a "weight" (its max points) and a "chip" status of Strong / Needs work / Missing / Too early (unmeasured). "fieldLowHangingFruit" lists real, mostly-free tactics specific to this business's field (directories, booking platforms, proof formats) — draw on these where they genuinely fit.
+Each entry in "channels" is a marketing/sales function already scored 0-100 by a fixed rubric (higher = healthier), with a "weight" (its max points) and a "chip" status of Strong / Needs work / Missing / Too early (unmeasured). "practitionerType" is their exact profession (e.g. "chiro", "psychologist", "pt") — use this, not just the broader "practitionerGroup", when deciding what real high-performers in their specific field actually do. "fieldLowHangingFruit" lists a starting set of real, mostly-free tactics for their field (directories, booking platforms, proof formats) — treat it as a floor to build on, not the ceiling.
 
-Gathr's actual services — read each one's "notes" carefully, they describe real overlaps between services (e.g. one service already includes another's scope). Every "help_service" must be exactly one of these names, chosen with that overlap in mind, never invented:
+Gathr's actual services — read each one's "notes" (real overlaps between services — e.g. one already includes another's scope) AND "deliverables" (what actually gets built, week by week) carefully. Every "help_reason" must name a real deliverable from the matching service, never generic filler. Every "help_service" must be exactly one of these names, never invented:
 ${JSON.stringify(services, null, 2)}
 
-For EVERY channel listed in the context (all of them, none skipped), write:
-- best_practices: what genuinely good execution of this specific channel looks like for this kind of practitioner business, from real marketing knowledge — not the generic advice a template would give
-- quick_win: one concrete, free, doable-in-30-days action tailored to THIS business's actual score and gap on this channel — specific enough that a solo practitioner could just go do it, not "improve your X"
-- help_service + help_reason: whichever one Gathr service is the smart fit, reasoning about the service overlaps above rather than a fixed mapping — the "action" in quick_win must always be free and independent of any paid service
+Write:
+- field_best_practices: 5 to 8 real, specific tactics that the best-performing practitioners in THIS EXACT profession actually do — go beyond fieldLowHangingFruit with genuine marketing knowledge for this specific field, not the broader compliance group it happens to share with other professions
+- For EVERY channel listed (all of them, none skipped):
+  - best_practices: what genuinely good execution of this specific channel looks like for this kind of practitioner business, from real marketing knowledge — not the generic advice a template would give
+  - quick_win: one concrete, free, doable-in-30-days action tailored to THIS business's actual score and gap on this channel — specific enough that a solo practitioner could just go do it, not "improve your X"
+  - help_service + help_reason: whichever one Gathr service is the smart fit, naming the actual deliverable that closes this specific gap (reasoning about the service overlaps above rather than a fixed mapping) — the "action" in quick_win must always be free and independent of any paid service
 
-Be concrete and specific throughout — this should read like a strategist who actually looked at this business's numbers, not a template applied to every client. Reference the business's own numbers where it strengthens the case.${customInstruction ? `\n\nThe team has this additional instruction for you — follow it, but do not violate any rule above (still one entry per channel, still free quick wins, still real Gathr services) unless the instruction explicitly says otherwise:\n"${String(customInstruction).slice(0, 1000)}"` : ''}`;
+Be concrete and specific throughout — this should read like a strategist who actually looked at this business's numbers, not a template applied to every client. Reference the business's own numbers where it strengthens the case.${customInstruction ? `\n\nThe team has this additional instruction for you — follow it, but do not violate any rule above (still one entry per channel, still free quick wins, still real Gathr services and their actual deliverables) unless the instruction explicitly says otherwise:\n"${String(customInstruction).slice(0, 1000)}"` : ''}`;
     // Cost-efficient model on purpose: Sonnet, not Opus. Effort 'medium'
     // since this now runs once per assessment and is saved (see
     // /api/diagnostic/assessments persistence) rather than on every report

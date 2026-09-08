@@ -291,14 +291,22 @@
   // "Ways to work with us" pricing cards AND for what the AI recommendation
   // pass is told Gathr can actually deliver, so a recommendation's "what we
   // can help with" always points at something real, never an invented offer.
+  // Deliverables pulled from the real program curricula under the CRM's own
+  // Programs tab (Brand Basics = Software Setup, Personal Brand Foundation
+  // = Brand OS, plus Content and Ads Management) — so the AI can name
+  // actual weekly deliverables instead of writing vague filler.
   const GATHR_SERVICES = [
     { name: 'Brand OS', price: '$4500', blurb: 'We set up your whole foundation. Your first 120 days, done for you.',
-      notes: "A comprehensive 120-day build across every foundational gap — Get Found, Capture and the systems work, including everything Software Setup alone covers. Recommend Brand OS (not standalone Software Setup) when the business has multiple foundational gaps across different channels, not just one narrow issue." },
+      deliverables: "12-week build. Weeks 1-4 (identical to Software Setup): brand assets and content questionnaire collected; funnel, CRM, automations and pipelines built; domain, business number, sending domain and booking calendar connected; bio and CTA optimised, content strategy set, first content batch filmed and delivered; client trained, playbook sent, launched. Weeks 5-8: lead-gen activation (turning the built system into actual leads). Weeks 9-12: independence and paid ads (client can run it themselves, ads layered on top).",
+      notes: "A comprehensive 120-day build across every foundational gap — Get Found, Capture and the systems work, including everything Software Setup alone covers, plus lead-gen activation and paid ads on top. Recommend Brand OS (not standalone Software Setup) when the business has multiple foundational gaps across different channels, not just one narrow issue." },
     { name: 'Ads Management', price: null, blurb: 'We run your ads and fill your funnel. The next 120 days.',
+      deliverables: 'Recurring monthly cycle: ad account access granted and audited, tracking/pixel confirmed, campaign strategy session, creatives briefed, campaigns built and made live; weekly optimisation meetings, performance baseline and A/B tests set up, budget pacing checked, audience/creative adjustments made; monthly performance report delivered and next month’s budget/strategy reviewed.',
       notes: 'Only makes sense once the foundation (booking, follow-up, a working capture page) is in decent shape — recommend this for paid-ads-specific gaps on a business whose other foundations already score reasonably well.' },
     { name: 'Software Setup', price: '$1500', blurb: 'We set up your systems, then hand you the keys.',
+      deliverables: '4-week build (this is literally the first 4 weeks of Brand OS, Phase 1 "System Build"): Week 1 intake, brand assets and content questionnaire collected. Week 2 funnel and CRM built and approved, domain connected, business number purchased, sending domain and calendar connected, pipelines and automations created, email templates loaded, booking calendar and integrations set up. Week 3 bio optimised, CTA finalised, content strategy completed, filming session held, first content batch delivered and revised. Week 4 client trained, playbook sent, weekly tech call assigned, QA’d and launched.',
       notes: "The narrower, standalone version of the systems/booking work that's also included inside Brand OS. Recommend this alone only when systems/booking is genuinely their one clear gap and their other foundations are already solid — otherwise Brand OS is the smarter, more complete fit." },
     { name: 'Content', price: '$1000/$1500', blurb: 'We create your content, so you show up without the effort.',
+      deliverables: 'Recurring monthly cycle: content strategy session and a monthly content plan approved, shot list briefed and a filming date set; filming session held, raw footage reviewed, editing brief confirmed; hero reels (x4), basic reels (x8), short branded reels (x8) and photos (x5) edited and delivered; client revisions completed, a full posting calendar delivered, and a monthly review call held.',
       notes: 'For a content-specific gap on a business whose other foundations are otherwise fine.' },
   ];
 
@@ -786,29 +794,34 @@
     </div>`;
   }
   // One card per channel. sectionKey drives the status badge and (via
-  // CHANNEL_META) the quick win / help blocks; channels with no score
-  // yet (or that score Strong) skip the quick-win/help blocks and show
-  // just the badge and what-good-looks-like reference.
-  function channelCard(title, sectionKey, bullets, scores, quickWinOverride) {
+  // CHANNEL_META) the quick win / help blocks; channels with no score yet
+  // (or that score Strong) skip the quick-win/help blocks and show just the
+  // badge and what-good-looks-like reference. `ai` (optional) is that
+  // channel's entry from the AI recommendation pass — when present it
+  // overrides best_practices/quick_win/help entirely, baked in at build
+  // time (not patched afterward), so cached, fresh, and regenerated
+  // renders are always built the exact same way.
+  function channelCard(title, sectionKey, bullets, scores, ai) {
     const s = sectionKey ? scores.sections[sectionKey] : null;
     const chip = s ? s.chip : null;
     const badgeCls = chip === 'strong' ? 'strong' : chip === 'needswork' ? 'needswork' : chip ? 'missing' : null;
     const showGap = badgeCls && badgeCls !== 'strong';
     const meta = sectionKey ? CHANNEL_META[sectionKey] : null;
-    const quickWin = quickWinOverride || meta?.quickWin;
+    const finalBullets = ai?.best_practices?.length ? ai.best_practices : bullets;
+    const quickWin = ai?.quick_win || meta?.quickWin;
+    const helpService = ai?.help_service || meta?.service;
+    const helpText = ai?.help_reason || meta?.serviceBlurb;
     // Quick-win/help blocks always render (hidden via CSS when not shown)
-    // rather than being conditionally omitted, so the AI pass always has a
-    // stable element to patch into regardless of this channel's status —
-    // and so a Regenerate after a score change can reveal them without a
-    // full re-render.
+    // rather than being conditionally omitted, so a later regenerate can
+    // reveal them without needing different markup.
     return `<div class="ch-card" data-channel-key="${esc(sectionKey || '')}">
       <div class="ch-card-head">
         <h3>${esc(title)}</h3>
         ${badgeCls ? `<span class="ch-badge ${badgeCls}">${esc(chipLabel(chip))}</span>` : ''}
       </div>
-      <div class="ch-block ch-bestpractice"><h4>What good looks like</h4><ul>${bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>
+      <div class="ch-block ch-bestpractice"><h4>What good looks like</h4><ul>${finalBullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>
       <div class="ch-block ch-quickwin"${showGap && meta ? '' : ' hidden'}><h4>Quick win &mdash; free, next 30 days</h4><p>${meta ? esc(quickWin) : ''}</p></div>
-      <div class="ch-block ch-help"${showGap && meta ? '' : ' hidden'}><h4>What we can help with</h4><p>${meta ? `${esc(meta.serviceBlurb)} <span style="color:var(--dg-orange)">(${esc(meta.service)})</span>` : ''}</p></div>
+      <div class="ch-block ch-help"${showGap && meta ? '' : ' hidden'}><h4>What we can help with</h4><p>${meta ? `${esc(helpText)} <span style="color:var(--dg-orange)">(${esc(helpService)})</span>` : ''}</p></div>
     </div>`;
   }
   function docGroup(cls, title, cardsHtml) {
@@ -850,8 +863,28 @@
   }
   function showReport() {
     const a = cur; const scores = computeScores(a); const rec = computeRecommendation(a, scores);
-    const { ltv, gltv } = ltvMath(a);
     const group = CONFIG_GROUPS[rec.group];
+    lastReportCtx = { a, scores, rec, group };
+    // Only trust the cache if it's shaped the way the current renderer
+    // expects (a "channels" array) — an older cached shape from before a
+    // schema change must never silently pass as valid and block
+    // regeneration with no error shown; that's exactly what happened once.
+    const cachedAI = a.aiRecommendation?.channels?.length ? a.aiRecommendation : null;
+    if (cachedAI) {
+      renderReport(cachedAI, { firstOpen: true });
+    } else {
+      generateThenRenderReport(lastReportCtx);
+    }
+  }
+  // Builds and paints the ENTIRE report in one pass — deterministic content
+  // plus whatever AI data is available (null before the first generation,
+  // or if AI failed) baked straight into each channel card at build time.
+  // Never called with a half-finished AI result: the caller decides when
+  // this runs, so the report is either the full deterministic version or
+  // the full AI-sharpened version, never something in between.
+  function renderReport(aiData, { firstOpen } = {}) {
+    const { a, scores, rec, group } = lastReportCtx;
+    const { ltv, gltv } = ltvMath(a);
     const targetClients = Number(a.answers.targetNewClients) || 4;
     const leadsNeeded = targetClients * 10;
     const serviceCardName = { Setup: 'Software Setup', Content: 'Content', 'Brand OS': 'Brand OS', 'Ads Management': 'Ads Management' }[rec.service] || rec.service;
@@ -863,6 +896,7 @@
       const cls = val < floor ? 'low' : 'ok';
       return `<tr><td>${label}</td><td class="${cls}">${Math.round(val)}%</td><td class="muted">floor ${floor}%${healthy ? `, healthy ${healthy}%+` : ''}</td></tr>`;
     };
+    const aiCh = key => aiData?.channels?.find(c => c.channel_key === key);
 
     const sections = [];
 
@@ -944,36 +978,36 @@
       <h2 class="doc-h2">Two ways to get found. You need both.</h2>
       <p style="font-size:14.5px; color:#57524c; max-width:640px;">Active: you put in time or money, and more people find you. Passive: you set it up once, and it works in the background. You need both.</p>
       ${docGroup('active', 'Active', [
-        channelCard('Creating content', 'content', CHANNEL_BULLETS.content, scores),
-        channelCard('Paid ads', 'paidads', CHANNEL_BULLETS.paidads, scores),
-        channelCard('Outreach', 'outreach', CHANNEL_BULLETS.outreach, scores),
+        channelCard('Creating content', 'content', CHANNEL_BULLETS.content, scores, aiCh('content')),
+        channelCard('Paid ads', 'paidads', CHANNEL_BULLETS.paidads, scores, aiCh('paidads')),
+        channelCard('Outreach', 'outreach', CHANNEL_BULLETS.outreach, scores, aiCh('outreach')),
         channelCard('Events and workshops', null, [
           'Give a real experience, not a sales pitch.', 'Promote by email first, then social.',
           'Let people bring a friend.', 'Use one booking link so you can track it.', 'Follow up with everyone who comes.',
         ], scores),
       ].join(''))}
       ${docGroup('passive', 'Passive', [
-        channelCard('Referrals', 'referrals', CHANNEL_BULLETS.referrals, scores),
-        channelCard('Reviews and Google', 'reviews', CHANNEL_BULLETS.reviews, scores),
-        channelCard('Your website (search and AI)', 'website', CHANNEL_BULLETS.website, scores),
-        channelCard('Directory listings', 'directories', CHANNEL_BULLETS.directories, scores, group?.directories),
+        channelCard('Referrals', 'referrals', CHANNEL_BULLETS.referrals, scores, aiCh('referrals')),
+        channelCard('Reviews and Google', 'reviews', CHANNEL_BULLETS.reviews, scores, aiCh('reviews')),
+        channelCard('Your website (search and AI)', 'website', CHANNEL_BULLETS.website, scores, aiCh('website')),
+        channelCard('Directory listings', 'directories', CHANNEL_BULLETS.directories, scores, aiCh('directories') || (group?.directories ? { quick_win: group.directories } : undefined)),
         channelCard('Word of mouth', null, [
           'The best marketing is a great experience.', 'Give people a simple story to pass on.',
           'Make it easy to share you.', 'You cannot force it, but you can earn it.',
         ], scores),
       ].join(''))}
       <div class="eyebrow-sm" style="margin-top:36px;">JOB 2 &middot; CAPTURE INTEREST</div>
-      ${docGroup('capture', null, channelCard('Turning interest into leads', 'capture', CHANNEL_BULLETS.capture, scores))}
+      ${docGroup('capture', null, channelCard('Turning interest into leads', 'capture', CHANNEL_BULLETS.capture, scores, aiCh('capture')))}
     </div>`);
 
     // Job 3 — Sell
     sections.push(docBanner('JOB 3', 'Sell', null, true));
     sections.push(`<div class="doc-section" style="margin-top:0;">
       ${docGroup('sell', null, [
-        channelCard('Speed to reply', 'speed', CHANNEL_BULLETS.speed, scores),
-        channelCard('Follow-up', 'followup', CHANNEL_BULLETS.followup, scores),
-        channelCard('Show rate', 'show', CHANNEL_BULLETS.show, scores),
-        channelCard('The sales call', 'sales', CHANNEL_BULLETS.sales, scores),
+        channelCard('Speed to reply', 'speed', CHANNEL_BULLETS.speed, scores, aiCh('speed')),
+        channelCard('Follow-up', 'followup', CHANNEL_BULLETS.followup, scores, aiCh('followup')),
+        channelCard('Show rate', 'show', CHANNEL_BULLETS.show, scores, aiCh('show')),
+        channelCard('The sales call', 'sales', CHANNEL_BULLETS.sales, scores, aiCh('sales')),
       ].join(''))}
     </div>`);
 
@@ -995,18 +1029,21 @@
       <p style="margin-top:26px; font-size:15px;">More leads come from doing Jobs 1 and 2 better. Better book, show and close come from Job 3.</p>
     </div>`);
 
-    // Low-hanging fruit for their field — real, named, mostly-free tactics
-    // (directories, booking platforms, proof formats) specific to their
-    // practitioner group. Always shown, independent of score, since these
-    // are foundational "just go do this" items regardless of how anything
-    // scored.
-    if (group?.lowHangingFruit?.length) {
+    // Low-hanging fruit for their field — once the AI has run, this is its
+    // field_best_practices (specific to the exact practitionerType, e.g. a
+    // chiro's list differs from a psychologist's even in the same
+    // compliance group); before that, the static per-group starter list.
+    // Always shown regardless of score — these are foundational "just go
+    // do this" items.
+    const fieldPractices = aiData?.field_best_practices?.length ? aiData.field_best_practices : group?.lowHangingFruit;
+    if (fieldPractices?.length) {
+      const fieldLabel = PRACTITIONER_TYPES.find(t => t.v === a.answers.practitionerType)?.l || group?.label?.replace(/^Group [A-Z] — /, '') || 'your field';
       sections.push(`<div class="doc-section">
         <div class="eyebrow-sm">LOW-HANGING FRUIT</div>
         <h2 class="doc-h2">Best practices for your field</h2>
-        <p style="font-size:14.5px; color:#57524c;">Specific to ${esc(group.label.replace(/^Group [A-Z] — /, ''))} — mostly free, mostly quick.</p>
+        <p style="font-size:14.5px; color:#57524c;">Specific to ${esc(fieldLabel)} — mostly free, mostly quick.</p>
         <ul class="plan-checklist">
-          ${group.lowHangingFruit.map(item => `<li><span class="chk"></span>${esc(item)}</li>`).join('')}
+          ${fieldPractices.map(item => `<li><span class="chk"></span>${esc(item)}</li>`).join('')}
         </ul>
       </div>`);
     }
@@ -1017,34 +1054,21 @@
     // since fixing the true constraint compounds through the rest of the
     // funnel; remaining slots go to whichever channels have the most
     // points genuinely recoverable (weight x how far below good they
-    // are), not just the highest-weight section. Directory listings uses
-    // the practitioner-specific list instead of the generic quick win,
-    // same as the channel card above.
-    const quickWinFor = key => (key === 'directories' && group?.directories) || CHANNEL_META[key].quickWin;
+    // are), not just the highest-weight section. AI's own per-channel
+    // quick win wins when available; directory listings falls back to the
+    // practitioner-specific override before the generic copy.
+    const quickWinFor = key => aiCh(key)?.quick_win || (key === 'directories' && group?.directories) || CHANNEL_META[key].quickWin;
     const top3 = topThirtyDayActions(scores, rec);
     sections.push(`<div class="doc-section">
       <div class="eyebrow-sm">YOUR PLAN</div>
       <h2 class="doc-h2">Your plan for the first 30 days</h2>
-      <div id="dg-planContent">
       ${top3.length ? `
-      <p style="font-size:14.5px; color:#57524c;">${esc(rec.priorityBlurb || 'Based on where you stand today, here are the three biggest things to fix first.')}</p>
+      <p style="font-size:14.5px; color:#57524c;">${esc(aiData?.priority_summary || rec.priorityBlurb || 'Based on where you stand today, here are the three biggest things to fix first.')}</p>
       <ul class="plan-checklist">
         ${top3.map(c => `<li><span class="chk"></span><span style="color:var(--dg-orange);">${esc(c.label)}:</span> ${esc(quickWinFor(c.key))}</li>`).join('')}
-      </ul>` : `
+      </ul>
+      ${aiData ? `<div style="font-size:11px; color:#a89f8f; margin-top:10px; letter-spacing:.03em;">Sharpened by AI, based on this business's own numbers and goals.</div>` : ''}` : `
       <p style="font-size:14.5px; color:#57524c;">You're already doing the fundamentals well across every channel — nothing urgent to fix this month. Keep it up.</p>`}
-      </div>
-      <div class="dg-ai-prompt">
-        <div class="dg-ai-prompt-head">
-          <label for="dg-aiPromptInput">&#10024; AI recommendations</label>
-          <button class="secondary small" type="button" onclick="Diagnostic.regenerateAIRecommendation()">Regenerate</button>
-        </div>
-        <div class="dg-ai-prompt-sub">Rewrites the best practices, quick win and "what we can help with" on every channel card above, plus the 30-day plan. Generated once and saved — opening the report again won't re-run it or spend AI credits. Use Regenerate for a fresh pass, or tell it something to factor in below.</div>
-        <div class="dg-ai-prompt-row">
-          <input type="text" id="dg-aiPromptInput" placeholder="e.g. they mentioned wanting to expand into telehealth, weight that in">
-          <button class="accent" type="button" onclick="Diagnostic.refinePlanWithPrompt()">Ask AI</button>
-        </div>
-        <div id="dg-aiPromptStatus"></div>
-      </div>
     </div>`);
 
     // Special notes — the practitioner-type compliance note (always
@@ -1065,17 +1089,37 @@
       </div>`);
     }
 
-    // Ways to work with us
+    // Ways to work with us — each card also lists the specific gaps (from
+    // this business's own needs-work/missing channels) that service would
+    // actually close, using the AI's own help_reason when available so the
+    // bullets name real deliverables instead of a generic blurb.
+    const serviceGapBullets = {};
+    SECTIONS.filter(s => s.key !== 'measure').forEach(sec => {
+      const sc = scores.sections[sec.key];
+      if (sc.chip === 'strong') return; // only gaps earn a bullet
+      const ch = aiCh(sec.key);
+      const svcName = ch?.help_service || CHANNEL_META[sec.key]?.service;
+      if (!svcName) return;
+      const text = ch?.help_reason ? `${sec.label}: ${ch.help_reason}` : sec.label;
+      (serviceGapBullets[svcName] = serviceGapBullets[svcName] || []).push(text);
+    });
+    const priceCard = name => {
+      const svc = GATHR_SERVICES.find(s => s.name === name);
+      const bullets = serviceGapBullets[name];
+      return `<div class="${rc(name)}">${recTag(name)}<h4>${esc(svc.name)}${svc.price ? ' - ' + esc(svc.price) : ''}</h4><p>${esc(svc.blurb)}</p>
+        ${bullets?.length ? `<ul class="price-card-bullets">${bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>` : ''}
+      </div>`;
+    };
     sections.push(`<div class="doc-section">
       <div class="eyebrow-sm">HOW WE CAN HELP</div>
       <h2 class="doc-h2">Ways to work with us</h2>
       <p style="font-size:14.5px; color:#57524c; max-width:640px;">None of this is complicated, but it takes time, and time on marketing is time away from your clients. You can do all of it yourself — or, if you'd rather stay with your clients, this is exactly what we do.</p>
       <div class="price-grid">
-        ${['Brand OS', 'Ads Management'].map(name => { const svc = GATHR_SERVICES.find(s => s.name === name); return `<div class="${rc(name)}">${recTag(name)}<h4>${esc(svc.name)}${svc.price ? ' - ' + esc(svc.price) : ''}</h4><p>${esc(svc.blurb)}</p></div>`; }).join('')}
+        ${['Brand OS', 'Ads Management'].map(priceCard).join('')}
       </div>
       <div class="price-subhead">Just want part of it?</div>
       <div class="price-grid">
-        ${['Software Setup', 'Content'].map(name => { const svc = GATHR_SERVICES.find(s => s.name === name); return `<div class="${rc(name)}">${recTag(name)}<h4>${esc(svc.name)}${svc.price ? ' - ' + esc(svc.price) : ''}</h4><p>${esc(svc.blurb)}</p></div>`; }).join('')}
+        ${['Software Setup', 'Content'].map(priceCard).join('')}
       </div>
     </div>`);
 
@@ -1090,23 +1134,10 @@
     // re-generating the report never silently leaves stale edits editable.
     const editBtn = $('editToggle'); if (editBtn) editBtn.textContent = 'Edit details';
     const editHint = $('editHint'); if (editHint) editHint.classList.add('hidden');
-    document.getElementById('tab-diagnostic')?.scrollIntoView({ behavior: 'auto', block: 'start' });
-
-    // AI recommendations are generated ONCE per assessment and saved on the
-    // record itself — every later "Generate strategy report" just renders
-    // the saved version, no API call, no credits spent. A fresh call only
-    // happens the very first time, or when the team explicitly hits
-    // Regenerate or submits a custom instruction.
-    // Only trust the cache if it's shaped the way the current renderer
-    // expects (a "channels" array) — an older cached shape from before a
-    // schema change must never silently pass as valid and block
-    // regeneration with no error shown; that's exactly what happened here.
-    lastReportCtx = { a, scores, rec, group };
-    if (a.aiRecommendation?.channels?.length) {
-      renderAIRecommendation(a.aiRecommendation);
-    } else {
-      fetchAIRecommendation(lastReportCtx);
-    }
+    // Only jump to the top on the initial form->report transition — a
+    // Regenerate or Ask AI while already reading the report shouldn't
+    // yank the scroll position out from under the team.
+    if (firstOpen) document.getElementById('tab-diagnostic')?.scrollIntoView({ behavior: 'auto', block: 'start' });
   }
   function buildAIContext({ a, scores, rec, group }) {
     const channels = SECTIONS.filter(s => s.key !== 'measure').map(s => {
@@ -1129,7 +1160,7 @@
       biggestGapInOwnWords: a.answers.biggestGap || null,
       // What Gathr can actually deliver — the AI's recommendations must be
       // grounded in these, not invented services.
-      gathrServices: GATHR_SERVICES.map(s => ({ name: s.name, price: s.price, blurb: s.blurb, notes: s.notes })),
+      gathrServices: GATHR_SERVICES.map(s => ({ name: s.name, price: s.price, blurb: s.blurb, notes: s.notes, deliverables: s.deliverables })),
       fieldLowHangingFruit: group?.lowHangingFruit || [],
     };
   }
@@ -1140,59 +1171,35 @@
   // them, i.e. not Strong) plus rebuilds the "first 30 days" digest using
   // the same deterministic impact ranking as before, now with beefed-up
   // AI text per channel instead of the static copy.
-  function renderAIRecommendation(data) {
-    if (!data?.channels?.length || !lastReportCtx) return;
-    const byKey = {};
-    data.channels.forEach(c => { if (c.channel_key) byKey[c.channel_key] = c; });
-
-    document.querySelectorAll('.ch-card[data-channel-key]').forEach(card => {
-      const key = card.getAttribute('data-channel-key');
-      const chData = byKey[key];
-      if (!chData) return;
-      const bpUl = card.querySelector('.ch-bestpractice ul');
-      if (bpUl && chData.best_practices?.length) bpUl.innerHTML = chData.best_practices.map(b => `<li>${esc(b)}</li>`).join('');
-      const qwBlock = card.querySelector('.ch-quickwin');
-      if (qwBlock && !qwBlock.hidden && chData.quick_win) {
-        const p = qwBlock.querySelector('p'); if (p) p.textContent = chData.quick_win;
-      }
-      const helpBlock = card.querySelector('.ch-help');
-      if (helpBlock && !helpBlock.hidden && chData.help_service) {
-        const p = helpBlock.querySelector('p');
-        if (p) p.innerHTML = `${esc(chData.help_reason || '')} <span style="color:var(--dg-orange)">(${esc(chData.help_service)})</span>`;
-      }
-    });
-
-    const planEl = document.getElementById('dg-planContent');
-    if (planEl) {
-      const { scores, rec } = lastReportCtx;
-      const top3 = topThirtyDayActions(scores, rec);
-      planEl.innerHTML = `
-        <p style="font-size:14.5px; color:#57524c;">${esc(data.priority_summary || '')}</p>
-        <ul class="plan-checklist">
-          ${top3.map(c => `<li><span class="chk"></span><span style="color:var(--dg-orange);">${esc(c.label)}:</span> ${esc(byKey[c.key]?.quick_win || CHANNEL_META[c.key].quickWin)}</li>`).join('')}
-        </ul>
-        <div style="font-size:11px; color:#a89f8f; margin-top:10px; letter-spacing:.03em;">Sharpened by AI, based on this business's own numbers and goals.</div>`;
-    }
+  // Fun, rotating copy for the blocking "generating" modal so a minute-long
+  // wait doesn't feel stuck — plus a live elapsed-time counter.
+  let aiModalTimer = null;
+  const AI_MODAL_MESSAGES = ['Analysing every channel…', 'Matching services to your gaps…', 'Sharpening the quick wins…', 'Double-checking the numbers…', 'Writing it up…'];
+  function showAIModal() {
+    const modal = document.getElementById('dg-aiModal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+    const timerEl = document.getElementById('dg-aiModalTimer');
+    const msgEl = document.getElementById('dg-aiModalMsg');
+    let elapsed = 0, msgIdx = 0;
+    if (timerEl) timerEl.textContent = '0s';
+    if (msgEl) msgEl.textContent = AI_MODAL_MESSAGES[0];
+    if (aiModalTimer) clearInterval(aiModalTimer);
+    aiModalTimer = setInterval(() => {
+      elapsed++;
+      if (timerEl) timerEl.textContent = elapsed + 's';
+      if (msgEl && elapsed % 6 === 0) { msgIdx = (msgIdx + 1) % AI_MODAL_MESSAGES.length; msgEl.textContent = AI_MODAL_MESSAGES[msgIdx]; }
+    }, 1000);
   }
-  // Calls the AI, renders the result, and — this is the part that stops
-  // repeat API spend — saves it onto the assessment record via the normal
-  // persist() path, so the very next "Generate strategy report" (even a
-  // page reload) finds a and skips the call entirely.
-  async function fetchAIRecommendation({ a, scores, rec, group }, customInstruction) {
-    const planEl = document.getElementById('dg-planContent');
-    if (!planEl) return;
-    const promptBox = document.querySelector('#dg-reportInner .dg-ai-prompt');
-    const statusEl = document.getElementById('dg-aiPromptStatus');
-    const isFirstTime = !customInstruction && !a.aiRecommendation;
-    const busyMsg = customInstruction ? 'Asking AI…' : isFirstTime ? 'Generating your AI report — analysing every channel, this can take up to a minute…' : 'Regenerating — analysing every channel, this can take up to a minute…';
-    // A tiny grey status line is easy to miss entirely, which is exactly
-    // what happened last time — a stale-shaped cache silently skipped
-    // regeneration with no visible error. Make busy/success/failure loud:
-    // a toast (visible regardless of scroll position) plus the AI card
-    // itself changing colour while working.
-    toast(busyMsg);
-    if (statusEl) statusEl.textContent = busyMsg;
-    if (promptBox) promptBox.classList.add('busy');
+  function hideAIModal() {
+    const modal = document.getElementById('dg-aiModal');
+    if (modal) modal.classList.add('hidden');
+    if (aiModalTimer) { clearInterval(aiModalTimer); aiModalTimer = null; }
+  }
+  // Pure network call — talks to the server and saves on success, but never
+  // touches report DOM itself, so it's safe to reuse for the blocking
+  // first-generate flow and the lighter regenerate/custom-prompt flow.
+  async function requestAIRecommendation({ a, scores, rec, group }, customInstruction) {
     const context = buildAIContext({ a, scores, rec, group });
     try {
       const r = await fetch('/api/diagnostic/ai-recommendations', {
@@ -1202,37 +1209,57 @@
       if (!r.ok) {
         const errBody = await r.json().catch(() => null);
         console.warn('[Diagnostic] AI recommendations failed:', r.status, errBody);
-        const msg = `AI generation failed (${errBody?.detail || r.status}) — ${a.aiRecommendation ? 'previous version kept' : 'showing the deterministic version'}.`;
-        toast(msg);
-        if (statusEl) statusEl.textContent = msg;
-        return;
+        return { ok: false, error: `AI generation failed (${errBody?.detail || r.status})` };
       }
       const data = await r.json();
-      if (!data?.channels?.length) { const msg = 'AI returned nothing usable — nothing changed.'; toast(msg); if (statusEl) statusEl.textContent = msg; return; }
-      if (!document.body.contains(planEl)) return; // user navigated away while we waited
-      renderAIRecommendation(data);
+      if (!data?.channels?.length) return { ok: false, error: 'AI returned nothing usable' };
       cur.aiRecommendation = data;
-      await persist(); // saves once — this is what makes it free to view again
-      const msg = customInstruction ? 'AI update saved.' : 'AI report generated and saved.';
-      toast(msg);
-      if (statusEl) statusEl.textContent = msg;
+      await persist(); // saves once — this is what makes it free to view again later
+      return { ok: true, data };
     } catch {
-      const msg = "Couldn't reach AI — nothing changed.";
-      toast(msg);
-      if (statusEl) statusEl.textContent = msg;
-    } finally {
-      if (promptBox) promptBox.classList.remove('busy');
+      return { ok: false, error: "Couldn't reach AI" };
     }
+  }
+  // First-time generation: block behind the modal and only paint the report
+  // once AI actually finishes (success or failure) — never a half-baked or
+  // stale report while generation is still running.
+  async function generateThenRenderReport(ctx) {
+    showAIModal();
+    const result = await requestAIRecommendation(ctx);
+    hideAIModal();
+    toast(result.ok ? 'AI report generated and saved.' : `${result.error} — showing the deterministic version.`);
+    renderReport(result.ok ? result.data : null, { firstOpen: true });
+  }
+  // Regenerate / Ask AI on an already-open report — lighter touch than the
+  // full modal since the report is already visible and usable; the console
+  // panel itself pulses instead.
+  async function runAIAndRerender(customInstruction) {
+    if (!lastReportCtx) return;
+    const consoleBox = document.querySelector('.dg-ai-console');
+    const statusEl = document.getElementById('dg-aiPromptStatus');
+    const busyMsg = customInstruction ? 'Asking AI…' : 'Regenerating — analysing every channel, this can take up to a minute…';
+    toast(busyMsg);
+    if (statusEl) statusEl.textContent = busyMsg;
+    if (consoleBox) consoleBox.classList.add('busy');
+    const result = await requestAIRecommendation(lastReportCtx, customInstruction);
+    if (consoleBox) consoleBox.classList.remove('busy');
+    if (!result.ok) {
+      const msg = `${result.error} — previous version kept.`;
+      toast(msg); if (statusEl) statusEl.textContent = msg;
+      return;
+    }
+    renderReport(result.data, { firstOpen: false });
+    const msg = customInstruction ? 'AI update saved.' : 'AI report generated and saved.';
+    toast(msg); if (statusEl) statusEl.textContent = msg;
   }
   function refinePlanWithPrompt() {
     const input = document.getElementById('dg-aiPromptInput');
     const instruction = input?.value.trim();
-    if (!instruction || !lastReportCtx) return;
-    fetchAIRecommendation(lastReportCtx, instruction);
+    if (!instruction) return;
+    runAIAndRerender(instruction);
   }
   function regenerateAIRecommendation() {
-    if (!lastReportCtx) return;
-    fetchAIRecommendation(lastReportCtx);
+    runAIAndRerender();
   }
   function backToForm() { $('reportSection').classList.add('hidden'); $('formView').classList.remove('hidden'); }
   // Let the team fix wording or fill in a missing detail directly in the

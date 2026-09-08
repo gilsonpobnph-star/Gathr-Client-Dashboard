@@ -245,18 +245,32 @@
 #tab-diagnostic .plan-checklist .chk{width:19px; height:19px; border:1.5px solid var(--dg-charcoal); border-radius:3px; flex-shrink:0; margin-top:3px;}
 #tab-diagnostic .plan-close-line{font-weight:700; margin-top:22px; font-size:15.5px;}
 
-#tab-diagnostic .dg-ai-prompt{ margin-top:22px; padding:18px 20px; background:linear-gradient(135deg, var(--dg-lightgrey), #f8f4ec); border:1px solid var(--dg-warmgrey); border-radius:10px; transition:background .3s, border-color .3s; }
-#tab-diagnostic .dg-ai-prompt.busy{ background:linear-gradient(135deg, #fdf1ea, #fbe6d8); border-color:var(--dg-orange); animation:dg-ai-pulse 1.6s ease-in-out infinite; }
+/* AI console: a team-only control panel above the report (not inside it —
+   sibling of #dg-reportView, so it's never part of what prints). */
+#tab-diagnostic .dg-ai-console{ margin:0 0 24px; padding:18px 20px; background:linear-gradient(135deg, var(--dg-lightgrey), #f8f4ec); border:1px solid var(--dg-warmgrey); border-radius:10px; transition:background .3s, border-color .3s; }
+#tab-diagnostic .dg-ai-console.busy{ background:linear-gradient(135deg, #fdf1ea, #fbe6d8); border-color:var(--dg-orange); animation:dg-ai-pulse 1.6s ease-in-out infinite; }
 @keyframes dg-ai-pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.72; } }
-#tab-diagnostic .dg-ai-prompt-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
-#tab-diagnostic .dg-ai-prompt-head button{ border-radius:20px; padding:6px 14px; }
-#tab-diagnostic .dg-ai-prompt label{ display:block; font-size:13.5px; font-weight:700; color:var(--dg-orange); margin-bottom:3px; }
-#tab-diagnostic .dg-ai-prompt-sub{ font-size:12.5px; color:#7d766e; margin-bottom:12px; }
-#tab-diagnostic .dg-ai-prompt-row{ display:flex; gap:10px; }
-#tab-diagnostic .dg-ai-prompt input{ flex:1; font-family:var(--dg-sans); font-size:14px; padding:11px 16px; border:1px solid var(--dg-warmgrey); border-radius:22px; background:#fff; color:var(--dg-charcoal); }
-#tab-diagnostic .dg-ai-prompt input::placeholder{ color:#a89f8f; }
-#tab-diagnostic .dg-ai-prompt input:focus{ outline:none; border-color:var(--dg-orange); box-shadow:0 0 0 3px rgba(205,95,57,.14); }
-#tab-diagnostic .dg-ai-prompt button{ flex-shrink:0; border-radius:22px; padding:10px 22px; }
+#tab-diagnostic .dg-ai-console-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+#tab-diagnostic .dg-ai-console-head button{ border-radius:20px; padding:6px 14px; }
+#tab-diagnostic .dg-ai-console label{ display:block; font-size:13.5px; font-weight:700; color:var(--dg-orange); margin-bottom:3px; }
+#tab-diagnostic .dg-ai-console-sub{ font-size:12.5px; color:#7d766e; margin-bottom:12px; }
+#tab-diagnostic .dg-ai-console-row{ display:flex; gap:10px; }
+#tab-diagnostic .dg-ai-console input{ flex:1; font-family:var(--dg-sans); font-size:14px; padding:11px 16px; border:1px solid var(--dg-warmgrey); border-radius:22px; background:#fff; color:var(--dg-charcoal); }
+#tab-diagnostic .dg-ai-console input::placeholder{ color:#a89f8f; }
+#tab-diagnostic .dg-ai-console input:focus{ outline:none; border-color:var(--dg-orange); box-shadow:0 0 0 3px rgba(205,95,57,.14); }
+#tab-diagnostic .dg-ai-console button{ flex-shrink:0; border-radius:22px; padding:10px 22px; }
+#tab-diagnostic #dg-aiPromptStatus{ font-size:12px; color:#7d766e; margin-top:9px; min-height:14px; }
+
+/* Blocking "generating" modal — cute and fancy, per request, with a live
+   elapsed-time counter so it doesn't feel stuck. */
+#tab-diagnostic .dg-ai-modal{ position:fixed; inset:0; z-index:500; display:flex; align-items:center; justify-content:center; background:rgba(50,47,47,.6); backdrop-filter:blur(2px); }
+#tab-diagnostic .dg-ai-modal.hidden{ display:none; }
+#tab-diagnostic .dg-ai-modal-card{ background:#fff; border-radius:16px; padding:40px 44px; text-align:center; max-width:360px; box-shadow:0 20px 60px rgba(0,0,0,.35); }
+#tab-diagnostic .dg-ai-modal-spinner{ font-size:40px; animation:dg-ai-spin-bounce 1.4s ease-in-out infinite; }
+@keyframes dg-ai-spin-bounce{ 0%,100%{ transform:scale(1) rotate(0deg); } 50%{ transform:scale(1.18) rotate(12deg); } }
+#tab-diagnostic .dg-ai-modal-card h3{ font-family:var(--dg-serif); font-size:22px; font-weight:700; margin:14px 0 8px; }
+#tab-diagnostic .dg-ai-modal-card p{ font-size:14px; color:#7d766e; margin:0 0 16px; min-height:20px; }
+#tab-diagnostic .dg-ai-modal-timer{ font-size:12px; letter-spacing:.05em; text-transform:uppercase; color:var(--dg-orange); font-weight:700; }
 #tab-diagnostic #dg-aiPromptStatus{ font-size:12px; color:#7d766e; margin-top:9px; min-height:14px; }
 
 #tab-diagnostic .price-grid{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:22px;}
@@ -265,6 +279,8 @@
 #tab-diagnostic .price-card .rec-tag{display:inline-block; background:var(--dg-orange); color:#fff; font-size:10px; letter-spacing:.06em; text-transform:uppercase; padding:3px 9px; border-radius:20px; margin-bottom:8px;}
 #tab-diagnostic .price-card h4{color:var(--dg-orange); font-weight:700; font-size:18px; margin-bottom:6px;}
 #tab-diagnostic .price-card p{font-size:13.5px; color:#57524c;}
+#tab-diagnostic .price-card-bullets{list-style:disc; padding-left:18px; margin:10px 0 0;}
+#tab-diagnostic .price-card-bullets li{font-size:12.5px; color:#3a3632; margin-bottom:5px;}
 #tab-diagnostic .price-subhead{font-weight:700; margin-top:22px; font-size:14px;}
 
 @media print{
@@ -306,7 +322,9 @@
     -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; color-adjust:exact !important;
   }
   #tab-diagnostic .report-actions, #tab-diagnostic .toast{ visibility:hidden !important; display:none !important; }
-  #tab-diagnostic .dg-ai-prompt{ visibility:hidden !important; display:none !important; }
+  /* .dg-ai-console and .dg-ai-modal are outside #dg-reportView entirely now,
+     so the blanket "body *{visibility:hidden}" rule above already hides
+     them — no extra rule needed. */
   #tab-diagnostic .report-inner{padding:0;}
   #tab-diagnostic .job-page{grid-template-columns:1fr 1fr;}
   #tab-diagnostic .doc-wrap{ box-shadow:none; border-radius:0; padding:0; max-width:none; }
