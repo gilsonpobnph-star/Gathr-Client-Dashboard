@@ -292,10 +292,14 @@
   // pass is told Gathr can actually deliver, so a recommendation's "what we
   // can help with" always points at something real, never an invented offer.
   const GATHR_SERVICES = [
-    { name: 'Brand OS', price: '$4500', blurb: 'We set up your whole foundation. Your first 120 days, done for you.' },
-    { name: 'Ads Management', price: null, blurb: 'We run your ads and fill your funnel. The next 120 days.' },
-    { name: 'Software Setup', price: '$1500', blurb: 'We set up your systems, then hand you the keys.' },
-    { name: 'Content', price: '$1000/$1500', blurb: 'We create your content, so you show up without the effort.' },
+    { name: 'Brand OS', price: '$4500', blurb: 'We set up your whole foundation. Your first 120 days, done for you.',
+      notes: "A comprehensive 120-day build across every foundational gap — Get Found, Capture and the systems work, including everything Software Setup alone covers. Recommend Brand OS (not standalone Software Setup) when the business has multiple foundational gaps across different channels, not just one narrow issue." },
+    { name: 'Ads Management', price: null, blurb: 'We run your ads and fill your funnel. The next 120 days.',
+      notes: 'Only makes sense once the foundation (booking, follow-up, a working capture page) is in decent shape — recommend this for paid-ads-specific gaps on a business whose other foundations already score reasonably well.' },
+    { name: 'Software Setup', price: '$1500', blurb: 'We set up your systems, then hand you the keys.',
+      notes: "The narrower, standalone version of the systems/booking work that's also included inside Brand OS. Recommend this alone only when systems/booking is genuinely their one clear gap and their other foundations are already solid — otherwise Brand OS is the smarter, more complete fit." },
+    { name: 'Content', price: '$1000/$1500', blurb: 'We create your content, so you show up without the effort.',
+      notes: 'For a content-specific gap on a business whose other foundations are otherwise fine.' },
   ];
 
   function fresh() {
@@ -792,15 +796,19 @@
     const showGap = badgeCls && badgeCls !== 'strong';
     const meta = sectionKey ? CHANNEL_META[sectionKey] : null;
     const quickWin = quickWinOverride || meta?.quickWin;
+    // Quick-win/help blocks always render (hidden via CSS when not shown)
+    // rather than being conditionally omitted, so the AI pass always has a
+    // stable element to patch into regardless of this channel's status —
+    // and so a Regenerate after a score change can reveal them without a
+    // full re-render.
     return `<div class="ch-card" data-channel-key="${esc(sectionKey || '')}">
       <div class="ch-card-head">
         <h3>${esc(title)}</h3>
         ${badgeCls ? `<span class="ch-badge ${badgeCls}">${esc(chipLabel(chip))}</span>` : ''}
       </div>
       <div class="ch-block ch-bestpractice"><h4>What good looks like</h4><ul>${bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>
-      ${showGap && meta ? `
-      <div class="ch-block ch-quickwin"><h4>Quick win &mdash; free, next 30 days</h4><p>${esc(quickWin)}</p></div>
-      <div class="ch-block ch-help"><h4>What we can help with</h4><p>${esc(meta.serviceBlurb)} <span style="color:var(--dg-orange)">(${esc(meta.service)})</span></p></div>` : ''}
+      <div class="ch-block ch-quickwin"${showGap && meta ? '' : ' hidden'}><h4>Quick win &mdash; free, next 30 days</h4><p>${meta ? esc(quickWin) : ''}</p></div>
+      <div class="ch-block ch-help"${showGap && meta ? '' : ' hidden'}><h4>What we can help with</h4><p>${meta ? `${esc(meta.serviceBlurb)} <span style="color:var(--dg-orange)">(${esc(meta.service)})</span>` : ''}</p></div>
     </div>`;
   }
   function docGroup(cls, title, cardsHtml) {
@@ -1030,7 +1038,7 @@
           <label for="dg-aiPromptInput">&#10024; AI recommendations</label>
           <button class="secondary small" type="button" onclick="Diagnostic.regenerateAIRecommendation()">Regenerate</button>
         </div>
-        <div class="dg-ai-prompt-sub">Generated once and saved — it won't re-run (or spend AI credits) just from opening the report. Use Regenerate for a fresh pass, or tell it something to factor in below.</div>
+        <div class="dg-ai-prompt-sub">Rewrites the best practices, quick win and "what we can help with" on every channel card above, plus the 30-day plan. Generated once and saved — opening the report again won't re-run it or spend AI credits. Use Regenerate for a fresh pass, or tell it something to factor in below.</div>
         <div class="dg-ai-prompt-row">
           <input type="text" id="dg-aiPromptInput" placeholder="e.g. they mentioned wanting to expand into telehealth, weight that in">
           <button class="accent" type="button" onclick="Diagnostic.refinePlanWithPrompt()">Ask AI</button>
@@ -1117,30 +1125,50 @@
       biggestGapInOwnWords: a.answers.biggestGap || null,
       // What Gathr can actually deliver — the AI's recommendations must be
       // grounded in these, not invented services.
-      gathrServices: GATHR_SERVICES.map(s => ({ name: s.name, price: s.price, blurb: s.blurb })),
+      gathrServices: GATHR_SERVICES.map(s => ({ name: s.name, price: s.price, blurb: s.blurb, notes: s.notes })),
       fieldLowHangingFruit: group?.lowHangingFruit || [],
     };
   }
   // Paint the AI recommendation into the DOM — used both for an instantly
   // rendered cached result and for a freshly fetched one, so cached and
-  // live renders always look identical.
+  // live renders always look identical. Patches every channel card
+  // (best practices always; quick-win/help only on cards that already show
+  // them, i.e. not Strong) plus rebuilds the "first 30 days" digest using
+  // the same deterministic impact ranking as before, now with beefed-up
+  // AI text per channel instead of the static copy.
   function renderAIRecommendation(data) {
-    const planEl = document.getElementById('dg-planContent');
-    if (!planEl || !data?.recommendations?.length) return;
-    planEl.innerHTML = `
-      <p style="font-size:14.5px; color:#57524c;">${esc(data.priority_summary || '')}</p>
-      <ul class="plan-checklist">
-        ${data.recommendations.map(rItem => `<li><span class="chk"></span><span style="color:var(--dg-orange);">${esc(rItem.title)}:</span> ${esc(rItem.action)}<em style="display:block; color:#7d766e; font-size:12.5px; font-style:italic; margin-top:3px;">${esc(rItem.business_impact)}${rItem.service ? ` (${esc(rItem.service)})` : ''}</em></li>`).join('')}
-      </ul>
-      <div style="font-size:11px; color:#a89f8f; margin-top:10px; letter-spacing:.03em;">Sharpened by AI, based on this business's own numbers and goals.</div>`;
-    // If the AI proposed refreshed "what good looks like" bullets for a
-    // channel, update that card too — never touches cards it didn't
-    // mention, and never removes the quick-win/help blocks it doesn't own.
-    data.recommendations.forEach(rItem => {
-      if (!rItem.best_practices?.length || !rItem.channel_key) return;
-      const card = document.querySelector(`.ch-card[data-channel-key="${CSS.escape(rItem.channel_key)}"] .ch-bestpractice ul`);
-      if (card) card.innerHTML = rItem.best_practices.map(b => `<li>${esc(b)}</li>`).join('');
+    if (!data?.channels?.length || !lastReportCtx) return;
+    const byKey = {};
+    data.channels.forEach(c => { if (c.channel_key) byKey[c.channel_key] = c; });
+
+    document.querySelectorAll('.ch-card[data-channel-key]').forEach(card => {
+      const key = card.getAttribute('data-channel-key');
+      const chData = byKey[key];
+      if (!chData) return;
+      const bpUl = card.querySelector('.ch-bestpractice ul');
+      if (bpUl && chData.best_practices?.length) bpUl.innerHTML = chData.best_practices.map(b => `<li>${esc(b)}</li>`).join('');
+      const qwBlock = card.querySelector('.ch-quickwin');
+      if (qwBlock && !qwBlock.hidden && chData.quick_win) {
+        const p = qwBlock.querySelector('p'); if (p) p.textContent = chData.quick_win;
+      }
+      const helpBlock = card.querySelector('.ch-help');
+      if (helpBlock && !helpBlock.hidden && chData.help_service) {
+        const p = helpBlock.querySelector('p');
+        if (p) p.innerHTML = `${esc(chData.help_reason || '')} <span style="color:var(--dg-orange)">(${esc(chData.help_service)})</span>`;
+      }
     });
+
+    const planEl = document.getElementById('dg-planContent');
+    if (planEl) {
+      const { scores, rec } = lastReportCtx;
+      const top3 = topThirtyDayActions(scores, rec);
+      planEl.innerHTML = `
+        <p style="font-size:14.5px; color:#57524c;">${esc(data.priority_summary || '')}</p>
+        <ul class="plan-checklist">
+          ${top3.map(c => `<li><span class="chk"></span><span style="color:var(--dg-orange);">${esc(c.label)}:</span> ${esc(byKey[c.key]?.quick_win || CHANNEL_META[c.key].quickWin)}</li>`).join('')}
+        </ul>
+        <div style="font-size:11px; color:#a89f8f; margin-top:10px; letter-spacing:.03em;">Sharpened by AI, based on this business's own numbers and goals.</div>`;
+    }
   }
   // Calls the AI, renders the result, and — this is the part that stops
   // repeat API spend — saves it onto the assessment record via the normal
@@ -1150,7 +1178,7 @@
     const planEl = document.getElementById('dg-planContent');
     if (!planEl) return;
     const statusEl = document.getElementById('dg-aiPromptStatus');
-    if (statusEl) statusEl.textContent = customInstruction ? 'Asking AI…' : 'Generating recommendations…';
+    if (statusEl) statusEl.textContent = customInstruction ? 'Asking AI…' : 'Generating — this analyses every channel, may take a bit…';
     const context = buildAIContext({ a, scores, rec, group });
     try {
       const r = await fetch('/api/diagnostic/ai-recommendations', {
@@ -1160,11 +1188,11 @@
       if (!r.ok) {
         const errBody = await r.json().catch(() => null);
         console.warn('[Diagnostic] AI recommendations failed:', r.status, errBody);
-        if (statusEl) statusEl.textContent = `Couldn't reach AI (${errBody?.detail || r.status}) — ${a.aiRecommendation ? 'previous version kept' : 'deterministic plan left as-is'}.`;
+        if (statusEl) statusEl.textContent = `Couldn't reach AI (${errBody?.detail || r.status}) — ${a.aiRecommendation ? 'previous version kept' : 'deterministic content left as-is'}.`;
         return;
       }
       const data = await r.json();
-      if (!data?.recommendations?.length) { if (statusEl) statusEl.textContent = 'AI returned nothing usable — nothing changed.'; return; }
+      if (!data?.channels?.length) { if (statusEl) statusEl.textContent = 'AI returned nothing usable — nothing changed.'; return; }
       if (!document.body.contains(planEl)) return; // user navigated away while we waited
       renderAIRecommendation(data);
       cur.aiRecommendation = data;

@@ -1042,89 +1042,83 @@ function getAnthropicClient() {
   }
   return _anthropicClient;
 }
-function aiRecommendationSchema(serviceNames) {
+function aiRecommendationSchema(serviceNames, channelKeys) {
   return {
     type: 'object',
     properties: {
-      priority_summary: { type: 'string', description: "Two to three sentences summarizing your holistic read of this business's whole diagnostic — where it genuinely stands and why these picks are the highest-impact moves right now. Reference their actual numbers, not generic advice." },
-      recommendations: {
-        // Anthropic's structured-output json_schema only supports minItems/
-        // maxItems of 0 or 1 on arrays — anything else is a 400. The "3 to
-        // 5" constraint lives in the prompt text and description instead,
-        // and the server clamps the result defensively after parsing.
+      priority_summary: { type: 'string', description: "Two to three sentences summarizing your holistic read of this business's whole diagnostic — where it genuinely stands right now and what matters most. Reference their actual numbers, not generic advice." },
+      channels: {
         type: 'array',
-        description: 'Exactly 3 to 5 items — as many as genuinely earn their place, no more, no fewer than 3.',
+        description: `Exactly one entry for EVERY one of these channel keys, no more, no fewer, none skipped: ${channelKeys.join(', ')}.`,
         items: {
           type: 'object',
           properties: {
-            channel_key: { type: 'string', description: 'One of the provided channel keys, or "measure".' },
-            title: { type: 'string' },
-            business_impact: { type: 'string', description: "Why this specific action moves revenue or client volume for THIS business — reference their funnel/LTV/target numbers." },
-            action: { type: 'string', description: 'The concrete, free, doable-in-30-days action — independent of any paid Gathr service.' },
-            service: { type: 'string', enum: serviceNames, description: "Which Gathr service (from the provided list, verbatim) would take this further for them. Always one of the given names — never invent a service Gathr doesn't offer." },
+            channel_key: { type: 'string', enum: channelKeys },
             best_practices: {
               type: 'array', items: { type: 'string' },
-              description: "Optional: only include if you have a genuinely better 'what good looks like' list for this specific channel than generic advice — 3 to 5 short bullets. Omit entirely to leave that channel's existing card unchanged.",
+              description: "4 to 6 genuinely current, specific marketing best practices for this exact channel, for this type of practitioner business — draw on real marketing knowledge for this field, not generic filler. Replaces this channel's 'what good looks like' list entirely.",
             },
+            quick_win: { type: 'string', description: "A specific, free, doable-in-30-days action for THIS business on this channel, tailored to their actual score and gap here — concrete and a real step up from generic advice ('post more content' is not acceptable; name what to post, to whom, how often). Still write one even for a channel scored Strong — the client only shows it when relevant." },
+            help_service: { type: 'string', enum: serviceNames, description: "Which ONE Gathr service is the smart fit for closing this specific gap. Reason about overlaps between services (see their notes) rather than a fixed one-to-one mapping — e.g. don't recommend a narrower service when a broader one that already includes that work is the better fit for this business's overall situation." },
+            help_reason: { type: 'string', description: 'One sentence on why this specific service is the smart fit here, for this business — not a generic service blurb.' },
           },
-          required: ['channel_key', 'title', 'business_impact', 'action', 'service'],
+          required: ['channel_key', 'best_practices', 'quick_win', 'help_service', 'help_reason'],
           additionalProperties: false,
         },
       },
     },
-    required: ['priority_summary', 'recommendations'],
+    required: ['priority_summary', 'channels'],
     additionalProperties: false,
   };
 }
+const DEFAULT_GATHR_SERVICES = [
+  { name: 'Brand OS', price: '$4500', blurb: 'We set up your whole foundation.', notes: 'A comprehensive 120-day build covering every foundational gap, including the systems work Software Setup covers alone.' },
+  { name: 'Ads Management', price: null, blurb: 'We run your ads and fill your funnel.', notes: 'Only makes sense once the foundation is in decent shape.' },
+  { name: 'Software Setup', price: '$1500', blurb: 'We set up your systems, then hand you the keys.', notes: "The narrower, standalone version of the systems work also included inside Brand OS — fits when that's their one clear gap." },
+  { name: 'Content', price: '$1000/$1500', blurb: 'We create your content, so you show up without the effort.', notes: 'For a content-specific gap on an otherwise healthy business.' },
+];
 app.post('/api/diagnostic/ai-recommendations', requireAuth, async (req, res) => {
   const client = getAnthropicClient();
   if (!client) return res.status(503).json({ error: 'AI recommendations are not configured (missing ANTHROPIC_API_KEY).' });
   const { context, customInstruction } = req.body || {};
   if (!context) return res.status(400).json({ error: 'Missing context' });
-  const services = Array.isArray(context.gathrServices) && context.gathrServices.length
-    ? context.gathrServices
-    : [{ name: 'Brand OS', price: '$4500', blurb: 'We set up your whole foundation.' }, { name: 'Ads Management', price: null, blurb: 'We run your ads and fill your funnel.' }, { name: 'Software Setup', price: '$1500', blurb: 'We set up your systems, then hand you the keys.' }, { name: 'Content', price: '$1000/$1500', blurb: 'We create your content, so you show up without the effort.' }];
+  const services = Array.isArray(context.gathrServices) && context.gathrServices.length ? context.gathrServices : DEFAULT_GATHR_SERVICES;
   const serviceNames = services.map(s => s.name);
+  const channelKeys = Array.isArray(context.channels) && context.channels.length
+    ? context.channels.map(c => c.key)
+    : ['content', 'paidads', 'outreach', 'referrals', 'reviews', 'website', 'directories', 'capture', 'speed', 'followup', 'show', 'sales'];
   try {
-    const prompt = `You are a marketing strategist for Gathr Grow, advising a health/fitness/beauty practitioner business right after a diagnostic assessment.
+    const prompt = `You are a senior marketing strategist for Gathr Grow, holistically rewriting the marketing-strategy report for a health/fitness/beauty practitioner business right after a diagnostic assessment.
 
-Analyse the ENTIRE business context below holistically before deciding anything — every channel's score, the funnel numbers together (not stage by stage), client LTV against their target, and their own words on their biggest gap. Don't just react to the single worst-looking number.
+Keep in mind the report's scores, funnel numbers, and structure are already fixed and correct — your job is ONLY to write the content that goes inside each channel's card: best practices, a quick win, and which Gathr service helps. Analyse the ENTIRE business context below holistically before writing anything — every channel's score together, the funnel numbers as a whole, client LTV against their target, and their own words on their biggest gap. Don't treat each channel in isolation.
 
 Business context (JSON):
 ${JSON.stringify(context, null, 2)}
 
-Each entry in "channels" is a marketing/sales function already scored 0-100 by a fixed rubric (higher = healthier), with a "weight" (its max points — how much it counts toward the overall score) and a "chip" status of Strong / Needs work / Missing / Too early (unmeasured). "fieldLowHangingFruit" lists real, mostly-free tactics specific to this business's field (directories, booking platforms, proof formats) — draw on these where they genuinely fit rather than generic advice.
+Each entry in "channels" is a marketing/sales function already scored 0-100 by a fixed rubric (higher = healthier), with a "weight" (its max points) and a "chip" status of Strong / Needs work / Missing / Too early (unmeasured). "fieldLowHangingFruit" lists real, mostly-free tactics specific to this business's field (directories, booking platforms, proof formats) — draw on these where they genuinely fit.
 
-Gathr's actual services — every recommendation's "service" field must be exactly one of these names, matched to whichever service genuinely fits that channel. Never invent a service, and never suggest one that isn't listed here:
+Gathr's actual services — read each one's "notes" carefully, they describe real overlaps between services (e.g. one service already includes another's scope). Every "help_service" must be exactly one of these names, chosen with that overlap in mind, never invented:
 ${JSON.stringify(services, null, 2)}
 
-Pick 3 to 5 of the highest BUSINESS-IMPACT actions this specific business should take in the next 30 days — enough to be genuinely useful, but only ones that earn their place. This is not "pick the lowest scores" — weigh:
-- Which fix most increases revenue or client volume for THIS business specifically, given their funnel numbers, client LTV, and target client count/date
-- Whether a channel is a genuine bottleneck constraining everything downstream (e.g. if bookings never happen, more content or leads doesn't help)
-- What's realistically achievable for free within 30 days by a solo or small-team practitioner — the "action" itself must always be free; "service" separately names what Gathr could do to go further
-- Never recommend a channel with chip "Strong"
+For EVERY channel listed in the context (all of them, none skipped), write:
+- best_practices: what genuinely good execution of this specific channel looks like for this kind of practitioner business, from real marketing knowledge — not the generic advice a template would give
+- quick_win: one concrete, free, doable-in-30-days action tailored to THIS business's actual score and gap on this channel — specific enough that a solo practitioner could just go do it, not "improve your X"
+- help_service + help_reason: whichever one Gathr service is the smart fit, reasoning about the service overlaps above rather than a fixed mapping — the "action" in quick_win must always be free and independent of any paid service
 
-Be concrete and specific, not generic — this should read like an experienced strategist who actually looked at this business's numbers, not a template. Reference the business's own numbers in your reasoning where it strengthens the case.${customInstruction ? `\n\nThe team has this additional instruction for you — follow it, but do not violate any rule above (still 3-5 recommendations, still free 30-day actions, still real Gathr services, still never a "Strong" channel) unless the instruction explicitly says otherwise:\n"${String(customInstruction).slice(0, 1000)}"` : ''}`;
-    // Cost-efficient model on purpose: Sonnet, not Opus. Effort is 'medium'
-    // rather than 'low' because this now runs once per assessment and is
-    // saved (see /api/diagnostic/assessments persistence) rather than on
-    // every report view, so the one-off cost of a more thorough pass is
-    // worth it without needing Opus-tier reasoning.
+Be concrete and specific throughout — this should read like a strategist who actually looked at this business's numbers, not a template applied to every client. Reference the business's own numbers where it strengthens the case.${customInstruction ? `\n\nThe team has this additional instruction for you — follow it, but do not violate any rule above (still one entry per channel, still free quick wins, still real Gathr services) unless the instruction explicitly says otherwise:\n"${String(customInstruction).slice(0, 1000)}"` : ''}`;
+    // Cost-efficient model on purpose: Sonnet, not Opus. Effort 'medium'
+    // since this now runs once per assessment and is saved (see
+    // /api/diagnostic/assessments persistence) rather than on every report
+    // view, so a more thorough one-off pass is worth it without Opus.
     const message = await client.messages.create({
       model: 'claude-sonnet-5',
-      max_tokens: 3000,
-      output_config: { effort: 'medium', format: { type: 'json_schema', schema: aiRecommendationSchema(serviceNames) } },
+      max_tokens: 8000,
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: aiRecommendationSchema(serviceNames, channelKeys) } },
       messages: [{ role: 'user', content: prompt }],
     });
     const textBlock = message.content.find(b => b.type === 'text');
     if (!textBlock) return res.status(502).json({ error: 'No AI response' });
-    const parsed = JSON.parse(textBlock.text);
-    // The schema can no longer enforce "3 to 5" (see above) — clamp
-    // defensively in case the model ever drifts outside the prompted range.
-    if (Array.isArray(parsed.recommendations) && parsed.recommendations.length > 5) {
-      parsed.recommendations = parsed.recommendations.slice(0, 5);
-    }
-    res.json(parsed);
+    res.json(JSON.parse(textBlock.text));
   } catch (err) {
     // Log everything the SDK gives us — err.message alone hides the actual
     // cause (auth, bad request, rate limit) behind a generic string.
