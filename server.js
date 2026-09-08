@@ -1098,10 +1098,14 @@ Pick exactly the 3 highest BUSINESS-IMPACT actions this specific business should
 - Never recommend a channel with chip "Strong"
 
 Be concrete and specific, not generic. Reference the business's own numbers in your reasoning where it strengthens the case.${customInstruction ? `\n\nThe team has this additional instruction for you — follow it, but do not violate any rule above (still 3 recommendations, still free 30-day actions, still real Gathr services, still never a "Strong" channel) unless the instruction explicitly says otherwise:\n"${String(customInstruction).slice(0, 1000)}"` : ''}`;
+    // Cost-efficient model on purpose: this is a same-request, low-latency
+    // classification/recommendation task on structured business data, not
+    // hard multi-step reasoning — Sonnet at low effort is the right tier,
+    // not Opus.
     const message = await client.messages.create({
-      model: 'claude-opus-5',
+      model: 'claude-sonnet-5',
       max_tokens: 2000,
-      output_config: { format: { type: 'json_schema', schema: aiRecommendationSchema(serviceNames) } },
+      output_config: { effort: 'low', format: { type: 'json_schema', schema: aiRecommendationSchema(serviceNames) } },
       messages: [{ role: 'user', content: prompt }],
     });
     const textBlock = message.content.find(b => b.type === 'text');
