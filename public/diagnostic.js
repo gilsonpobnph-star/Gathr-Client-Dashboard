@@ -1097,8 +1097,12 @@
     // the saved version, no API call, no credits spent. A fresh call only
     // happens the very first time, or when the team explicitly hits
     // Regenerate or submits a custom instruction.
+    // Only trust the cache if it's shaped the way the current renderer
+    // expects (a "channels" array) — an older cached shape from before a
+    // schema change must never silently pass as valid and block
+    // regeneration with no error shown; that's exactly what happened here.
     lastReportCtx = { a, scores, rec, group };
-    if (a.aiRecommendation) {
+    if (a.aiRecommendation?.channels?.length) {
       renderAIRecommendation(a.aiRecommendation);
     } else {
       fetchAIRecommendation(lastReportCtx);
@@ -1177,8 +1181,18 @@
   async function fetchAIRecommendation({ a, scores, rec, group }, customInstruction) {
     const planEl = document.getElementById('dg-planContent');
     if (!planEl) return;
+    const promptBox = document.querySelector('#dg-reportInner .dg-ai-prompt');
     const statusEl = document.getElementById('dg-aiPromptStatus');
-    if (statusEl) statusEl.textContent = customInstruction ? 'Asking AI…' : 'Generating — this analyses every channel, may take a bit…';
+    const isFirstTime = !customInstruction && !a.aiRecommendation;
+    const busyMsg = customInstruction ? 'Asking AI…' : isFirstTime ? 'Generating your AI report — analysing every channel, this can take up to a minute…' : 'Regenerating — analysing every channel, this can take up to a minute…';
+    // A tiny grey status line is easy to miss entirely, which is exactly
+    // what happened last time — a stale-shaped cache silently skipped
+    // regeneration with no visible error. Make busy/success/failure loud:
+    // a toast (visible regardless of scroll position) plus the AI card
+    // itself changing colour while working.
+    toast(busyMsg);
+    if (statusEl) statusEl.textContent = busyMsg;
+    if (promptBox) promptBox.classList.add('busy');
     const context = buildAIContext({ a, scores, rec, group });
     try {
       const r = await fetch('/api/diagnostic/ai-recommendations', {
@@ -1188,18 +1202,26 @@
       if (!r.ok) {
         const errBody = await r.json().catch(() => null);
         console.warn('[Diagnostic] AI recommendations failed:', r.status, errBody);
-        if (statusEl) statusEl.textContent = `Couldn't reach AI (${errBody?.detail || r.status}) — ${a.aiRecommendation ? 'previous version kept' : 'deterministic content left as-is'}.`;
+        const msg = `AI generation failed (${errBody?.detail || r.status}) — ${a.aiRecommendation ? 'previous version kept' : 'showing the deterministic version'}.`;
+        toast(msg);
+        if (statusEl) statusEl.textContent = msg;
         return;
       }
       const data = await r.json();
-      if (!data?.channels?.length) { if (statusEl) statusEl.textContent = 'AI returned nothing usable — nothing changed.'; return; }
+      if (!data?.channels?.length) { const msg = 'AI returned nothing usable — nothing changed.'; toast(msg); if (statusEl) statusEl.textContent = msg; return; }
       if (!document.body.contains(planEl)) return; // user navigated away while we waited
       renderAIRecommendation(data);
       cur.aiRecommendation = data;
       await persist(); // saves once — this is what makes it free to view again
-      if (statusEl) statusEl.textContent = customInstruction ? 'Updated and saved.' : 'Generated and saved.';
+      const msg = customInstruction ? 'AI update saved.' : 'AI report generated and saved.';
+      toast(msg);
+      if (statusEl) statusEl.textContent = msg;
     } catch {
-      if (statusEl) statusEl.textContent = "Couldn't reach AI — nothing changed.";
+      const msg = "Couldn't reach AI — nothing changed.";
+      toast(msg);
+      if (statusEl) statusEl.textContent = msg;
+    } finally {
+      if (promptBox) promptBox.classList.remove('busy');
     }
   }
   function refinePlanWithPrompt() {
