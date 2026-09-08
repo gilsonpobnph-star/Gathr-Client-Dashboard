@@ -5,6 +5,7 @@
    persistence via /api/diagnostic/*, same isolation pattern as growth.js. */
 (function () {
   let assessments = [], cur = null;
+  let lastReportCtx = null; // {a, scores, rec, group} from the most recent showReport() — reused when the user asks the AI to redo the plan with a custom instruction
 
   const $ = id => document.getElementById('dg-' + id);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m]));
@@ -264,6 +265,16 @@
     show: ['Book calls within 3 to 4 days.', 'Send reminders by text and email.', 'Ask them to reply to confirm.', 'Make it easy to rebook.'],
     sales: ['Set the plan for the call up front.', 'Understand their problem and their goal.', 'Ask for the sale, clearly.', 'Have a smaller first step ready.', 'Keep it helpful, not pushy.'],
   };
+  // Gathr's actual service catalog — the single source of truth for the
+  // "Ways to work with us" pricing cards AND for what the AI recommendation
+  // pass is told Gathr can actually deliver, so a recommendation's "what we
+  // can help with" always points at something real, never an invented offer.
+  const GATHR_SERVICES = [
+    { name: 'Brand OS', price: '$4500', blurb: 'We set up your whole foundation. Your first 120 days, done for you.' },
+    { name: 'Ads Management', price: null, blurb: 'We run your ads and fill your funnel. The next 120 days.' },
+    { name: 'Software Setup', price: '$1500', blurb: 'We set up your systems, then hand you the keys.' },
+    { name: 'Content', price: '$1000/$1500', blurb: 'We create your content, so you show up without the effort.' },
+  ];
 
   function fresh() {
     return {
@@ -759,14 +770,14 @@
     const showGap = badgeCls && badgeCls !== 'strong';
     const meta = sectionKey ? CHANNEL_META[sectionKey] : null;
     const quickWin = quickWinOverride || meta?.quickWin;
-    return `<div class="ch-card">
+    return `<div class="ch-card" data-channel-key="${esc(sectionKey || '')}">
       <div class="ch-card-head">
         <h3>${esc(title)}</h3>
         ${badgeCls ? `<span class="ch-badge ${badgeCls}">${esc(chipLabel(chip))}</span>` : ''}
       </div>
-      <div class="ch-block"><h4>What good looks like</h4><ul>${bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>
+      <div class="ch-block ch-bestpractice"><h4>What good looks like</h4><ul>${bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul></div>
       ${showGap && meta ? `
-      <div class="ch-block"><h4>Quick win &mdash; free, next 30 days</h4><p>${esc(quickWin)}</p></div>
+      <div class="ch-block ch-quickwin"><h4>Quick win &mdash; free, next 30 days</h4><p>${esc(quickWin)}</p></div>
       <div class="ch-block ch-help"><h4>What we can help with</h4><p>${esc(meta.serviceBlurb)} <span style="color:var(--dg-orange)">(${esc(meta.service)})</span></p></div>` : ''}
     </div>`;
   }
@@ -976,6 +987,14 @@
       </ul>` : `
       <p style="font-size:14.5px; color:#57524c;">You're already doing the fundamentals well across every channel — nothing urgent to fix this month. Keep it up.</p>`}
       </div>
+      <div class="dg-ai-prompt">
+        <label for="dg-aiPromptInput">Ask AI to adjust this plan</label>
+        <div style="display:flex; gap:8px; margin-top:6px;">
+          <input type="text" id="dg-aiPromptInput" placeholder="e.g. they mentioned wanting to expand into telehealth, weight that in">
+          <button class="secondary" type="button" onclick="Diagnostic.refinePlanWithPrompt()">Ask AI</button>
+        </div>
+        <div id="dg-aiPromptStatus"></div>
+      </div>
     </div>`);
 
     // Special notes — the practitioner-type compliance note (always
@@ -1002,13 +1021,11 @@
       <h2 class="doc-h2">Ways to work with us</h2>
       <p style="font-size:14.5px; color:#57524c; max-width:640px;">None of this is complicated, but it takes time, and time on marketing is time away from your clients. You can do all of it yourself — or, if you'd rather stay with your clients, this is exactly what we do.</p>
       <div class="price-grid">
-        <div class="${rc('Brand OS')}">${recTag('Brand OS')}<h4>Brand OS - $4500</h4><p>We set up your whole foundation. Your first 120 days, done for you.</p></div>
-        <div class="${rc('Ads Management')}">${recTag('Ads Management')}<h4>Ads Management</h4><p>We run your ads and fill your funnel. The next 120 days.</p></div>
+        ${['Brand OS', 'Ads Management'].map(name => { const svc = GATHR_SERVICES.find(s => s.name === name); return `<div class="${rc(name)}">${recTag(name)}<h4>${esc(svc.name)}${svc.price ? ' - ' + esc(svc.price) : ''}</h4><p>${esc(svc.blurb)}</p></div>`; }).join('')}
       </div>
       <div class="price-subhead">Just want part of it?</div>
       <div class="price-grid">
-        <div class="${rc('Software Setup')}">${recTag('Software Setup')}<h4>Software Setup - $1500</h4><p>We set up your systems, then hand you the keys.</p></div>
-        <div class="${rc('Content')}">${recTag('Content')}<h4>Content - $1000/$1500</h4><p>We create your content, so you show up without the effort.</p></div>
+        ${['Software Setup', 'Content'].map(name => { const svc = GATHR_SERVICES.find(s => s.name === name); return `<div class="${rc(name)}">${recTag(name)}<h4>${esc(svc.name)}${svc.price ? ' - ' + esc(svc.price) : ''}</h4><p>${esc(svc.blurb)}</p></div>`; }).join('')}
       </div>
     </div>`);
 
@@ -1029,11 +1046,14 @@
     // its own — this is a best-effort AI pass layered on top, fired async so
     // it never blocks or breaks report generation. If it's not configured,
     // fails, or times out, the deterministic plan simply stays as-is.
-    enhancePlanWithAI({ a, scores, rec, group });
+    lastReportCtx = { a, scores, rec, group };
+    enhancePlanWithAI(lastReportCtx);
   }
-  async function enhancePlanWithAI({ a, scores, rec, group }) {
+  async function enhancePlanWithAI({ a, scores, rec, group }, customInstruction) {
     const planEl = document.getElementById('dg-planContent');
     if (!planEl) return;
+    const statusEl = document.getElementById('dg-aiPromptStatus');
+    if (statusEl && customInstruction) statusEl.textContent = 'Asking AI…';
     const channels = SECTIONS.filter(s => s.key !== 'measure').map(s => {
       const sc = scores.sections[s.key];
       return { key: s.key, label: s.label, job: s.job, weight: s.weight, pct: sc.pct, chip: chipLabel(sc.chip) };
@@ -1052,22 +1072,44 @@
       headlineScore: scores.headline,
       channels,
       biggestGapInOwnWords: a.answers.biggestGap || null,
+      // What Gathr can actually deliver — the AI's recommendations must be
+      // grounded in these, not invented services.
+      gathrServices: GATHR_SERVICES.map(s => ({ name: s.name, price: s.price, blurb: s.blurb })),
     };
     try {
       const r = await fetch('/api/diagnostic/ai-recommendations', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ context }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ context, customInstruction: customInstruction || undefined }),
       });
-      if (!r.ok) return;
+      if (!r.ok) { if (statusEl && customInstruction) statusEl.textContent = "Couldn't reach AI — plan left as-is."; return; }
       const data = await r.json();
-      if (!data?.recommendations?.length) return;
+      if (!data?.recommendations?.length) { if (statusEl && customInstruction) statusEl.textContent = "Couldn't reach AI — plan left as-is."; return; }
       if (!document.body.contains(planEl)) return; // user navigated away while we waited
       planEl.innerHTML = `
         <p style="font-size:14.5px; color:#57524c;">${esc(data.priority_summary || '')}</p>
         <ul class="plan-checklist">
-          ${data.recommendations.map(rItem => `<li><span class="chk"></span><span style="color:var(--dg-orange);">${esc(rItem.title)}:</span> ${esc(rItem.action)}<em style="display:block; color:#7d766e; font-size:12.5px; font-style:italic; margin-top:3px;">${esc(rItem.business_impact)}</em></li>`).join('')}
+          ${data.recommendations.map(rItem => `<li><span class="chk"></span><span style="color:var(--dg-orange);">${esc(rItem.title)}:</span> ${esc(rItem.action)}<em style="display:block; color:#7d766e; font-size:12.5px; font-style:italic; margin-top:3px;">${esc(rItem.business_impact)}${rItem.service ? ` (${esc(rItem.service)})` : ''}</em></li>`).join('')}
         </ul>
         <div style="font-size:11px; color:#a89f8f; margin-top:10px; letter-spacing:.03em;">Sharpened by AI, based on this business's own numbers and goals.</div>`;
-    } catch { /* network error — deterministic plan already rendered, nothing to do */ }
+      // If the AI proposed refreshed "what good looks like" bullets for a
+      // channel, update that card too — never touches cards it didn't
+      // mention, and never removes the quick-win/help blocks it doesn't own.
+      data.recommendations.forEach(rItem => {
+        if (!rItem.best_practices?.length || !rItem.channel_key) return;
+        const card = document.querySelector(`.ch-card[data-channel-key="${CSS.escape(rItem.channel_key)}"] .ch-bestpractice ul`);
+        if (card) card.innerHTML = rItem.best_practices.map(b => `<li>${esc(b)}</li>`).join('');
+      });
+      if (statusEl) statusEl.textContent = customInstruction ? 'Updated.' : '';
+    } catch {
+      if (statusEl && customInstruction) statusEl.textContent = "Couldn't reach AI — plan left as-is.";
+      // network error — deterministic (or previous) plan stays as it was
+    }
+  }
+  function refinePlanWithPrompt() {
+    const input = document.getElementById('dg-aiPromptInput');
+    const instruction = input?.value.trim();
+    if (!instruction || !lastReportCtx) return;
+    enhancePlanWithAI(lastReportCtx, instruction);
   }
   function backToForm() { $('reportSection').classList.add('hidden'); $('formView').classList.remove('hidden'); }
   // Let the team fix wording or fill in a missing detail directly in the
@@ -1084,6 +1126,6 @@
   }
 
   window.Diagnostic = {
-    onOpen, showDash, newAssessment, openAssessment, deleteAssessment, showReport, backToForm, toggleReportEdit,
+    onOpen, showDash, newAssessment, openAssessment, deleteAssessment, showReport, backToForm, toggleReportEdit, refinePlanWithPrompt,
   };
 })();

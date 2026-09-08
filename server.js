@@ -1042,33 +1042,44 @@ function getAnthropicClient() {
   }
   return _anthropicClient;
 }
-const AI_RECOMMENDATION_SCHEMA = {
-  type: 'object',
-  properties: {
-    priority_summary: { type: 'string', description: "One to two sentences on why these three are the highest-impact moves for THIS business right now — reference their actual numbers, not generic advice." },
-    recommendations: {
-      type: 'array', minItems: 3, maxItems: 3,
-      items: {
-        type: 'object',
-        properties: {
-          channel_key: { type: 'string', description: 'One of the provided channel keys, or "measure".' },
-          title: { type: 'string' },
-          business_impact: { type: 'string', description: "Why this specific action moves revenue or client volume for THIS business — reference their funnel/LTV/target numbers." },
-          action: { type: 'string', description: 'The concrete, free, doable-in-30-days action.' },
+function aiRecommendationSchema(serviceNames) {
+  return {
+    type: 'object',
+    properties: {
+      priority_summary: { type: 'string', description: "One to two sentences on why these three are the highest-impact moves for THIS business right now — reference their actual numbers, not generic advice." },
+      recommendations: {
+        type: 'array', minItems: 3, maxItems: 3,
+        items: {
+          type: 'object',
+          properties: {
+            channel_key: { type: 'string', description: 'One of the provided channel keys, or "measure".' },
+            title: { type: 'string' },
+            business_impact: { type: 'string', description: "Why this specific action moves revenue or client volume for THIS business — reference their funnel/LTV/target numbers." },
+            action: { type: 'string', description: 'The concrete, free, doable-in-30-days action — independent of any paid Gathr service.' },
+            service: { type: 'string', enum: serviceNames, description: "Which Gathr service (from the provided list, verbatim) would take this further for them. Always one of the given names — never invent a service Gathr doesn't offer." },
+            best_practices: {
+              type: 'array', items: { type: 'string' }, maxItems: 5,
+              description: "Optional: only include if you have a genuinely better 'what good looks like' list for this specific channel than generic advice — 3 to 5 short bullets. Omit entirely to leave that channel's existing card unchanged.",
+            },
+          },
+          required: ['channel_key', 'title', 'business_impact', 'action', 'service'],
+          additionalProperties: false,
         },
-        required: ['channel_key', 'title', 'business_impact', 'action'],
-        additionalProperties: false,
       },
     },
-  },
-  required: ['priority_summary', 'recommendations'],
-  additionalProperties: false,
-};
+    required: ['priority_summary', 'recommendations'],
+    additionalProperties: false,
+  };
+}
 app.post('/api/diagnostic/ai-recommendations', requireAuth, async (req, res) => {
   const client = getAnthropicClient();
   if (!client) return res.status(503).json({ error: 'AI recommendations are not configured (missing ANTHROPIC_API_KEY).' });
-  const { context } = req.body || {};
+  const { context, customInstruction } = req.body || {};
   if (!context) return res.status(400).json({ error: 'Missing context' });
+  const services = Array.isArray(context.gathrServices) && context.gathrServices.length
+    ? context.gathrServices
+    : [{ name: 'Brand OS', price: '$4500', blurb: 'We set up your whole foundation.' }, { name: 'Ads Management', price: null, blurb: 'We run your ads and fill your funnel.' }, { name: 'Software Setup', price: '$1500', blurb: 'We set up your systems, then hand you the keys.' }, { name: 'Content', price: '$1000/$1500', blurb: 'We create your content, so you show up without the effort.' }];
+  const serviceNames = services.map(s => s.name);
   try {
     const prompt = `You are a marketing strategist for Gathr Grow, advising a health/fitness/beauty practitioner business right after a diagnostic assessment.
 
@@ -1077,17 +1088,20 @@ ${JSON.stringify(context, null, 2)}
 
 Each entry in "channels" is a marketing/sales function already scored 0-100 by a fixed rubric (higher = healthier), with a "weight" (its max points — how much it counts toward the overall score) and a "chip" status of Strong / Needs work / Missing / Too early (unmeasured).
 
+Gathr's actual services — every recommendation's "service" field must be exactly one of these names, matched to whichever service genuinely fits that channel. Never invent a service, and never suggest one that isn't listed here:
+${JSON.stringify(services, null, 2)}
+
 Pick exactly the 3 highest BUSINESS-IMPACT actions this specific business should take in the next 30 days. This is not "pick the 3 lowest scores" — weigh:
 - Which fix most increases revenue or client volume for THIS business specifically, given their funnel numbers, client LTV, and target client count/date
 - Whether a channel is a genuine bottleneck constraining everything downstream (e.g. if bookings never happen, more content or leads doesn't help)
-- What's realistically achievable for free within 30 days by a solo or small-team practitioner — never recommend anything that requires paying for a service
+- What's realistically achievable for free within 30 days by a solo or small-team practitioner — the "action" itself must always be free; "service" separately names what Gathr could do to go further
 - Never recommend a channel with chip "Strong"
 
-Be concrete and specific, not generic. Reference the business's own numbers in your reasoning where it strengthens the case.`;
+Be concrete and specific, not generic. Reference the business's own numbers in your reasoning where it strengthens the case.${customInstruction ? `\n\nThe team has this additional instruction for you — follow it, but do not violate any rule above (still 3 recommendations, still free 30-day actions, still real Gathr services, still never a "Strong" channel) unless the instruction explicitly says otherwise:\n"${String(customInstruction).slice(0, 1000)}"` : ''}`;
     const message = await client.messages.create({
       model: 'claude-opus-5',
       max_tokens: 2000,
-      output_config: { format: { type: 'json_schema', schema: AI_RECOMMENDATION_SCHEMA } },
+      output_config: { format: { type: 'json_schema', schema: aiRecommendationSchema(serviceNames) } },
       messages: [{ role: 'user', content: prompt }],
     });
     const textBlock = message.content.find(b => b.type === 'text');

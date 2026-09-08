@@ -245,6 +245,12 @@
 #tab-diagnostic .plan-checklist .chk{width:19px; height:19px; border:1.5px solid var(--dg-charcoal); border-radius:3px; flex-shrink:0; margin-top:3px;}
 #tab-diagnostic .plan-close-line{font-weight:700; margin-top:22px; font-size:15.5px;}
 
+#tab-diagnostic .dg-ai-prompt{ margin-top:20px; padding-top:16px; border-top:1px dashed var(--dg-warmgrey); }
+#tab-diagnostic .dg-ai-prompt label{ font-size:12px; letter-spacing:.04em; text-transform:uppercase; color:#7d766e; }
+#tab-diagnostic .dg-ai-prompt input{ flex:1; font-family:var(--dg-sans); font-size:14px; padding:9px 12px; border:1px solid var(--dg-warmgrey); border-radius:5px; background:#fff; color:var(--dg-charcoal); }
+#tab-diagnostic .dg-ai-prompt button{ flex-shrink:0; }
+#tab-diagnostic #dg-aiPromptStatus{ font-size:12px; color:#7d766e; margin-top:6px; min-height:14px; }
+
 #tab-diagnostic .price-grid{display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-top:22px;}
 #tab-diagnostic .price-card{background:var(--dg-lightgrey); border-radius:6px; padding:20px 22px;}
 #tab-diagnostic .price-card.recommended{background:#fdf1ea; border:2px solid var(--dg-orange);}
@@ -292,6 +298,7 @@
     -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; color-adjust:exact !important;
   }
   #tab-diagnostic .report-actions, #tab-diagnostic .toast{ visibility:hidden !important; display:none !important; }
+  #tab-diagnostic .dg-ai-prompt{ visibility:hidden !important; display:none !important; }
   #tab-diagnostic .report-inner{padding:0;}
   #tab-diagnostic .job-page{grid-template-columns:1fr 1fr;}
   #tab-diagnostic .doc-wrap{ box-shadow:none; border-radius:0; padding:0; max-width:none; }
