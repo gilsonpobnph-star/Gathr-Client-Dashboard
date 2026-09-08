@@ -1048,7 +1048,12 @@ function aiRecommendationSchema(serviceNames) {
     properties: {
       priority_summary: { type: 'string', description: "Two to three sentences summarizing your holistic read of this business's whole diagnostic — where it genuinely stands and why these picks are the highest-impact moves right now. Reference their actual numbers, not generic advice." },
       recommendations: {
-        type: 'array', minItems: 3, maxItems: 5,
+        // Anthropic's structured-output json_schema only supports minItems/
+        // maxItems of 0 or 1 on arrays — anything else is a 400. The "3 to
+        // 5" constraint lives in the prompt text and description instead,
+        // and the server clamps the result defensively after parsing.
+        type: 'array',
+        description: 'Exactly 3 to 5 items — as many as genuinely earn their place, no more, no fewer than 3.',
         items: {
           type: 'object',
           properties: {
@@ -1058,7 +1063,7 @@ function aiRecommendationSchema(serviceNames) {
             action: { type: 'string', description: 'The concrete, free, doable-in-30-days action — independent of any paid Gathr service.' },
             service: { type: 'string', enum: serviceNames, description: "Which Gathr service (from the provided list, verbatim) would take this further for them. Always one of the given names — never invent a service Gathr doesn't offer." },
             best_practices: {
-              type: 'array', items: { type: 'string' }, maxItems: 5,
+              type: 'array', items: { type: 'string' },
               description: "Optional: only include if you have a genuinely better 'what good looks like' list for this specific channel than generic advice — 3 to 5 short bullets. Omit entirely to leave that channel's existing card unchanged.",
             },
           },
@@ -1113,7 +1118,13 @@ Be concrete and specific, not generic — this should read like an experienced s
     });
     const textBlock = message.content.find(b => b.type === 'text');
     if (!textBlock) return res.status(502).json({ error: 'No AI response' });
-    res.json(JSON.parse(textBlock.text));
+    const parsed = JSON.parse(textBlock.text);
+    // The schema can no longer enforce "3 to 5" (see above) — clamp
+    // defensively in case the model ever drifts outside the prompted range.
+    if (Array.isArray(parsed.recommendations) && parsed.recommendations.length > 5) {
+      parsed.recommendations = parsed.recommendations.slice(0, 5);
+    }
+    res.json(parsed);
   } catch (err) {
     // Log everything the SDK gives us — err.message alone hides the actual
     // cause (auth, bad request, rate limit) behind a generic string.
