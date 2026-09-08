@@ -1126,19 +1126,36 @@ Write:
   - help_service + help_reason: whichever one Gathr service is the smart fit, naming the actual deliverable that closes this specific gap (reasoning about the service overlaps above rather than a fixed mapping) — the "action" in quick_win must always be free and independent of any paid service
 
 Be concrete and specific throughout, and write like a person talking to a colleague, not a report generator. Plain sentences only: no em dashes or en dashes, no semicolons used as a dash substitute, no "Label: description" or "Label - description" fragments, no bullet-speak crammed into one sentence. If a sentence needs a pause, use a period or "and"/"so"/"which means" instead of a dash. This should read like a strategist who actually looked at this business's numbers, not a template applied to every client. Reference the business's own numbers where it strengthens the case.${customInstruction ? `\n\nThe team has this additional instruction for you — follow it, but do not violate any rule above (still one entry per channel, still free quick wins, still real Gathr services and their actual deliverables, still plain human sentences with no dashes) unless the instruction explicitly says otherwise:\n"${String(customInstruction).slice(0, 1000)}"` : ''}`;
-    // Cost-efficient model on purpose: Sonnet, not Opus. Effort 'medium'
-    // since this now runs once per assessment and is saved (see
-    // /api/diagnostic/assessments persistence) rather than on every report
-    // view, so a more thorough one-off pass is worth it without Opus.
-    const message = await client.messages.create({
+    // Cost-efficient model on purpose: Sonnet, not Opus, at low effort.
+    // max_tokens is generous (16000) because this asks for one full entry
+    // per channel (12 of them) plus field_best_practices in one response —
+    // 8000 was cutting the response off mid-JSON on a real run: Anthropic
+    // still bills the tokens generated before the cutoff, and the
+    // truncated JSON then fails to parse, which is exactly the "it failed
+    // AND used credits" report this is fixing. Streaming avoids the HTTP
+    // timeout that a max_tokens this size would otherwise risk on a
+    // non-streaming request.
+    const stream = client.messages.stream({
       model: 'claude-sonnet-5',
-      max_tokens: 8000,
-      output_config: { effort: 'medium', format: { type: 'json_schema', schema: aiRecommendationSchema(serviceNames, channelKeys) } },
+      max_tokens: 16000,
+      output_config: { effort: 'low', format: { type: 'json_schema', schema: aiRecommendationSchema(serviceNames, channelKeys) } },
       messages: [{ role: 'user', content: prompt }],
     });
+    const message = await stream.finalMessage();
+    if (message.stop_reason === 'max_tokens') {
+      console.error('[AI recommendations] truncated: hit max_tokens before finishing the response');
+      return res.status(502).json({ error: 'AI response was cut off (too long to finish)', detail: 'stop_reason: max_tokens' });
+    }
     const textBlock = message.content.find(b => b.type === 'text');
-    if (!textBlock) return res.status(502).json({ error: 'No AI response' });
-    res.json(JSON.parse(textBlock.text));
+    if (!textBlock) return res.status(502).json({ error: 'No AI response', detail: `stop_reason: ${message.stop_reason}` });
+    let parsed;
+    try {
+      parsed = JSON.parse(textBlock.text);
+    } catch (parseErr) {
+      console.error('[AI recommendations] JSON.parse failed:', parseErr.message, '| stop_reason:', message.stop_reason);
+      return res.status(502).json({ error: 'AI response was not valid JSON', detail: parseErr.message });
+    }
+    res.json(parsed);
   } catch (err) {
     // Log everything the SDK gives us — err.message alone hides the actual
     // cause (auth, bad request, rate limit) behind a generic string.
