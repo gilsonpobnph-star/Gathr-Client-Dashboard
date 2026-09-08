@@ -1026,6 +1026,79 @@ app.delete('/api/diagnostic/assessments/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+// ── Diagnostic: AI-sharpened recommendations (Claude) ────────────────────────
+// The deterministic scoring engine in diagnostic.js (computeRecommendation /
+// topThirtyDayActions) is the source of truth and always renders first — this
+// is a best-effort enhancement layered on top, called async from the client.
+// If there's no API key, or the call fails or times out, the client silently
+// keeps the deterministic plan. Nothing about report generation depends on
+// this succeeding.
+let _anthropicClient;
+function getAnthropicClient() {
+  if (!process.env.ANTHROPIC_API_KEY) return null;
+  if (!_anthropicClient) {
+    const Anthropic = require('@anthropic-ai/sdk');
+    _anthropicClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  }
+  return _anthropicClient;
+}
+const AI_RECOMMENDATION_SCHEMA = {
+  type: 'object',
+  properties: {
+    priority_summary: { type: 'string', description: "One to two sentences on why these three are the highest-impact moves for THIS business right now — reference their actual numbers, not generic advice." },
+    recommendations: {
+      type: 'array', minItems: 3, maxItems: 3,
+      items: {
+        type: 'object',
+        properties: {
+          channel_key: { type: 'string', description: 'One of the provided channel keys, or "measure".' },
+          title: { type: 'string' },
+          business_impact: { type: 'string', description: "Why this specific action moves revenue or client volume for THIS business — reference their funnel/LTV/target numbers." },
+          action: { type: 'string', description: 'The concrete, free, doable-in-30-days action.' },
+        },
+        required: ['channel_key', 'title', 'business_impact', 'action'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['priority_summary', 'recommendations'],
+  additionalProperties: false,
+};
+app.post('/api/diagnostic/ai-recommendations', requireAuth, async (req, res) => {
+  const client = getAnthropicClient();
+  if (!client) return res.status(503).json({ error: 'AI recommendations are not configured (missing ANTHROPIC_API_KEY).' });
+  const { context } = req.body || {};
+  if (!context) return res.status(400).json({ error: 'Missing context' });
+  try {
+    const prompt = `You are a marketing strategist for Gathr Grow, advising a health/fitness/beauty practitioner business right after a diagnostic assessment.
+
+Business context (JSON):
+${JSON.stringify(context, null, 2)}
+
+Each entry in "channels" is a marketing/sales function already scored 0-100 by a fixed rubric (higher = healthier), with a "weight" (its max points — how much it counts toward the overall score) and a "chip" status of Strong / Needs work / Missing / Too early (unmeasured).
+
+Pick exactly the 3 highest BUSINESS-IMPACT actions this specific business should take in the next 30 days. This is not "pick the 3 lowest scores" — weigh:
+- Which fix most increases revenue or client volume for THIS business specifically, given their funnel numbers, client LTV, and target client count/date
+- Whether a channel is a genuine bottleneck constraining everything downstream (e.g. if bookings never happen, more content or leads doesn't help)
+- What's realistically achievable for free within 30 days by a solo or small-team practitioner — never recommend anything that requires paying for a service
+- Never recommend a channel with chip "Strong"
+
+Be concrete and specific, not generic. Reference the business's own numbers in your reasoning where it strengthens the case.`;
+    const message = await client.messages.create({
+      model: 'claude-opus-5',
+      max_tokens: 2000,
+      output_config: { format: { type: 'json_schema', schema: AI_RECOMMENDATION_SCHEMA } },
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const textBlock = message.content.find(b => b.type === 'text');
+    if (!textBlock) return res.status(502).json({ error: 'No AI response' });
+    res.json(JSON.parse(textBlock.text));
+  } catch (err) {
+    console.error('[AI recommendations] failed:', err.message);
+    res.status(502).json({ error: 'AI recommendation failed' });
+  }
+});
+
 // ── Client CRUD ───────────────────────────────────────────────────────────────
 app.get('/api/clients', requireAuth, (req, res) => {
   const store = readStore();

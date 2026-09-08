@@ -968,12 +968,14 @@
     sections.push(`<div class="doc-section">
       <div class="eyebrow-sm">YOUR PLAN</div>
       <h2 class="doc-h2">Your plan for the first 30 days</h2>
+      <div id="dg-planContent">
       ${top3.length ? `
       <p style="font-size:14.5px; color:#57524c;">${esc(rec.priorityBlurb || 'Based on where you stand today, here are the three biggest things to fix first.')}</p>
       <ul class="plan-checklist">
         ${top3.map(c => `<li><span class="chk"></span><span style="color:var(--dg-orange);">${esc(c.label)}:</span> ${esc(quickWinFor(c.key))}</li>`).join('')}
       </ul>` : `
       <p style="font-size:14.5px; color:#57524c;">You're already doing the fundamentals well across every channel — nothing urgent to fix this month. Keep it up.</p>`}
+      </div>
     </div>`);
 
     // Special notes — the practitioner-type compliance note (always
@@ -1022,6 +1024,50 @@
     const editBtn = $('editToggle'); if (editBtn) editBtn.textContent = 'Edit details';
     const editHint = $('editHint'); if (editHint) editHint.classList.add('hidden');
     document.getElementById('tab-diagnostic')?.scrollIntoView({ behavior: 'auto', block: 'start' });
+
+    // The deterministic plan above is already fully rendered and correct on
+    // its own — this is a best-effort AI pass layered on top, fired async so
+    // it never blocks or breaks report generation. If it's not configured,
+    // fails, or times out, the deterministic plan simply stays as-is.
+    enhancePlanWithAI({ a, scores, rec, group });
+  }
+  async function enhancePlanWithAI({ a, scores, rec, group }) {
+    const planEl = document.getElementById('dg-planContent');
+    if (!planEl) return;
+    const channels = SECTIONS.filter(s => s.key !== 'measure').map(s => {
+      const sc = scores.sections[s.key];
+      return { key: s.key, label: s.label, job: s.job, weight: s.weight, pct: sc.pct, chip: chipLabel(sc.chip) };
+    });
+    const context = {
+      businessName: a.businessName || null,
+      practitionerType: a.answers.practitionerType || null,
+      practitionerGroup: group?.label || null,
+      idealClient: a.answers.idealClient || null,
+      mainOffer: a.answers.mainOffer || null,
+      clientLTV: Number(a.answers.avgClientValue) || null,
+      activeClients: Number(a.answers.activeClients) || null,
+      targetNewClients: Number(a.answers.targetNewClients) || null,
+      targetDate: a.answers.targetDate || null,
+      funnel: { leadsLastMonth: rec.funnel.leads || null, bookRatePct: rec.funnel.bookPct, showRatePct: rec.funnel.showPct, closeRatePct: rec.funnel.closePct },
+      headlineScore: scores.headline,
+      channels,
+      biggestGapInOwnWords: a.answers.biggestGap || null,
+    };
+    try {
+      const r = await fetch('/api/diagnostic/ai-recommendations', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ context }),
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (!data?.recommendations?.length) return;
+      if (!document.body.contains(planEl)) return; // user navigated away while we waited
+      planEl.innerHTML = `
+        <p style="font-size:14.5px; color:#57524c;">${esc(data.priority_summary || '')}</p>
+        <ul class="plan-checklist">
+          ${data.recommendations.map(rItem => `<li><span class="chk"></span><span style="color:var(--dg-orange);">${esc(rItem.title)}:</span> ${esc(rItem.action)}<em style="display:block; color:#7d766e; font-size:12.5px; font-style:italic; margin-top:3px;">${esc(rItem.business_impact)}</em></li>`).join('')}
+        </ul>
+        <div style="font-size:11px; color:#a89f8f; margin-top:10px; letter-spacing:.03em;">Sharpened by AI, based on this business's own numbers and goals.</div>`;
+    } catch { /* network error — deterministic plan already rendered, nothing to do */ }
   }
   function backToForm() { $('reportSection').classList.add('hidden'); $('formView').classList.remove('hidden'); }
   // Let the team fix wording or fill in a missing detail directly in the
