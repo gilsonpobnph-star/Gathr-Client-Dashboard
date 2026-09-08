@@ -1046,9 +1046,9 @@ function aiRecommendationSchema(serviceNames) {
   return {
     type: 'object',
     properties: {
-      priority_summary: { type: 'string', description: "One to two sentences on why these three are the highest-impact moves for THIS business right now — reference their actual numbers, not generic advice." },
+      priority_summary: { type: 'string', description: "Two to three sentences summarizing your holistic read of this business's whole diagnostic — where it genuinely stands and why these picks are the highest-impact moves right now. Reference their actual numbers, not generic advice." },
       recommendations: {
-        type: 'array', minItems: 3, maxItems: 3,
+        type: 'array', minItems: 3, maxItems: 5,
         items: {
           type: 'object',
           properties: {
@@ -1083,37 +1083,45 @@ app.post('/api/diagnostic/ai-recommendations', requireAuth, async (req, res) => 
   try {
     const prompt = `You are a marketing strategist for Gathr Grow, advising a health/fitness/beauty practitioner business right after a diagnostic assessment.
 
+Analyse the ENTIRE business context below holistically before deciding anything — every channel's score, the funnel numbers together (not stage by stage), client LTV against their target, and their own words on their biggest gap. Don't just react to the single worst-looking number.
+
 Business context (JSON):
 ${JSON.stringify(context, null, 2)}
 
-Each entry in "channels" is a marketing/sales function already scored 0-100 by a fixed rubric (higher = healthier), with a "weight" (its max points — how much it counts toward the overall score) and a "chip" status of Strong / Needs work / Missing / Too early (unmeasured).
+Each entry in "channels" is a marketing/sales function already scored 0-100 by a fixed rubric (higher = healthier), with a "weight" (its max points — how much it counts toward the overall score) and a "chip" status of Strong / Needs work / Missing / Too early (unmeasured). "fieldLowHangingFruit" lists real, mostly-free tactics specific to this business's field (directories, booking platforms, proof formats) — draw on these where they genuinely fit rather than generic advice.
 
 Gathr's actual services — every recommendation's "service" field must be exactly one of these names, matched to whichever service genuinely fits that channel. Never invent a service, and never suggest one that isn't listed here:
 ${JSON.stringify(services, null, 2)}
 
-Pick exactly the 3 highest BUSINESS-IMPACT actions this specific business should take in the next 30 days. This is not "pick the 3 lowest scores" — weigh:
+Pick 3 to 5 of the highest BUSINESS-IMPACT actions this specific business should take in the next 30 days — enough to be genuinely useful, but only ones that earn their place. This is not "pick the lowest scores" — weigh:
 - Which fix most increases revenue or client volume for THIS business specifically, given their funnel numbers, client LTV, and target client count/date
 - Whether a channel is a genuine bottleneck constraining everything downstream (e.g. if bookings never happen, more content or leads doesn't help)
 - What's realistically achievable for free within 30 days by a solo or small-team practitioner — the "action" itself must always be free; "service" separately names what Gathr could do to go further
 - Never recommend a channel with chip "Strong"
 
-Be concrete and specific, not generic. Reference the business's own numbers in your reasoning where it strengthens the case.${customInstruction ? `\n\nThe team has this additional instruction for you — follow it, but do not violate any rule above (still 3 recommendations, still free 30-day actions, still real Gathr services, still never a "Strong" channel) unless the instruction explicitly says otherwise:\n"${String(customInstruction).slice(0, 1000)}"` : ''}`;
-    // Cost-efficient model on purpose: this is a same-request, low-latency
-    // classification/recommendation task on structured business data, not
-    // hard multi-step reasoning — Sonnet at low effort is the right tier,
-    // not Opus.
+Be concrete and specific, not generic — this should read like an experienced strategist who actually looked at this business's numbers, not a template. Reference the business's own numbers in your reasoning where it strengthens the case.${customInstruction ? `\n\nThe team has this additional instruction for you — follow it, but do not violate any rule above (still 3-5 recommendations, still free 30-day actions, still real Gathr services, still never a "Strong" channel) unless the instruction explicitly says otherwise:\n"${String(customInstruction).slice(0, 1000)}"` : ''}`;
+    // Cost-efficient model on purpose: Sonnet, not Opus. Effort is 'medium'
+    // rather than 'low' because this now runs once per assessment and is
+    // saved (see /api/diagnostic/assessments persistence) rather than on
+    // every report view, so the one-off cost of a more thorough pass is
+    // worth it without needing Opus-tier reasoning.
     const message = await client.messages.create({
       model: 'claude-sonnet-5',
-      max_tokens: 2000,
-      output_config: { effort: 'low', format: { type: 'json_schema', schema: aiRecommendationSchema(serviceNames) } },
+      max_tokens: 3000,
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema: aiRecommendationSchema(serviceNames) } },
       messages: [{ role: 'user', content: prompt }],
     });
     const textBlock = message.content.find(b => b.type === 'text');
     if (!textBlock) return res.status(502).json({ error: 'No AI response' });
     res.json(JSON.parse(textBlock.text));
   } catch (err) {
-    console.error('[AI recommendations] failed:', err.message);
-    res.status(502).json({ error: 'AI recommendation failed' });
+    // Log everything the SDK gives us — err.message alone hides the actual
+    // cause (auth, bad request, rate limit) behind a generic string.
+    console.error('[AI recommendations] failed:', err.status, err.name, err.message, err.error || '');
+    // Temporarily echo the real reason back to the client too, so this can
+    // be diagnosed from the browser's network tab without needing to pull
+    // Railway logs. This is an authenticated internal-team endpoint only.
+    res.status(502).json({ error: 'AI recommendation failed', detail: err.message, status: err.status || null });
   }
 });
 

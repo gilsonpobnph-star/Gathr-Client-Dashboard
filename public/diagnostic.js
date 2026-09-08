@@ -35,24 +35,46 @@
       compliance: 'No paid or incentivised patient referrals. No clinical testimonials in their own marketing — steer collected reviews toward service and experience, not outcomes. Keep every message free of clinical detail.',
       proofNote: 'Educational and service-experience content, not before/after or outcome claims.',
       directories: 'Association directory, Whitecoat, HotDoc/HealthEngine (optional paid). Psychologists: Psychology Today (~$25/mo) dominates search there.',
+      lowHangingFruit: [
+        'Claim and complete your HotDoc and HealthEngine profiles — most patients now book through these apps, and the basic listing is free.',
+        "List on Whitecoat, Australia's largest health-practitioner directory — free basic profile.",
+        'Get on your professional association\'s public "find a practitioner" directory — usually already included in your membership.',
+        'Match your Google Business Profile category exactly to your registration (e.g. "Physical Therapist", not "Gym") so you show up in the right local searches.',
+        'Psychologists specifically: claim a Psychology Today profile — it dominates "psychologist near me" search.',
+      ],
     },
     B: {
       label: 'Group B — Allied health (non-AHPRA)',
       compliance: 'Testimonials are allowed.',
       proofNote: 'Testimonials allowed; keep the tone professional and service-focused.',
       directories: "Their body's free listing (ESSA, Dietitians Australia, PACFA/ACA, or the relevant massage association) plus Whitecoat.",
+      lowHangingFruit: [
+        "Claim your body's own free directory listing (ESSA's Find an AEP, Dietitians Australia's Find a Dietitian, the PACFA/ACA register, or your massage association's directory).",
+        'List on Whitecoat — free basic profile.',
+        'Match your Google Business Profile category precisely to your modality.',
+      ],
     },
     C: {
       label: 'Group C — Fitness / coaching',
       compliance: 'No professional-directory compliance constraints. Before/after transformations and video testimonials are expected proof, not just allowed.',
       proofNote: 'Before-and-afters, transformations and video testimonials are expected proof and score directly.',
       directories: 'No professional directories apply — Google, Gathr and local listings carry more weight instead.',
+      lowHangingFruit: [
+        'Post in local Facebook community groups — still one of the highest-response-rate free channels for PTs and coaches.',
+        'Add before/after photos to your Google Business Profile — expected proof for this category, and it directly helps local search.',
+        'List on ClassPass or MindBody if you run group sessions — brings in trial-minded browsers ready to try something new.',
+      ],
     },
     D: {
       label: 'Group D — Beauty / aesthetics',
       compliance: 'Same proof standard as Group C. If a nurse or doctor delivers or oversees treatment, Group A compliance applies instead (no incentivised referrals, no clinical testimonials).',
       proofNote: 'Before-and-afters, transformations and client stories are expected proof.',
       directories: 'Fresha, Bookwell (note the commission), plus general local listings.',
+      lowHangingFruit: [
+        'Claim a free Fresha profile — high organic booking traffic for beauty and aesthetics.',
+        'List on Bookwell (factor in their commission on bookings from it).',
+        'Post before/after content on Instagram and TikTok — expected proof in this category, and it doubles as free reach.',
+      ],
     },
   };
   function groupFor(type, nurseFlag) {
@@ -965,6 +987,22 @@
       <p style="margin-top:26px; font-size:15px;">More leads come from doing Jobs 1 and 2 better. Better book, show and close come from Job 3.</p>
     </div>`);
 
+    // Low-hanging fruit for their field — real, named, mostly-free tactics
+    // (directories, booking platforms, proof formats) specific to their
+    // practitioner group. Always shown, independent of score, since these
+    // are foundational "just go do this" items regardless of how anything
+    // scored.
+    if (group?.lowHangingFruit?.length) {
+      sections.push(`<div class="doc-section">
+        <div class="eyebrow-sm">LOW-HANGING FRUIT</div>
+        <h2 class="doc-h2">Best practices for your field</h2>
+        <p style="font-size:14.5px; color:#57524c;">Specific to ${esc(group.label.replace(/^Group [A-Z] — /, ''))} — mostly free, mostly quick.</p>
+        <ul class="plan-checklist">
+          ${group.lowHangingFruit.map(item => `<li><span class="chk"></span>${esc(item)}</li>`).join('')}
+        </ul>
+      </div>`);
+    }
+
     // Your plan for the first 30 days — the biggest three things to fix,
     // weighted by actual business impact: whichever funnel stage is the
     // real bottleneck (computeRecommendation's mode) claims priority,
@@ -988,10 +1026,14 @@
       <p style="font-size:14.5px; color:#57524c;">You're already doing the fundamentals well across every channel — nothing urgent to fix this month. Keep it up.</p>`}
       </div>
       <div class="dg-ai-prompt">
-        <label for="dg-aiPromptInput">Ask AI to adjust this plan</label>
-        <div style="display:flex; gap:8px; margin-top:6px;">
+        <div class="dg-ai-prompt-head">
+          <label for="dg-aiPromptInput">&#10024; AI recommendations</label>
+          <button class="secondary small" type="button" onclick="Diagnostic.regenerateAIRecommendation()">Regenerate</button>
+        </div>
+        <div class="dg-ai-prompt-sub">Generated once and saved — it won't re-run (or spend AI credits) just from opening the report. Use Regenerate for a fresh pass, or tell it something to factor in below.</div>
+        <div class="dg-ai-prompt-row">
           <input type="text" id="dg-aiPromptInput" placeholder="e.g. they mentioned wanting to expand into telehealth, weight that in">
-          <button class="secondary" type="button" onclick="Diagnostic.refinePlanWithPrompt()">Ask AI</button>
+          <button class="accent" type="button" onclick="Diagnostic.refinePlanWithPrompt()">Ask AI</button>
         </div>
         <div id="dg-aiPromptStatus"></div>
       </div>
@@ -1042,23 +1084,24 @@
     const editHint = $('editHint'); if (editHint) editHint.classList.add('hidden');
     document.getElementById('tab-diagnostic')?.scrollIntoView({ behavior: 'auto', block: 'start' });
 
-    // The deterministic plan above is already fully rendered and correct on
-    // its own — this is a best-effort AI pass layered on top, fired async so
-    // it never blocks or breaks report generation. If it's not configured,
-    // fails, or times out, the deterministic plan simply stays as-is.
+    // AI recommendations are generated ONCE per assessment and saved on the
+    // record itself — every later "Generate strategy report" just renders
+    // the saved version, no API call, no credits spent. A fresh call only
+    // happens the very first time, or when the team explicitly hits
+    // Regenerate or submits a custom instruction.
     lastReportCtx = { a, scores, rec, group };
-    enhancePlanWithAI(lastReportCtx);
+    if (a.aiRecommendation) {
+      renderAIRecommendation(a.aiRecommendation);
+    } else {
+      fetchAIRecommendation(lastReportCtx);
+    }
   }
-  async function enhancePlanWithAI({ a, scores, rec, group }, customInstruction) {
-    const planEl = document.getElementById('dg-planContent');
-    if (!planEl) return;
-    const statusEl = document.getElementById('dg-aiPromptStatus');
-    if (statusEl && customInstruction) statusEl.textContent = 'Asking AI…';
+  function buildAIContext({ a, scores, rec, group }) {
     const channels = SECTIONS.filter(s => s.key !== 'measure').map(s => {
       const sc = scores.sections[s.key];
       return { key: s.key, label: s.label, job: s.job, weight: s.weight, pct: sc.pct, chip: chipLabel(sc.chip) };
     });
-    const context = {
+    return {
       businessName: a.businessName || null,
       practitionerType: a.answers.practitionerType || null,
       practitionerGroup: group?.label || null,
@@ -1075,41 +1118,71 @@
       // What Gathr can actually deliver — the AI's recommendations must be
       // grounded in these, not invented services.
       gathrServices: GATHR_SERVICES.map(s => ({ name: s.name, price: s.price, blurb: s.blurb })),
+      fieldLowHangingFruit: group?.lowHangingFruit || [],
     };
+  }
+  // Paint the AI recommendation into the DOM — used both for an instantly
+  // rendered cached result and for a freshly fetched one, so cached and
+  // live renders always look identical.
+  function renderAIRecommendation(data) {
+    const planEl = document.getElementById('dg-planContent');
+    if (!planEl || !data?.recommendations?.length) return;
+    planEl.innerHTML = `
+      <p style="font-size:14.5px; color:#57524c;">${esc(data.priority_summary || '')}</p>
+      <ul class="plan-checklist">
+        ${data.recommendations.map(rItem => `<li><span class="chk"></span><span style="color:var(--dg-orange);">${esc(rItem.title)}:</span> ${esc(rItem.action)}<em style="display:block; color:#7d766e; font-size:12.5px; font-style:italic; margin-top:3px;">${esc(rItem.business_impact)}${rItem.service ? ` (${esc(rItem.service)})` : ''}</em></li>`).join('')}
+      </ul>
+      <div style="font-size:11px; color:#a89f8f; margin-top:10px; letter-spacing:.03em;">Sharpened by AI, based on this business's own numbers and goals.</div>`;
+    // If the AI proposed refreshed "what good looks like" bullets for a
+    // channel, update that card too — never touches cards it didn't
+    // mention, and never removes the quick-win/help blocks it doesn't own.
+    data.recommendations.forEach(rItem => {
+      if (!rItem.best_practices?.length || !rItem.channel_key) return;
+      const card = document.querySelector(`.ch-card[data-channel-key="${CSS.escape(rItem.channel_key)}"] .ch-bestpractice ul`);
+      if (card) card.innerHTML = rItem.best_practices.map(b => `<li>${esc(b)}</li>`).join('');
+    });
+  }
+  // Calls the AI, renders the result, and — this is the part that stops
+  // repeat API spend — saves it onto the assessment record via the normal
+  // persist() path, so the very next "Generate strategy report" (even a
+  // page reload) finds a and skips the call entirely.
+  async function fetchAIRecommendation({ a, scores, rec, group }, customInstruction) {
+    const planEl = document.getElementById('dg-planContent');
+    if (!planEl) return;
+    const statusEl = document.getElementById('dg-aiPromptStatus');
+    if (statusEl) statusEl.textContent = customInstruction ? 'Asking AI…' : 'Generating recommendations…';
+    const context = buildAIContext({ a, scores, rec, group });
     try {
       const r = await fetch('/api/diagnostic/ai-recommendations', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ context, customInstruction: customInstruction || undefined }),
       });
-      if (!r.ok) { if (statusEl && customInstruction) statusEl.textContent = "Couldn't reach AI — plan left as-is."; return; }
+      if (!r.ok) {
+        const errBody = await r.json().catch(() => null);
+        console.warn('[Diagnostic] AI recommendations failed:', r.status, errBody);
+        if (statusEl) statusEl.textContent = `Couldn't reach AI (${errBody?.detail || r.status}) — ${a.aiRecommendation ? 'previous version kept' : 'deterministic plan left as-is'}.`;
+        return;
+      }
       const data = await r.json();
-      if (!data?.recommendations?.length) { if (statusEl && customInstruction) statusEl.textContent = "Couldn't reach AI — plan left as-is."; return; }
+      if (!data?.recommendations?.length) { if (statusEl) statusEl.textContent = 'AI returned nothing usable — nothing changed.'; return; }
       if (!document.body.contains(planEl)) return; // user navigated away while we waited
-      planEl.innerHTML = `
-        <p style="font-size:14.5px; color:#57524c;">${esc(data.priority_summary || '')}</p>
-        <ul class="plan-checklist">
-          ${data.recommendations.map(rItem => `<li><span class="chk"></span><span style="color:var(--dg-orange);">${esc(rItem.title)}:</span> ${esc(rItem.action)}<em style="display:block; color:#7d766e; font-size:12.5px; font-style:italic; margin-top:3px;">${esc(rItem.business_impact)}${rItem.service ? ` (${esc(rItem.service)})` : ''}</em></li>`).join('')}
-        </ul>
-        <div style="font-size:11px; color:#a89f8f; margin-top:10px; letter-spacing:.03em;">Sharpened by AI, based on this business's own numbers and goals.</div>`;
-      // If the AI proposed refreshed "what good looks like" bullets for a
-      // channel, update that card too — never touches cards it didn't
-      // mention, and never removes the quick-win/help blocks it doesn't own.
-      data.recommendations.forEach(rItem => {
-        if (!rItem.best_practices?.length || !rItem.channel_key) return;
-        const card = document.querySelector(`.ch-card[data-channel-key="${CSS.escape(rItem.channel_key)}"] .ch-bestpractice ul`);
-        if (card) card.innerHTML = rItem.best_practices.map(b => `<li>${esc(b)}</li>`).join('');
-      });
-      if (statusEl) statusEl.textContent = customInstruction ? 'Updated.' : '';
+      renderAIRecommendation(data);
+      cur.aiRecommendation = data;
+      await persist(); // saves once — this is what makes it free to view again
+      if (statusEl) statusEl.textContent = customInstruction ? 'Updated and saved.' : 'Generated and saved.';
     } catch {
-      if (statusEl && customInstruction) statusEl.textContent = "Couldn't reach AI — plan left as-is.";
-      // network error — deterministic (or previous) plan stays as it was
+      if (statusEl) statusEl.textContent = "Couldn't reach AI — nothing changed.";
     }
   }
   function refinePlanWithPrompt() {
     const input = document.getElementById('dg-aiPromptInput');
     const instruction = input?.value.trim();
     if (!instruction || !lastReportCtx) return;
-    enhancePlanWithAI(lastReportCtx, instruction);
+    fetchAIRecommendation(lastReportCtx, instruction);
+  }
+  function regenerateAIRecommendation() {
+    if (!lastReportCtx) return;
+    fetchAIRecommendation(lastReportCtx);
   }
   function backToForm() { $('reportSection').classList.add('hidden'); $('formView').classList.remove('hidden'); }
   // Let the team fix wording or fill in a missing detail directly in the
@@ -1126,6 +1199,6 @@
   }
 
   window.Diagnostic = {
-    onOpen, showDash, newAssessment, openAssessment, deleteAssessment, showReport, backToForm, toggleReportEdit, refinePlanWithPrompt,
+    onOpen, showDash, newAssessment, openAssessment, deleteAssessment, showReport, backToForm, toggleReportEdit, refinePlanWithPrompt, regenerateAIRecommendation,
   };
 })();
