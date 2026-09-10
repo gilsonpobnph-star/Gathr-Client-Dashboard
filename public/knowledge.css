@@ -33,7 +33,11 @@
 #tab-knowledge .kb-cat-services { background:rgba(74,139,98,.14); color:var(--green); }
 #tab-knowledge .kb-cat-sops     { background:var(--accent-dim); color:var(--accent); }
 #tab-knowledge .kb-cat-brand    { background:rgba(224,91,46,.08); color:var(--accent2); }
+#tab-knowledge .kb-cat-marketing{ background:rgba(74,139,98,.10); color:var(--accent); }
 #tab-knowledge .kb-cat-always   { background:rgba(74,139,98,.14); color:var(--green); }
+#tab-knowledge .kb-cat-reports  { background:var(--surface3); color:var(--text2); }
+
+#tab-knowledge .kb-filter-reports { border-style:dashed; }
 
 #tab-knowledge .kb-card-tags { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
 #tab-knowledge .kb-tag {

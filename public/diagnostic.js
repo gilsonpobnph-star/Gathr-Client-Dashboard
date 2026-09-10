@@ -544,8 +544,8 @@
     if (!confirm('Clear the saved AI recommendation from every assessment? Each one will do a fresh AI generation next time it\'s opened. This does not delete any assessment or its answers.')) return;
     const result = await apiSend('/api/diagnostic/clear-ai-cache', 'POST', {});
     if (!result) { toast('Could not clear AI cache'); return; }
-    assessments.forEach(a => { delete a.aiRecommendation; });
-    if (cur) delete cur.aiRecommendation;
+    assessments.forEach(a => { delete a.aiRecommendation; delete a.reportEditedHtml; });
+    if (cur) { delete cur.aiRecommendation; delete cur.reportEditedHtml; }
     toast(`Cleared AI cache on ${result.cleared} assessment${result.cleared === 1 ? '' : 's'}.`);
   }
   async function setField(path, value) {
@@ -882,7 +882,9 @@
     // schema change must never silently pass as valid and block
     // regeneration with no error shown; that's exactly what happened once.
     const cachedAI = a.aiRecommendation?.channels?.length ? a.aiRecommendation : null;
-    if (cachedAI) {
+    if (a.reportEditedHtml) {
+      restoreEditedReport(a.reportEditedHtml);
+    } else if (cachedAI) {
       renderReport(cachedAI, { firstOpen: true });
     } else {
       generateThenRenderReport(lastReportCtx);
@@ -1225,6 +1227,7 @@
       const data = await r.json();
       if (!data?.channels?.length) return { ok: false, error: 'AI returned nothing usable' };
       cur.aiRecommendation = data;
+      delete cur.reportEditedHtml; // a fresh generation replaces the content any manual edit was made against
       await persist(); // saves once — this is what makes it free to view again later
       return { ok: true, data };
     } catch {
@@ -1273,10 +1276,20 @@
     runAIAndRerender();
   }
   function backToForm() { $('reportSection').classList.add('hidden'); $('formView').classList.remove('hidden'); }
+  // Entry point for the Knowledge Base's "Client Reports" list — jumps
+  // straight to one assessment's report after switching tabs into
+  // Diagnostic, refreshing the assessment list first so a report opened
+  // from elsewhere is never stale.
+  async function openReportById(id) {
+    await onOpen();
+    if (!assessments.some(x => x.id === id)) { toast('Could not find that assessment'); return; }
+    openAssessment(id);
+    showReport();
+  }
   // Let the team fix wording or fill in a missing detail directly in the
   // rendered report before printing/saving as PDF — window.print() prints
   // the live DOM, so anything typed here is what ends up in the PDF.
-  function toggleReportEdit() {
+  async function toggleReportEdit() {
     const wrap = document.querySelector('#dg-reportInner .doc-wrap');
     if (!wrap) return;
     const turningOn = wrap.getAttribute('contenteditable') !== 'true';
@@ -1284,9 +1297,33 @@
     wrap.classList.toggle('editing', turningOn);
     const btn = $('editToggle'); if (btn) btn.textContent = turningOn ? 'Done editing' : 'Edit details';
     const hint = $('editHint'); if (hint) hint.classList.toggle('hidden', !turningOn);
+    // Turning editing off is the save point: previously this only toggled
+    // contenteditable, so anything typed lived in the DOM only and vanished
+    // the moment the report was rebuilt (revisit, Regenerate, Ask AI) —
+    // exactly the "my edit didn't stick" bug. Now the edited HTML is
+    // snapshotted onto the assessment and persisted, and showReport()
+    // restores it instead of rebuilding from scratch until the next real
+    // regenerate.
+    if (!turningOn && cur) {
+      cur.reportEditedHtml = wrap.innerHTML;
+      toast('Saving your edits…');
+      await persist();
+      toast('Edits saved.');
+    }
+  }
+  // Repaints a previously saved manual edit exactly as it was left, instead
+  // of rebuilding the report from the underlying AI/deterministic data —
+  // mirrors the tail of renderReport() (view toggling, edit-button reset)
+  // without touching the sections build logic.
+  function restoreEditedReport(html) {
+    $('reportInner').innerHTML = html;
+    $('formView').classList.add('hidden'); $('reportSection').classList.remove('hidden');
+    const editBtn = $('editToggle'); if (editBtn) editBtn.textContent = 'Edit details';
+    const editHint = $('editHint'); if (editHint) editHint.classList.add('hidden');
+    document.getElementById('tab-diagnostic')?.scrollIntoView({ behavior: 'auto', block: 'start' });
   }
 
   window.Diagnostic = {
-    onOpen, showDash, newAssessment, openAssessment, deleteAssessment, showReport, backToForm, toggleReportEdit, refinePlanWithPrompt, regenerateAIRecommendation, clearAICache,
+    onOpen, showDash, newAssessment, openAssessment, deleteAssessment, showReport, backToForm, toggleReportEdit, refinePlanWithPrompt, regenerateAIRecommendation, clearAICache, openReportById,
   };
 })();

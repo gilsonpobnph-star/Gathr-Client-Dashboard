@@ -750,7 +750,7 @@
           <p class="subtitle">Facts and SOPs the CRM — including AI-generated reports — can pull from.</p>
         </div>
         <div class="header-actions">
-          <button class="btn-primary" onclick="KnowledgeBase.showAdd()">+ Add doc</button>
+          <button id="kb-addBtn" class="btn-primary" onclick="KnowledgeBase.showAdd()">+ Add doc</button>
         </div>
       </div>
 
@@ -758,9 +758,11 @@
         <div class="kb-filters">
           <button class="kb-filter-chip active" data-cat="">All</button>
           <button class="kb-filter-chip" data-cat="services">Services</button>
+          <button class="kb-filter-chip" data-cat="marketing">Marketing</button>
           <button class="kb-filter-chip" data-cat="sops">SOPs</button>
           <button class="kb-filter-chip" data-cat="brand">Brand</button>
           <button class="kb-filter-chip" data-cat="other">Other</button>
+          <button class="kb-filter-chip kb-filter-reports" data-cat="reports">Client Reports</button>
         </div>
 
         <div id="kb-list" class="kb-list"></div>
@@ -789,6 +791,7 @@
               <label for="kb-f-category">Category</label>
               <select id="kb-f-category" class="inline-input" style="width:100%">
                 <option value="services">Services</option>
+                <option value="marketing">Marketing</option>
                 <option value="sops">SOPs</option>
                 <option value="brand">Brand</option>
                 <option value="other" selected>Other</option>

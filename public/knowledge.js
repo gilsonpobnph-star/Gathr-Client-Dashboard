@@ -27,7 +27,7 @@
     catch { return null; }
   }
 
-  const CATEGORY_LABEL = { services: 'Services', sops: 'SOPs', brand: 'Brand', other: 'Other' };
+  const CATEGORY_LABEL = { services: 'Services', marketing: 'Marketing', sops: 'SOPs', brand: 'Brand', other: 'Other' };
 
   async function onOpen() {
     const list = await apiGet('/api/knowledge/docs');
@@ -47,6 +47,13 @@
   }
 
   function render() {
+    const addBtn = $('addBtn');
+    if (activeFilter === 'reports') {
+      if (addBtn) addBtn.classList.add('hidden');
+      renderReports();
+      return;
+    }
+    if (addBtn) addBtn.classList.remove('hidden');
     const listEl = $('list'), emptyEl = $('empty');
     const filtered = activeFilter ? docs.filter(d => d.category === activeFilter) : docs;
     if (!filtered.length) {
@@ -78,6 +85,50 @@
       </div>
     `;
     }).join('');
+  }
+
+  // "Client Reports" isn't a doc category — it's a live read-only window
+  // into every diagnostic assessment that already has a generated AI
+  // report, so the finished report for every client sits in the same
+  // place as the facts that helped write it, without duplicating any data.
+  async function renderReports() {
+    const listEl = $('list'), emptyEl = $('empty');
+    listEl.innerHTML = '<p style="color:var(--text3);font-size:12.5px">Loading…</p>';
+    emptyEl.classList.add('hidden');
+    const assessments = (await apiGet('/api/diagnostic/assessments')) || [];
+    const withReports = assessments
+      .filter(a => a.aiRecommendation?.channels?.length)
+      .sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || ''));
+    if (!withReports.length) {
+      listEl.innerHTML = '';
+      emptyEl.classList.remove('hidden');
+      emptyEl.querySelector('p').textContent = 'No client reports generated yet. They show up here automatically once a Diagnostic report is generated.';
+      return;
+    }
+    listEl.innerHTML = withReports.map(a => {
+      const date = a.updatedAt ? new Date(a.updatedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+      const summary = esc(a.aiRecommendation.priority_summary || '').slice(0, 220);
+      return `
+      <div class="kb-card">
+        <div class="kb-card-head">
+          <div>
+            <span class="kb-cat-badge kb-cat-reports">Client report</span>
+            <h3 class="kb-card-title">${esc(a.businessName || 'Untitled')}</h3>
+          </div>
+          <div class="kb-card-actions">
+            <button class="btn-secondary" onclick="KnowledgeBase.openReport('${a.id}')">Open report</button>
+          </div>
+        </div>
+        <div class="kb-card-tags"><span class="kb-tag">Generated ${esc(date)}</span></div>
+        <p class="kb-card-preview">${summary}${(a.aiRecommendation.priority_summary || '').length > 220 ? '…' : ''}</p>
+      </div>
+    `;
+    }).join('');
+  }
+
+  function openReport(id) {
+    if (typeof showTab === 'function') showTab('diagnostic');
+    window.Diagnostic && window.Diagnostic.openReportById(id);
   }
 
   function showAdd() {
@@ -146,5 +197,5 @@
     await onOpen();
   }
 
-  window.KnowledgeBase = { onOpen, showAdd, showEdit, closeModal, save, remove, cmd, titleCase };
+  window.KnowledgeBase = { onOpen, showAdd, showEdit, closeModal, save, remove, cmd, titleCase, openReport };
 })();

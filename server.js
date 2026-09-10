@@ -1169,7 +1169,7 @@ app.post('/api/diagnostic/clear-ai-cache', requireAuth, (req, res) => {
   ensureDiagnostic(store);
   let cleared = 0;
   Object.values(store.diagnostic.assessments).forEach(a => {
-    if (a.aiRecommendation) { delete a.aiRecommendation; cleared++; }
+    if (a.aiRecommendation) { delete a.aiRecommendation; delete a.reportEditedHtml; cleared++; }
   });
   writeStore(store);
   res.json({ ok: true, cleared });
@@ -1230,6 +1230,35 @@ const DEFAULT_GATHR_SERVICES = [
   { name: 'Software Setup', price: '$1500', blurb: 'We set up your systems, then hand you the keys.', notes: "The narrower, standalone version of the systems work also included inside Brand OS — fits when that's their one clear gap." },
   { name: 'Content', price: '$1000/$1500', blurb: 'We create your content, so you show up without the effort.', notes: 'For a content-specific gap on an otherwise healthy business.' },
 ];
+// Live web research, kept as its own plain (non-structured-output) call
+// rather than bolted onto the main json_schema request — combining a
+// server tool with output_config.format on one call is untested territory
+// for this app, and a broken combination there would silently corrupt the
+// one thing that must never break: the report's parseable JSON. If this
+// call fails or returns nothing, the report generation below proceeds
+// without it exactly as it always has (Knowledge Base docs only).
+async function researchWebForContext(client, context, channelKeys) {
+  try {
+    const stream = client.messages.stream({
+      model: 'claude-sonnet-5',
+      max_tokens: 2000,
+      output_config: { effort: 'low' },
+      tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 3 }],
+      messages: [{
+        role: 'user',
+        content: `Search the web for current, real marketing tactics for a ${context.practitionerType || 'health, fitness or beauty'} practitioner business, specifically anything relevant to these channels: ${channelKeys.join(', ')}. Look for what is genuinely working right now, real platforms, directories, ad formats, proof formats, not generic advice. Reply with a short plain-text summary of the most useful, concrete findings only, a sentence or two per point.`,
+      }],
+    });
+    const message = await stream.finalMessage();
+    const text = message.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+    if (!text) return '';
+    return `\n\nRecent web research (current findings, use as supporting context alongside the internal knowledge above, and again never copy wording verbatim):\n${text}\n`;
+  } catch (err) {
+    console.warn('[AI recommendations] web research step failed, continuing without it:', err.message);
+    return '';
+  }
+}
+
 app.post('/api/diagnostic/ai-recommendations', requireAuth, async (req, res) => {
   const client = getAnthropicClient();
   if (!client) return res.status(503).json({ error: 'AI recommendations are not configured (missing ANTHROPIC_API_KEY).' });
@@ -1253,6 +1282,7 @@ app.post('/api/diagnostic/ai-recommendations', requireAuth, async (req, res) => 
   const knowledgeSection = knowledgeDocs.length
     ? `\n\nInternal Gathr Grow knowledge (facts and SOPs the team has recorded, most relevant to this business first). Treat these as true and let them inform your thinking, but never copy a doc's wording into the report. Read each one, understand it, and write the point in your own plain sentences as part of the advice, the same way a strategist would absorb a briefing note and then talk about it in their own words:\n${knowledgeDocs.map(d => `${d.title} (${d.category}):\n${d.content}`).join('\n\n')}\n`
     : '';
+  const webResearchSection = await researchWebForContext(client, context, channelKeys);
   try {
     const prompt = `You are a senior marketing strategist for Gathr Grow, holistically rewriting the marketing-strategy report for a health/fitness/beauty practitioner business right after a diagnostic assessment.
 
@@ -1265,7 +1295,7 @@ Each entry in "channels" is a marketing/sales function already scored 0-100 by a
 
 Gathr's actual services — read each one's "notes" (real overlaps between services — e.g. one already includes another's scope) AND "deliverables" (what actually gets built, week by week) carefully. Every "help_reason" must name a real deliverable from the matching service, never generic filler. Every "help_service" must be exactly one of these names, never invented:
 ${JSON.stringify(services, null, 2)}
-${knowledgeSection}
+${knowledgeSection}${webResearchSection}
 Write:
 - field_best_practices: 5 to 8 real, specific tactics that the best-performing practitioners in THIS EXACT profession actually do — go beyond fieldLowHangingFruit with genuine marketing knowledge for this specific field, not the broader compliance group it happens to share with other professions
 - For EVERY channel listed (all of them, none skipped):
