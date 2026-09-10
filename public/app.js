@@ -358,6 +358,7 @@ function showTab(tab) {
   else if (tab === 'chat')        initChat();
   else if (tab === 'growth')      window.Growth && window.Growth.onOpen();
   else if (tab === 'diagnostic')  window.Diagnostic && window.Diagnostic.onOpen();
+  else if (tab === 'knowledge')   window.KnowledgeBase && window.KnowledgeBase.onOpen();
 }
 
 /* ── Assignee filters ─────────────────────────────────────────────────────── */

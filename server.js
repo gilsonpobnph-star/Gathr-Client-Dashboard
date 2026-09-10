@@ -1025,6 +1025,96 @@ app.delete('/api/diagnostic/assessments/:id', requireAuth, (req, res) => {
   writeStore(store);
   res.json({ ok: true });
 });
+// ── Knowledge Base: business facts / SOPs the CRM (and its AI features) can
+// pull from ─────────────────────────────────────────────────────────────────
+// Self-contained, same isolation pattern as diagnostic: its own store slice,
+// own CRUD, own tab. Docs are typed straight into the CRM (no Drive/export
+// step) so they're always current, then getRelevantKnowledgeDocs() lets any
+// AI prompt in this file pull in just the docs that matter for a given
+// context instead of stuffing everything into every call.
+function ensureKnowledge(store) {
+  if (!store.knowledge) store.knowledge = { docs: {} };
+  if (!store.knowledge.docs) store.knowledge.docs = {};
+}
+app.get('/api/knowledge/docs', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureKnowledge(store);
+  res.json(Object.values(store.knowledge.docs).sort((a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')));
+});
+app.post('/api/knowledge/docs', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureKnowledge(store);
+  const id = 'kb_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  const now = new Date().toISOString();
+  const doc = {
+    id,
+    title: req.body.title || 'Untitled',
+    category: req.body.category || 'other', // 'services' | 'sops' | 'brand' | 'other'
+    tags: req.body.tags || '',
+    content: req.body.content || '',
+    createdAt: now,
+    updatedAt: now,
+  };
+  store.knowledge.docs[id] = doc;
+  writeStore(store);
+  res.json(doc);
+});
+app.put('/api/knowledge/docs/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureKnowledge(store);
+  const existing = store.knowledge.docs[req.params.id];
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  const doc = {
+    ...existing,
+    title: req.body.title ?? existing.title,
+    category: req.body.category ?? existing.category,
+    tags: req.body.tags ?? existing.tags,
+    content: req.body.content ?? existing.content,
+    id: req.params.id,
+    updatedAt: new Date().toISOString(),
+  };
+  store.knowledge.docs[req.params.id] = doc;
+  writeStore(store);
+  res.json(doc);
+});
+app.delete('/api/knowledge/docs/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureKnowledge(store);
+  delete store.knowledge.docs[req.params.id];
+  writeStore(store);
+  res.json({ ok: true });
+});
+
+// Cheap relevance filter, not a real embeddings search: matches each doc's
+// tags/category/title against a handful of context keywords (practitioner
+// type, compliance group, channel keys) and returns the best matches plus
+// any untagged doc (treated as always-relevant, e.g. a general "how we
+// sell" SOP). Capped by count and total characters so this can't blow out
+// the prompt or the token budget of whatever calls it.
+function getRelevantKnowledgeDocs(store, keywords, { maxDocs = 6, maxChars = 6000 } = {}) {
+  ensureKnowledge(store);
+  const kw = (keywords || []).filter(Boolean).map(k => String(k).toLowerCase());
+  const docs = Object.values(store.knowledge.docs);
+  const scored = docs.map(d => {
+    const haystack = `${d.title} ${d.tags} ${d.category}`.toLowerCase();
+    const isUntagged = !d.tags || !d.tags.trim();
+    let score = isUntagged ? 1 : 0; // always-relevant baseline, specific matches push it up
+    kw.forEach(k => { if (k && haystack.includes(k)) score += 2; });
+    return { d, score };
+  }).filter(x => x.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, maxDocs);
+  let used = 0;
+  const picked = [];
+  for (const { d } of scored) {
+    if (used >= maxChars) break;
+    const chunk = d.content.slice(0, maxChars - used);
+    picked.push({ title: d.title, category: d.category, content: chunk });
+    used += chunk.length;
+  }
+  return picked;
+}
+
 // One-off maintenance action: clears the saved AI recommendation off every
 // assessment (never touches the assessment itself or its answers) so the
 // next "Generate strategy report" on each one does a genuine fresh AI pass
@@ -1105,6 +1195,13 @@ app.post('/api/diagnostic/ai-recommendations', requireAuth, async (req, res) => 
   const channelKeys = Array.isArray(context.channels) && context.channels.length
     ? context.channels.map(c => c.key)
     : ['content', 'paidads', 'outreach', 'referrals', 'reviews', 'website', 'directories', 'capture', 'speed', 'followup', 'show', 'sales'];
+  const knowledgeStore = readStore();
+  const knowledgeDocs = getRelevantKnowledgeDocs(knowledgeStore, [
+    context.practitionerType, context.practitionerGroup, context.complianceGroup, ...channelKeys,
+  ]);
+  const knowledgeSection = knowledgeDocs.length
+    ? `\n\nInternal Gathr Grow knowledge (facts and SOPs the team has recorded — treat as ground truth, and prefer this over generic instinct wherever it's relevant):\n${knowledgeDocs.map(d => `— ${d.title} (${d.category}):\n${d.content}`).join('\n\n')}\n`
+    : '';
   try {
     const prompt = `You are a senior marketing strategist for Gathr Grow, holistically rewriting the marketing-strategy report for a health/fitness/beauty practitioner business right after a diagnostic assessment.
 
@@ -1117,7 +1214,7 @@ Each entry in "channels" is a marketing/sales function already scored 0-100 by a
 
 Gathr's actual services — read each one's "notes" (real overlaps between services — e.g. one already includes another's scope) AND "deliverables" (what actually gets built, week by week) carefully. Every "help_reason" must name a real deliverable from the matching service, never generic filler. Every "help_service" must be exactly one of these names, never invented:
 ${JSON.stringify(services, null, 2)}
-
+${knowledgeSection}
 Write:
 - field_best_practices: 5 to 8 real, specific tactics that the best-performing practitioners in THIS EXACT profession actually do — go beyond fieldLowHangingFruit with genuine marketing knowledge for this specific field, not the broader compliance group it happens to share with other professions
 - For EVERY channel listed (all of them, none skipped):

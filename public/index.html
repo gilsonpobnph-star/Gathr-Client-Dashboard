@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="style.css" />
   <link rel="stylesheet" href="growth.css" />
   <link rel="stylesheet" href="diagnostic.css" />
+  <link rel="stylesheet" href="knowledge.css" />
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
@@ -106,6 +107,10 @@
       <button class="nav-item" data-tab="diagnostic">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         Diagnostic
+      </button>
+      <button class="nav-item" data-tab="knowledge">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Knowledge Base
       </button>
 
       <div class="nav-section-label">Intake</div>
@@ -735,6 +740,75 @@
         </div>
       </div>
       <div class="toast" id="dg-toast"></div>
+    </section>
+
+    <!-- Knowledge Base: business facts / SOPs the CRM's AI features pull from -->
+    <section id="tab-knowledge" class="tab-section hidden">
+      <div class="page-header">
+        <div>
+          <h1>Knowledge Base</h1>
+          <p class="subtitle">Facts and SOPs the CRM — including AI-generated reports — can pull from.</p>
+        </div>
+        <div class="header-actions">
+          <button class="btn-primary" onclick="KnowledgeBase.showAdd()">+ Add doc</button>
+        </div>
+      </div>
+
+      <div class="kb-filters">
+        <button class="kb-filter-chip active" data-cat="">All</button>
+        <button class="kb-filter-chip" data-cat="services">Services</button>
+        <button class="kb-filter-chip" data-cat="sops">SOPs</button>
+        <button class="kb-filter-chip" data-cat="brand">Brand</button>
+        <button class="kb-filter-chip" data-cat="other">Other</button>
+      </div>
+
+      <div id="kb-list" class="kb-list"></div>
+      <div id="kb-empty" class="empty-state hidden">
+        <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        <p>No docs yet. Add a service sheet, an SOP, or a brand-voice note to get started.</p>
+      </div>
+
+      <!-- Add/edit doc modal -->
+      <div id="kb-modal" class="modal-overlay hidden" onclick="if(event.target===this)KnowledgeBase.closeModal()">
+        <div class="modal" style="max-width:640px;max-height:85vh;overflow:auto">
+          <button class="modal-close" onclick="KnowledgeBase.closeModal()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+          <div class="modal-header">
+            <h2 id="kb-modal-title">Add doc</h2>
+          </div>
+          <input type="hidden" id="kb-f-id" />
+          <div style="margin-bottom:14px">
+            <label for="kb-f-title">Title</label>
+            <input type="text" id="kb-f-title" class="inline-input" style="width:100%" placeholder="e.g. Software Setup — full deliverables" />
+          </div>
+          <div style="display:flex; gap:14px; margin-bottom:14px">
+            <div style="flex:1">
+              <label for="kb-f-category">Category</label>
+              <select id="kb-f-category" class="inline-input" style="width:100%">
+                <option value="services">Services</option>
+                <option value="sops">SOPs</option>
+                <option value="brand">Brand</option>
+                <option value="other" selected>Other</option>
+              </select>
+            </div>
+            <div style="flex:2">
+              <label for="kb-f-tags">Tags <span style="font-weight:400;color:var(--text3)">(comma-separated — used to match this doc to relevant reports; leave blank to always include it)</span></label>
+              <input type="text" id="kb-f-tags" class="inline-input" style="width:100%" placeholder="e.g. chiro, capture, booking" />
+            </div>
+          </div>
+          <div style="margin-bottom:14px">
+            <label for="kb-f-content">Content</label>
+            <textarea id="kb-f-content" class="inline-input" style="width:100%;min-height:260px;resize:vertical;padding:10px" placeholder="Paste or type the actual fact/SOP text here. This is what gets fed to the AI verbatim, so write it the way you'd want it read."></textarea>
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:10px">
+            <button class="btn-secondary" onclick="KnowledgeBase.closeModal()">Cancel</button>
+            <button class="btn-primary" onclick="KnowledgeBase.save()">Save doc</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="toast" id="kb-toast"></div>
     </section>
 
     <!-- New Intakes -->
@@ -1854,6 +1928,7 @@
 
 <script src="growth.js"></script>
 <script src="diagnostic.js"></script>
+<script src="knowledge.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
