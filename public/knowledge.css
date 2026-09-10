@@ -1,5 +1,11 @@
 /* Knowledge Base tab — uses the CRM's global light-theme variables (style.css) */
 
+/* .page-header (from style.css) already pads itself — everything below it
+   needs its own scroll+padding wrapper, same pattern as .team-scroll /
+   .overview-scroll elsewhere, otherwise the list sits flush against the
+   window edges with no breathing room. */
+#tab-knowledge .kb-body-scroll { flex:1; overflow-y:auto; padding:24px 32px 32px; }
+
 #tab-knowledge .kb-filters { display:flex; gap:8px; margin:4px 0 18px; flex-wrap:wrap; }
 #tab-knowledge .kb-filter-chip {
   padding:6px 14px; border-radius:20px; border:1px solid var(--border);
