@@ -15,14 +15,18 @@
 #tab-knowledge .kb-filter-chip:hover { border-color:var(--glass-border2); }
 #tab-knowledge .kb-filter-chip.active { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
 
-#tab-knowledge .kb-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:16px; }
+/* One row per doc — title/badges/tags/description read left to right,
+   actions pinned to the right, so many docs scan quickly instead of
+   requiring a grid scan. */
+#tab-knowledge .kb-list { display:flex; flex-direction:column; gap:1px; background:var(--border); border:1px solid var(--border); border-radius:12px; overflow:hidden; }
 
 #tab-knowledge .kb-card {
-  background:var(--surface); border:1px solid var(--border); border-radius:14px;
-  padding:24px 26px;
+  background:var(--surface-solid); padding:14px 18px;
+  display:flex; align-items:center; gap:16px;
 }
-#tab-knowledge .kb-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; }
-#tab-knowledge .kb-card-title { margin:6px 0 0; font-size:16px; font-weight:600; color:var(--text); }
+#tab-knowledge .kb-card-head { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom:3px; }
+#tab-knowledge .kb-card-title { margin:0; font-size:14.5px; font-weight:600; color:var(--text); }
+#tab-knowledge .kb-card-main { flex:1; min-width:0; }
 #tab-knowledge .kb-card-actions { display:flex; gap:6px; flex-shrink:0; }
 #tab-knowledge .kb-card-actions .btn-secondary { padding:5px 10px; font-size:11.5px; }
 
@@ -39,12 +43,17 @@
 
 #tab-knowledge .kb-filter-reports { border-style:dashed; }
 
-#tab-knowledge .kb-card-tags { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+#tab-knowledge .kb-card-tags { display:inline-flex; gap:6px; flex-wrap:wrap; }
 #tab-knowledge .kb-tag {
-  font-size:11px; padding:3px 9px; border-radius:20px; background:var(--surface3); color:var(--text2);
+  font-size:10.5px; padding:2px 8px; border-radius:20px; background:var(--surface3); color:var(--text2);
 }
 
-#tab-knowledge .kb-card-preview { font-size:13px; color:var(--text2); line-height:1.65; margin:0; white-space:pre-wrap; }
+/* Single-line description — click Edit to read the full doc rather than
+   scanning a multi-line preview in the list. */
+#tab-knowledge .kb-card-preview {
+  font-size:12.5px; color:var(--text2); margin:0;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
 
 #tab-knowledge .toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--text); color:var(--surface-solid); padding:11px 22px; border-radius:3px; font-size:14px; opacity:0; pointer-events:none; transition:opacity .25s; z-index:600;}
 #tab-knowledge .toast.show{opacity:1;}

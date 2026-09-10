@@ -66,22 +66,24 @@
     }
     emptyEl.classList.add('hidden');
     listEl.innerHTML = filtered.map(d => {
-      const preview = htmlToText(d.content).slice(0, 220);
+      const text = htmlToText(d.content).replace(/\n+/g, ' — ');
+      const preview = text.slice(0, 160);
+      const tags = d.tags ? esc(d.tags).split(',').map(t => t.trim()).filter(Boolean) : [];
       return `
       <div class="kb-card">
-        <div class="kb-card-head">
-          <div>
+        <div class="kb-card-main">
+          <div class="kb-card-head">
             <span class="kb-cat-badge kb-cat-${esc(d.category)}">${esc(CATEGORY_LABEL[d.category] || d.category)}</span>
             ${d.alwaysInclude ? '<span class="kb-cat-badge kb-cat-always">Always included</span>' : ''}
             <h3 class="kb-card-title">${esc(d.title)}</h3>
+            ${tags.length ? `<span class="kb-card-tags">${tags.map(t => `<span class="kb-tag">${esc(t)}</span>`).join('')}</span>` : ''}
           </div>
-          <div class="kb-card-actions">
-            <button class="btn-secondary" onclick="KnowledgeBase.showEdit('${d.id}')">Edit</button>
-            <button class="btn-secondary" onclick="KnowledgeBase.remove('${d.id}')">Delete</button>
-          </div>
+          <p class="kb-card-preview">${esc(preview)}${text.length > 160 ? '…' : ''}</p>
         </div>
-        ${d.tags ? `<div class="kb-card-tags">${esc(d.tags).split(',').map(t => t.trim()).filter(Boolean).map(t => `<span class="kb-tag">${esc(t)}</span>`).join('')}</div>` : ''}
-        <p class="kb-card-preview">${esc(preview)}${htmlToText(d.content).length > 220 ? '…' : ''}</p>
+        <div class="kb-card-actions">
+          <button class="btn-secondary" onclick="KnowledgeBase.showEdit('${d.id}')">Edit</button>
+          <button class="btn-secondary" onclick="KnowledgeBase.remove('${d.id}')">Delete</button>
+        </div>
       </div>
     `;
     }).join('');
@@ -107,20 +109,21 @@
     }
     listEl.innerHTML = withReports.map(a => {
       const date = a.updatedAt ? new Date(a.updatedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
-      const summary = esc(a.aiRecommendation.priority_summary || '').slice(0, 220);
+      const summaryFull = a.aiRecommendation.priority_summary || '';
+      const summary = esc(summaryFull).slice(0, 160);
       return `
       <div class="kb-card">
-        <div class="kb-card-head">
-          <div>
+        <div class="kb-card-main">
+          <div class="kb-card-head">
             <span class="kb-cat-badge kb-cat-reports">Client report</span>
             <h3 class="kb-card-title">${esc(a.businessName || 'Untitled')}</h3>
+            <span class="kb-card-tags"><span class="kb-tag">Generated ${esc(date)}</span></span>
           </div>
-          <div class="kb-card-actions">
-            <button class="btn-secondary" onclick="KnowledgeBase.openReport('${a.id}')">Open report</button>
-          </div>
+          <p class="kb-card-preview">${summary}${summaryFull.length > 160 ? '…' : ''}</p>
         </div>
-        <div class="kb-card-tags"><span class="kb-tag">Generated ${esc(date)}</span></div>
-        <p class="kb-card-preview">${summary}${(a.aiRecommendation.priority_summary || '').length > 220 ? '…' : ''}</p>
+        <div class="kb-card-actions">
+          <button class="btn-secondary" onclick="KnowledgeBase.openReport('${a.id}')">Open report</button>
+        </div>
       </div>
     `;
     }).join('');
