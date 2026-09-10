@@ -9,32 +9,66 @@
 #tab-knowledge .kb-filter-chip:hover { border-color:var(--glass-border2); }
 #tab-knowledge .kb-filter-chip.active { background:var(--accent-dim); color:var(--accent); border-color:var(--accent); }
 
-#tab-knowledge .kb-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:14px; }
+#tab-knowledge .kb-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(340px, 1fr)); gap:16px; }
 
 #tab-knowledge .kb-card {
-  background:var(--surface); border:1px solid var(--border); border-radius:12px;
-  padding:16px 18px;
+  background:var(--surface); border:1px solid var(--border); border-radius:14px;
+  padding:24px 26px;
 }
-#tab-knowledge .kb-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:8px; }
-#tab-knowledge .kb-card-title { margin:4px 0 0; font-size:15px; font-weight:600; color:var(--text); }
+#tab-knowledge .kb-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; margin-bottom:10px; }
+#tab-knowledge .kb-card-title { margin:6px 0 0; font-size:16px; font-weight:600; color:var(--text); }
 #tab-knowledge .kb-card-actions { display:flex; gap:6px; flex-shrink:0; }
 #tab-knowledge .kb-card-actions .btn-secondary { padding:5px 10px; font-size:11.5px; }
 
 #tab-knowledge .kb-cat-badge {
   display:inline-block; font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
-  padding:2px 8px; border-radius:20px; background:var(--surface3); color:var(--text3);
+  padding:3px 9px; border-radius:20px; background:var(--surface3); color:var(--text3); margin-right:6px;
 }
 #tab-knowledge .kb-cat-services { background:rgba(74,139,98,.14); color:var(--green); }
 #tab-knowledge .kb-cat-sops     { background:var(--accent-dim); color:var(--accent); }
 #tab-knowledge .kb-cat-brand    { background:rgba(224,91,46,.08); color:var(--accent2); }
+#tab-knowledge .kb-cat-always   { background:rgba(74,139,98,.14); color:var(--green); }
 
-#tab-knowledge .kb-card-tags { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+#tab-knowledge .kb-card-tags { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
 #tab-knowledge .kb-tag {
-  font-size:11px; padding:2px 8px; border-radius:20px; background:var(--surface3); color:var(--text2);
+  font-size:11px; padding:3px 9px; border-radius:20px; background:var(--surface3); color:var(--text2);
 }
-#tab-knowledge .kb-tag-always { font-size:11px; color:var(--text3); font-style:italic; }
 
-#tab-knowledge .kb-card-preview { font-size:12.5px; color:var(--text2); line-height:1.5; margin:0; white-space:pre-wrap; }
+#tab-knowledge .kb-card-preview { font-size:13px; color:var(--text2); line-height:1.65; margin:0; white-space:pre-wrap; }
 
 #tab-knowledge .toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--text); color:var(--surface-solid); padding:11px 22px; border-radius:3px; font-size:14px; opacity:0; pointer-events:none; transition:opacity .25s; z-index:600;}
 #tab-knowledge .toast.show{opacity:1;}
+
+/* Add/edit modal */
+#tab-knowledge .kb-doc-modal { padding:30px 32px; }
+#tab-knowledge .kb-field { margin-bottom:18px; }
+#tab-knowledge .kb-field label { display:block; margin-bottom:7px; }
+#tab-knowledge .kb-field-hint { font-weight:400; color:var(--text3); font-size:11.5px; }
+
+#tab-knowledge .kb-always-row {
+  display:flex; align-items:center; gap:8px; margin-bottom:18px; font-size:13px; color:var(--text2); cursor:pointer;
+}
+#tab-knowledge .kb-always-row input { width:15px; height:15px; }
+
+#tab-knowledge .kb-editor-toolbar {
+  display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px; padding:8px; border-radius:10px 10px 0 0;
+  background:var(--surface3); border:1px solid var(--border); border-bottom:none;
+}
+#tab-knowledge .kb-editor-toolbar button, #tab-knowledge .kb-toolbar-select {
+  border:1px solid var(--border); background:var(--surface-solid); color:var(--text);
+  border-radius:6px; padding:6px 10px; font-size:12px; cursor:pointer;
+}
+#tab-knowledge .kb-editor-toolbar button:hover { background:var(--accent-dim); border-color:var(--accent); }
+
+#tab-knowledge .kb-editor {
+  width:100%; min-height:280px; max-height:50vh; overflow-y:auto;
+  border:1px solid var(--border); border-radius:0 0 10px 10px;
+  padding:20px 22px; font-size:13.5px; line-height:1.7; color:var(--text);
+  background:var(--surface-solid);
+}
+#tab-knowledge .kb-editor:focus { outline:2px solid var(--accent-dim); outline-offset:-2px; }
+#tab-knowledge .kb-editor:empty::before { content: attr(data-placeholder); color:var(--text3); }
+#tab-knowledge .kb-editor ul, #tab-knowledge .kb-editor ol { margin:8px 0 8px 22px; }
+#tab-knowledge .kb-editor h2 { font-size:19px; margin:14px 0 8px; }
+#tab-knowledge .kb-editor h3 { font-size:16px; margin:12px 0 6px; }
+#tab-knowledge .kb-editor p { margin:0 0 10px; }

@@ -770,7 +770,7 @@
 
       <!-- Add/edit doc modal -->
       <div id="kb-modal" class="modal-overlay hidden" onclick="if(event.target===this)KnowledgeBase.closeModal()">
-        <div class="modal" style="max-width:640px;max-height:85vh;overflow:auto">
+        <div class="modal kb-doc-modal" style="max-width:720px;max-height:88vh;overflow:auto">
           <button class="modal-close" onclick="KnowledgeBase.closeModal()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
           </button>
@@ -778,11 +778,11 @@
             <h2 id="kb-modal-title">Add doc</h2>
           </div>
           <input type="hidden" id="kb-f-id" />
-          <div style="margin-bottom:14px">
+          <div class="kb-field">
             <label for="kb-f-title">Title</label>
             <input type="text" id="kb-f-title" class="inline-input" style="width:100%" placeholder="e.g. Software Setup — full deliverables" />
           </div>
-          <div style="display:flex; gap:14px; margin-bottom:14px">
+          <div style="display:flex; gap:14px" class="kb-field">
             <div style="flex:1">
               <label for="kb-f-category">Category</label>
               <select id="kb-f-category" class="inline-input" style="width:100%">
@@ -793,13 +793,36 @@
               </select>
             </div>
             <div style="flex:2">
-              <label for="kb-f-tags">Tags <span style="font-weight:400;color:var(--text3)">(comma-separated — used to match this doc to relevant reports; leave blank to always include it)</span></label>
+              <label for="kb-f-tags">Tags <span class="kb-field-hint">(for your own browsing — the AI matches on what's actually being asked, not on tags)</span></label>
               <input type="text" id="kb-f-tags" class="inline-input" style="width:100%" placeholder="e.g. chiro, capture, booking" />
             </div>
           </div>
-          <div style="margin-bottom:14px">
-            <label for="kb-f-content">Content</label>
-            <textarea id="kb-f-content" class="inline-input" style="width:100%;min-height:260px;resize:vertical;padding:10px" placeholder="Paste or type the actual fact/SOP text here. This is what gets fed to the AI verbatim, so write it the way you'd want it read."></textarea>
+          <label class="kb-always-row">
+            <input type="checkbox" id="kb-f-always" />
+            Always include this in AI reports, regardless of topic
+          </label>
+          <div class="kb-field">
+            <label for="kb-f-content-editor">Content <span class="kb-field-hint">(the AI reads this as background and writes its own sentences from it, never copies it verbatim)</span></label>
+            <div class="kb-editor-toolbar">
+              <button type="button" title="Bold" onclick="KnowledgeBase.cmd('bold')"><b>B</b></button>
+              <select title="Heading size" onchange="KnowledgeBase.cmd('formatBlock', this.value); this.selectedIndex=0" class="kb-toolbar-select">
+                <option value="" selected disabled>Size</option>
+                <option value="h2">Heading</option>
+                <option value="h3">Subheading</option>
+                <option value="p">Normal</option>
+              </select>
+              <select title="Font" onchange="KnowledgeBase.cmd('fontName', this.value)" class="kb-toolbar-select">
+                <option value="" selected disabled>Font</option>
+                <option value="Interstate, Arial, sans-serif">Sans</option>
+                <option value="Georgia, serif">Serif</option>
+                <option value="'Courier New', monospace">Mono</option>
+              </select>
+              <button type="button" title="Bullet list" onclick="KnowledgeBase.cmd('insertUnorderedList')">&#8226; List</button>
+              <button type="button" title="Numbered list" onclick="KnowledgeBase.cmd('insertOrderedList')">1. List</button>
+              <button type="button" title="Title Case selection" onclick="KnowledgeBase.titleCase()">Aa</button>
+              <button type="button" title="Clear formatting" onclick="KnowledgeBase.cmd('removeFormat')">Clear</button>
+            </div>
+            <div id="kb-f-content" class="kb-editor" contenteditable="true" data-placeholder="Type or paste the actual fact/SOP here…"></div>
           </div>
           <div style="display:flex; justify-content:flex-end; gap:10px">
             <button class="btn-secondary" onclick="KnowledgeBase.closeModal()">Cancel</button>

@@ -1036,6 +1036,33 @@ function ensureKnowledge(store) {
   if (!store.knowledge) store.knowledge = { docs: {} };
   if (!store.knowledge.docs) store.knowledge.docs = {};
 }
+
+// Docs are edited with a small rich-text toolbar (bold/lists/headings/font)
+// on the client, so content arrives as HTML. Strip anything dangerous
+// before it's ever persisted — this is an admin-only tool, not a full
+// sanitizer, just a safety net against a stray <script> tag.
+function sanitizeDocHtml(html) {
+  return String(html || '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
+    .replace(/\son\w+\s*=\s*'[^']*'/gi, '');
+}
+// Flattens a doc's rich-text HTML into plain text for the AI prompt —
+// keeps bullet/paragraph structure (as "- " lines and blank lines) but
+// strips markup and decodes entities, so the model reads clean prose
+// instead of raw tags.
+function htmlToText(html) {
+  return String(html || '')
+    .replace(/<li[^>]*>/gi, '\n- ')
+    .replace(/<\/(p|div|h[1-6])>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&quot;/g, '"')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 app.get('/api/knowledge/docs', requireAuth, (req, res) => {
   const store = readStore();
   ensureKnowledge(store);
@@ -1050,8 +1077,9 @@ app.post('/api/knowledge/docs', requireAuth, (req, res) => {
     id,
     title: req.body.title || 'Untitled',
     category: req.body.category || 'other', // 'services' | 'sops' | 'brand' | 'other'
-    tags: req.body.tags || '',
-    content: req.body.content || '',
+    tags: req.body.tags || '', // organizational only now — matching reads the content itself, not tags
+    content: sanitizeDocHtml(req.body.content || ''),
+    alwaysInclude: !!req.body.alwaysInclude,
     createdAt: now,
     updatedAt: now,
   };
@@ -1069,7 +1097,8 @@ app.put('/api/knowledge/docs/:id', requireAuth, (req, res) => {
     title: req.body.title ?? existing.title,
     category: req.body.category ?? existing.category,
     tags: req.body.tags ?? existing.tags,
-    content: req.body.content ?? existing.content,
+    content: req.body.content != null ? sanitizeDocHtml(req.body.content) : existing.content,
+    alwaysInclude: req.body.alwaysInclude != null ? !!req.body.alwaysInclude : !!existing.alwaysInclude,
     id: req.params.id,
     updatedAt: new Date().toISOString(),
   };
@@ -1085,21 +1114,36 @@ app.delete('/api/knowledge/docs/:id', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// Cheap relevance filter, not a real embeddings search: matches each doc's
-// tags/category/title against a handful of context keywords (practitioner
-// type, compliance group, channel keys) and returns the best matches plus
-// any untagged doc (treated as always-relevant, e.g. a general "how we
-// sell" SOP). Capped by count and total characters so this can't blow out
-// the prompt or the token budget of whatever calls it.
+const KEYWORD_STOPWORDS = new Set(['the','and','for','with','that','this','have','from','they','their','what','when','where','which','about','into','your','you','are','was','were','been','being','not','but','can','could','would','should','will','just','more','most','some','such','than','then','them','these','those','over','under','also','only','very','much','many','make','made','need','needs','needing','want','wants','like','get','gets','getting','has','had']);
+// Pulls out the meaningful words from any free text — a client's own
+// description of their problem, the practitioner type, a custom AI
+// instruction — so knowledge lookups key off what's actually being asked
+// rather than requiring someone to have pre-tagged the right doc.
+function extractKeywords(text) {
+  return String(text || '')
+    .toLowerCase()
+    .split(/[^a-z0-9']+/)
+    .filter(w => w.length >= 4 && !KEYWORD_STOPWORDS.has(w));
+}
+
+// Cheap relevance filter, not a real embeddings search: matches keywords
+// pulled from the actual question/context (not from a doc's own tags —
+// tags are for the team's own browsing/organization only) against each
+// doc's title and full content, and always includes anything marked
+// "always include". Capped by count and total characters so this can't
+// blow out the prompt or the token budget of whatever calls it.
 function getRelevantKnowledgeDocs(store, keywords, { maxDocs = 6, maxChars = 6000 } = {}) {
   ensureKnowledge(store);
-  const kw = (keywords || []).filter(Boolean).map(k => String(k).toLowerCase());
+  const kw = [...new Set((keywords || []).flatMap(k => extractKeywords(k)))];
   const docs = Object.values(store.knowledge.docs);
   const scored = docs.map(d => {
-    const haystack = `${d.title} ${d.tags} ${d.category}`.toLowerCase();
-    const isUntagged = !d.tags || !d.tags.trim();
-    let score = isUntagged ? 1 : 0; // always-relevant baseline, specific matches push it up
-    kw.forEach(k => { if (k && haystack.includes(k)) score += 2; });
+    const title = (d.title || '').toLowerCase();
+    const body = htmlToText(d.content).toLowerCase();
+    let score = d.alwaysInclude ? 1000 : 0; // always-included docs sort first, regardless of match
+    kw.forEach(k => {
+      if (title.includes(k)) score += 3;
+      if (body.includes(k)) score += 1;
+    });
     return { d, score };
   }).filter(x => x.score > 0)
     .sort((a, b) => b.score - a.score)
@@ -1108,7 +1152,8 @@ function getRelevantKnowledgeDocs(store, keywords, { maxDocs = 6, maxChars = 600
   const picked = [];
   for (const { d } of scored) {
     if (used >= maxChars) break;
-    const chunk = d.content.slice(0, maxChars - used);
+    const text = htmlToText(d.content);
+    const chunk = text.slice(0, maxChars - used);
     picked.push({ title: d.title, category: d.category, content: chunk });
     used += chunk.length;
   }
@@ -1196,11 +1241,17 @@ app.post('/api/diagnostic/ai-recommendations', requireAuth, async (req, res) => 
     ? context.channels.map(c => c.key)
     : ['content', 'paidads', 'outreach', 'referrals', 'reviews', 'website', 'directories', 'capture', 'speed', 'followup', 'show', 'sales'];
   const knowledgeStore = readStore();
+  // Keywords come from the actual question being answered here: what this
+  // business does, who they serve, what they said their gap is, which
+  // channels are in play, and (on a regenerate-with-instruction) the literal
+  // instruction text — not from however a doc happens to be tagged.
   const knowledgeDocs = getRelevantKnowledgeDocs(knowledgeStore, [
-    context.practitionerType, context.practitionerGroup, context.complianceGroup, ...channelKeys,
+    context.practitionerType, context.practitionerGroup, context.idealClient, context.mainOffer,
+    context.biggestGapInOwnWords, customInstruction,
+    ...channelKeys, ...(Array.isArray(context.channels) ? context.channels.map(c => c.label) : []),
   ]);
   const knowledgeSection = knowledgeDocs.length
-    ? `\n\nInternal Gathr Grow knowledge (facts and SOPs the team has recorded — treat as ground truth, and prefer this over generic instinct wherever it's relevant):\n${knowledgeDocs.map(d => `— ${d.title} (${d.category}):\n${d.content}`).join('\n\n')}\n`
+    ? `\n\nInternal Gathr Grow knowledge (facts and SOPs the team has recorded, most relevant to this business first). Treat these as true and let them inform your thinking, but never copy a doc's wording into the report. Read each one, understand it, and write the point in your own plain sentences as part of the advice, the same way a strategist would absorb a briefing note and then talk about it in their own words:\n${knowledgeDocs.map(d => `${d.title} (${d.category}):\n${d.content}`).join('\n\n')}\n`
     : '';
   try {
     const prompt = `You are a senior marketing strategist for Gathr Grow, holistically rewriting the marketing-strategy report for a health/fitness/beauty practitioner business right after a diagnostic assessment.
