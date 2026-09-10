@@ -26,7 +26,7 @@
     try { const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }); return r.ok ? r.json() : null; }
     catch { return null; }
   }
-  function fresh() { return { board: null, periods: [], weeks: {}, fees: {}, notes: {} }; }
+  function fresh() { return { board: null, periods: [], weeks: {}, months: {}, fees: {}, notes: {} }; }
 
   // One-time, idempotent migration: old model was one WIG + one commitment per
   // PERSON per period (2 points each). New model is a flat list of goals per
@@ -49,13 +49,34 @@
     return changed;
   }
 
+  // One-time, idempotent migration: the data pool used to be entered per
+  // week (a reports person picking a Friday date). It's now entered per
+  // month directly, so this sums whatever weekly entries already exist
+  // into their month and moves them into d.months — nothing already
+  // recorded is lost. Runs once per client: an empty {} still counts as
+  // "already migrated", so this never re-sums after the switch.
+  function migrateWeeksToMonths(d) {
+    if (d.months) return false;
+    d.months = {};
+    Object.keys(d.weeks || {}).sort().forEach(k => {
+      const w = d.weeks[k]; const mo = monthOf(k);
+      if (!d.months[mo]) d.months[mo] = { ads: { spend: 0, impr: 0, clicks: 0, leads: 0 }, pipe: { booked: 0, showed: 0, closed: 0, rev: 0 } };
+      const m = d.months[mo];
+      if (w.ads) ['spend', 'impr', 'clicks', 'leads'].forEach(x => { if (w.ads[x] != null) m.ads[x] = (m.ads[x] || 0) + w.ads[x]; });
+      if (w.pipe) ['booked', 'showed', 'closed', 'rev'].forEach(x => { if (w.pipe[x] != null) m.pipe[x] = (m.pipe[x] || 0) + w.pipe[x]; });
+    });
+    return true;
+  }
+
   let booted = false;
   async function onOpen() {
     setSync('Loading…');
     clients = (await apiGet('/api/growth/clients')) || [];
     await Promise.all(clients.map(async c => {
       dataCache[c.id] = (await apiGet('/api/growth/data/' + c.id)) || fresh();
-      if (migrateClientData(dataCache[c.id])) await apiSend('/api/growth/data/' + c.id, 'PUT', dataCache[c.id]);
+      const changed1 = migrateClientData(dataCache[c.id]);
+      const changed2 = migrateWeeksToMonths(dataCache[c.id]);
+      if (changed1 || changed2) await apiSend('/api/growth/data/' + c.id, 'PUT', dataCache[c.id]);
     }));
     setSync('Synced · shared with your team');
     if (!booted) { booted = true; }
@@ -69,20 +90,27 @@
 
   function daysBetween(a, b) { return Math.round((new Date(b + 'T00:00') - new Date(a + 'T00:00')) / 86400000); }
   function todayStr() { return new Date().toISOString().slice(0, 10); }
-  function lastFriday() { const d = new Date(); d.setDate(d.getDate() - ((d.getDay() - 5 + 7) % 7)); return d.toISOString().slice(0, 10); }
   function niceDate(s) { return s ? new Date(s + 'T00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'long' }) : ''; }
   function shortDate(s) { return s ? new Date(s + 'T00:00').toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : ''; }
   function monthOf(s) { return s.slice(0, 7); }
   function monthLabel(mo) { const [y, m] = mo.split('-'); return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][+m - 1] + ' ' + y; }
 
-  function weekKeys(d) { return Object.keys(d.weeks).sort(); }
-  function monthKeys(d) { return [...new Set(weekKeys(d).map(monthOf))].sort(); }
-  function sumWeeks(d, f) {
+  function monthKeys(d) { return Object.keys(d.months || {}).sort(); }
+  // A single month's raw, manually-entered numbers — the base unit now that
+  // data is entered monthly, no more summing several weeks into one month.
+  function monthRaw(d, mo) {
+    const m = (d.months || {})[mo] || {};
     const s = { spend: 0, impr: 0, clicks: 0, leads: 0, booked: 0, showed: 0, closed: 0, rev: 0, any: false };
-    weekKeys(d).filter(f).forEach(k => {
-      const w = d.weeks[k];
-      if (w.ads) ['spend', 'impr', 'clicks', 'leads'].forEach(x => { if (w.ads[x] != null) { s[x] += w.ads[x]; s.any = true; } });
-      if (w.pipe) ['booked', 'showed', 'closed', 'rev'].forEach(x => { if (w.pipe[x] != null) { s[x] += w.pipe[x]; s.any = true; } });
+    if (m.ads) ['spend', 'impr', 'clicks', 'leads'].forEach(x => { if (m.ads[x] != null) { s[x] = m.ads[x]; s.any = true; } });
+    if (m.pipe) ['booked', 'showed', 'closed', 'rev'].forEach(x => { if (m.pipe[x] != null) { s[x] = m.pipe[x]; s.any = true; } });
+    return s;
+  }
+  function sumAllMonths(d, f) {
+    const s = { spend: 0, impr: 0, clicks: 0, leads: 0, booked: 0, showed: 0, closed: 0, rev: 0, any: false };
+    monthKeys(d).filter(f).forEach(mo => {
+      const r = monthRaw(d, mo);
+      if (r.any) s.any = true;
+      ['spend', 'impr', 'clicks', 'leads', 'booked', 'showed', 'closed', 'rev'].forEach(x => { s[x] += r[x] || 0; });
     });
     return s;
   }
@@ -99,10 +127,10 @@
   }
   function clientFor(d) { const id = Object.keys(dataCache).find(k => dataCache[k] === d); return clients.find(c => c.id === id); }
   function feeFor(d, mo) { return d.fees[mo] != null ? d.fees[mo] : (clientFor(d)?.fee || 0); }
-  function monthAgg(d, mo) { return deriveRates(sumWeeks(d, k => monthOf(k) === mo), feeFor(d, mo)); }
-  function totalAgg(d) { const mos = monthKeys(d); let fees = 0; mos.forEach(mo => { fees += feeFor(d, mo); }); return deriveRates(sumWeeks(d, () => true), fees); }
+  function monthAgg(d, mo) { return deriveRates(monthRaw(d, mo), feeFor(d, mo)); }
+  function totalAgg(d) { const mos = monthKeys(d); let fees = 0; mos.forEach(mo => { fees += feeFor(d, mo); }); return deriveRates(sumAllMonths(d, () => true), fees); }
   function longRun(d) {
-    const s = sumWeeks(d, () => true); const mos = monthKeys(d);
+    const s = sumAllMonths(d, () => true); const mos = monthKeys(d);
     let fees = 0; mos.forEach(mo => { fees += feeFor(d, mo); });
     const inv = s.spend + fees;
     return { roas: s.spend ? s.rev / s.spend : null, roi: inv ? s.rev / inv : null, cac: s.closed ? s.spend / s.closed : null, any: s.any };
@@ -191,12 +219,12 @@
   function openClient(id) {
     cur = id; curSym = cRec()?.currency || '£'; $('cName').textContent = cRec()?.name || ''; $('cBiz').textContent = cRec()?.business || 'Ads management';
     $('dashView').classList.add('hidden'); $('reportSection').classList.add('hidden'); $('clientView').classList.remove('hidden');
-    $('wkDate').value = lastFriday(); switchTab('wig');
+    $('moPicker').value = todayStr().slice(0, 7); switchTab('wig');
   }
   function switchTab(t) {
-    ['wig', 'weekly', 'report'].forEach(x => { $('tab-' + x).classList.toggle('hidden', x !== t); $('tabBtn-' + x).classList.toggle('active', x === t); });
+    ['wig', 'monthly', 'report'].forEach(x => { $('tab-' + x).classList.toggle('hidden', x !== t); $('tabBtn-' + x).classList.toggle('active', x === t); });
     if (t === 'wig') renderWig();
-    if (t === 'weekly') { loadWeek(); renderWeekTable(); }
+    if (t === 'monthly') { loadMonth(); renderMonthTable(); }
     if (t === 'report') { renderMonthlyTables(); renderRepMonthPicker(); }
   }
 
@@ -453,15 +481,15 @@
   }
   async function removePerson(pid, name) { const o = cData().periods.find(p => p.id === pid); if (!o) return; o.people = o.people.filter(x => x.name !== name); await persist(); renderWig(); }
 
-  function loadWeek() {
-    const k = $('wkDate').value; if (!k) { $('weekForm').classList.add('hidden'); return; }
-    const w = cData().weeks[k] || {};
-    $('aSpend').value = w.ads?.spend ?? ''; $('aImpr').value = w.ads?.impr ?? ''; $('aClicks').value = w.ads?.clicks ?? ''; $('aLeads').value = w.ads?.leads ?? '';
-    $('pBooked').value = w.pipe?.booked ?? ''; $('pShowed').value = w.pipe?.showed ?? ''; $('pClosed').value = w.pipe?.closed ?? ''; $('pRev').value = w.pipe?.rev ?? '';
-    $('weekForm').classList.remove('hidden'); recalcWeek();
+  function loadMonth() {
+    const mo = $('moPicker').value; if (!mo) { $('monthForm').classList.add('hidden'); return; }
+    const m = (cData().months || {})[mo] || {};
+    $('aSpend').value = m.ads?.spend ?? ''; $('aImpr').value = m.ads?.impr ?? ''; $('aClicks').value = m.ads?.clicks ?? ''; $('aLeads').value = m.ads?.leads ?? '';
+    $('pBooked').value = m.pipe?.booked ?? ''; $('pShowed').value = m.pipe?.showed ?? ''; $('pClosed').value = m.pipe?.closed ?? ''; $('pRev').value = m.pipe?.rev ?? '';
+    $('monthForm').classList.remove('hidden'); recalcMonth();
   }
   function nv(id) { const v = parseFloat($(id).value); return isNaN(v) ? null : v; }
-  function recalcWeek() {
+  function recalcMonth() {
     const spend = nv('aSpend'), impr = nv('aImpr'), clicks = nv('aClicks'), leads = nv('aLeads');
     const booked = nv('pBooked'), showed = nv('pShowed'), closed = nv('pClosed');
     const set = (id, v) => { const e = $(id); e.textContent = v; e.classList.toggle('on', v !== '—'); };
@@ -473,33 +501,56 @@
     set('xShow', (showed != null && booked) ? fmtP(showed / booked * 100) : '—');
     set('xClose', (closed != null && showed) ? fmtP(closed / showed * 100) : '—');
   }
-  async function saveWeek() {
-    const k = $('wkDate').value; if (!k) { toast('Pick the week-ending date'); return; }
-    cData().weeks[k] = { ads: { spend: nv('aSpend'), impr: nv('aImpr'), clicks: nv('aClicks'), leads: nv('aLeads') }, pipe: { booked: nv('pBooked'), showed: nv('pShowed'), closed: nv('pClosed'), rev: nv('pRev') } };
-    const ok = await persist(); toast(ok ? 'Week saved' : 'Save failed'); renderWeekTable(); renderDash();
+  async function saveMonth() {
+    const mo = $('moPicker').value; if (!mo) { toast('Pick the month'); return; }
+    if (!cData().months) cData().months = {};
+    cData().months[mo] = { ads: { spend: nv('aSpend'), impr: nv('aImpr'), clicks: nv('aClicks'), leads: nv('aLeads') }, pipe: { booked: nv('pBooked'), showed: nv('pShowed'), closed: nv('pClosed'), rev: nv('pRev') } };
+    const ok = await persist(); toast(ok ? 'Month saved' : 'Save failed'); renderMonthTable(); renderDash();
   }
-  function renderWeekTable() {
-    const tb = $('weekTable').querySelector('tbody'); tb.innerHTML = ''; const d = cData();
-    weekKeys(d).forEach(k => {
-      const w = d.weeks[k]; const cpl = (w.ads?.spend != null && w.ads?.leads) ? w.ads.spend / w.ads.leads : null;
+  function renderMonthTable() {
+    const tb = $('monthTable').querySelector('tbody'); tb.innerHTML = ''; const d = cData();
+    monthKeys(d).slice().reverse().forEach(mo => {
+      const m = d.months[mo]; const cpl = (m.ads?.spend != null && m.ads?.leads) ? m.ads.spend / m.ads.leads : null;
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${k}</td><td>${fmt$(w.ads?.spend)}</td><td>${fmtN(w.ads?.leads)}</td><td>${fmt$(cpl)}</td><td>${fmtN(w.pipe?.booked)}</td><td>${fmtN(w.pipe?.showed)}</td><td>${fmtN(w.pipe?.closed)}</td><td>${fmt$(w.pipe?.rev)}</td><td><button class="linkish" onclick="event.stopPropagation();Growth.delWeek('${k}')">delete</button></td>`;
-      tr.onclick = () => { $('wkDate').value = k; loadWeek(); document.getElementById('tab-growth')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); };
+      tr.innerHTML = `<td>${monthLabel(mo)}</td><td>${fmt$(m.ads?.spend)}</td><td>${fmtN(m.ads?.leads)}</td><td>${fmt$(cpl)}</td><td>${fmtN(m.pipe?.booked)}</td><td>${fmtN(m.pipe?.showed)}</td><td>${fmtN(m.pipe?.closed)}</td><td>${fmt$(m.pipe?.rev)}</td><td><button class="linkish" onclick="Growth.editMonth('${mo}')">edit</button> <button class="linkish" onclick="Growth.delMonth('${mo}')">delete</button></td>`;
       tb.appendChild(tr);
     });
   }
-  async function delWeek(k) { if (!confirm('Delete week ending ' + k + '?')) return; delete cData().weeks[k]; await persist(); renderWeekTable(); renderDash(); }
+  function editMonth(mo) { $('moPicker').value = mo; loadMonth(); document.getElementById('tab-growth')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+  async function delMonth(mo) { if (!confirm('Delete data for ' + monthLabel(mo) + '?')) return; delete cData().months[mo]; await persist(); renderMonthTable(); renderDash(); }
+  // Lets the Monthly Report table itself double as an edit surface for the
+  // manually-entered raw figures (ad spend, impressions, clicks, leads,
+  // bookings, shows, sales made, revenue) — the computed rates (CPM, CTR,
+  // CAC, ROAS, ROI, etc.) are never editable since they're always derived
+  // from these, never entered directly.
+  async function setMonthField(mo, group, field, val) {
+    const d = cData(); if (!d.months) d.months = {};
+    if (!d.months[mo]) d.months[mo] = { ads: {}, pipe: {} };
+    if (!d.months[mo][group]) d.months[mo][group] = {};
+    const v = parseFloat(val);
+    d.months[mo][group][field] = isNaN(v) ? null : v;
+    await persist(); renderMonthlyTables(); renderDash();
+  }
 
   function renderMonthlyTables() {
     const d = cData(), mosAsc = monthKeys(d), host = $('monthlyTables');
-    if (!mosAsc.length) { host.innerHTML = '<div class="card"><p class="muted">This table builds itself once weekly data is entered.</p></div>'; return; }
+    if (!mosAsc.length) { host.innerHTML = '<div class="card"><p class="muted">This table builds itself once monthly data is entered.</p></div>'; return; }
     const cols = mosAsc.slice().reverse();
     const tot = totalAgg(d);
     const aggByMo = {}; cols.forEach(mo => aggByMo[mo] = monthAgg(d, mo));
     const sym = cRec()?.currency || '£';
 
     const head = '<tr><th></th><th>Total</th>' + cols.map(m => '<th>' + monthLabel(m) + '</th>').join('') + '</tr>';
-    const row = (label, fn, cls) => `<tr><td>${label}</td><td class="${cls || ''}">${fn(tot)}</td>` + cols.map(mo => `<td class="${cls || ''}">${fn(aggByMo[mo])}</td>`).join('') + '</tr>';
+    // Calculated rows (CPM, CTR, CAC, ROAS, ROI, etc.) are always derived —
+    // never editable, there's nothing to type in.
+    const calcRow = (label, fn, cls) => `<tr><td>${label}</td><td class="${cls || ''}">${fn(tot)}</td>` + cols.map(mo => `<td class="${cls || ''}">${fn(aggByMo[mo])}</td>`).join('') + '</tr>';
+    // Raw, manually-entered rows are editable right here — the Total column
+    // stays a computed, read-only sum since it isn't something anyone types.
+    const rawRow = (label, group, field, fmtFn) => `<tr><td>${label}</td><td>${fmtFn(tot[field] || null)}</td>` +
+      cols.map(mo => {
+        const v = d.months[mo]?.[group]?.[field];
+        return `<td><input class="fee-in" type="number" step="any" value="${v ?? ''}" onchange="Growth.setMonthField('${mo}','${group}','${field}',this.value)"></td>`;
+      }).join('') + '</tr>';
     const spacer = `<tr class="tspace"><td colspan="${cols.length + 2}"></td></tr>`;
 
     let feeTotal = 0; cols.forEach(mo => feeTotal += feeFor(d, mo));
@@ -510,24 +561,24 @@
 
     const body =
       feeRow + spacer +
-      row('Ad spend', a => money(a.spend || null, sym)) +
-      row('CPM', a => money(a.cpm, sym)) +
-      row('Impressions', a => fmtN(a.impr || null)) +
-      row('Link CTR', a => fmtP2(a.ctr)) +
-      row('Clicks', a => fmtN(a.clicks || null)) +
-      row('Opt in %', a => fmtP2(a.optin)) +
-      row('Leads', a => fmtN(a.leads || null)) +
-      row('Booking %', a => fmtP0(a.bookPct)) +
-      row('Bookings', a => fmtN(a.booked || null)) +
-      row('Show rate %', a => fmtP0(a.showPct)) +
-      row('Shows', a => fmtN(a.showed || null)) +
-      row('Close rate %', a => fmtP0(a.closePct)) +
-      row('Sales Made', a => fmtN(a.closed || null)) +
+      rawRow('Ad spend', 'ads', 'spend', a => money(a, sym)) +
+      calcRow('CPM', a => money(a.cpm, sym)) +
+      rawRow('Impressions', 'ads', 'impr', a => fmtN(a)) +
+      calcRow('Link CTR', a => fmtP2(a.ctr)) +
+      rawRow('Clicks', 'ads', 'clicks', a => fmtN(a)) +
+      calcRow('Opt in %', a => fmtP2(a.optin)) +
+      rawRow('Leads', 'ads', 'leads', a => fmtN(a)) +
+      calcRow('Booking %', a => fmtP0(a.bookPct)) +
+      rawRow('Bookings', 'pipe', 'booked', a => fmtN(a)) +
+      calcRow('Show rate %', a => fmtP0(a.showPct)) +
+      rawRow('Shows', 'pipe', 'showed', a => fmtN(a)) +
+      calcRow('Close rate %', a => fmtP0(a.closePct)) +
+      rawRow('Sales Made', 'pipe', 'closed', a => fmtN(a)) +
       spacer +
-      row('CAC', a => money(a.cac, sym)) +
-      row('Total New Revenue', a => money(a.rev || null, sym)) +
+      calcRow('CAC', a => money(a.cac, sym)) +
+      rawRow('Total New Revenue', 'pipe', 'rev', a => money(a, sym)) +
       spacer +
-      row('ROAS', a => fmt2(a.roas)) +
+      calcRow('ROAS', a => fmt2(a.roas)) +
       `<tr><td>ROI</td><td class="${rc(tot.roi)}">${fmt2(tot.roi)}</td>` + cols.map(mo => `<td class="${rc(aggByMo[mo].roi)}">${fmt2(aggByMo[mo].roi)}</td>`).join('') + '</tr>';
 
     host.innerHTML = `
@@ -639,7 +690,7 @@
     onOpen, toggleAddClient, saveNewClient, deleteClient, showDash, openClient, switchTab,
     saveBoard, saveCurrent, addPerson, updPeriodDate, savePeriodProgress, closePeriod, removePerson,
     addGoal, toggleGoal, updateGoalText, removeGoal,
-    loadWeek, recalcWeek, saveWeek, delWeek, setFee, setClientCurrency,
+    loadMonth, recalcMonth, saveMonth, editMonth, delMonth, setMonthField, setFee, setClientCurrency,
     showReport, saveMonthNotes, backToClient,
   };
 })();

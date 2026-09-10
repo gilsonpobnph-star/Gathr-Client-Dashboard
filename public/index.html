@@ -533,7 +533,7 @@
           </div>
           <div class="g-tabs">
             <button class="g-tab active" id="g-tabBtn-wig" onclick="Growth.switchTab('wig')">WIG</button>
-            <button class="g-tab" id="g-tabBtn-weekly" onclick="Growth.switchTab('weekly')">Weekly data</button>
+            <button class="g-tab" id="g-tabBtn-monthly" onclick="Growth.switchTab('monthly')">Monthly data</button>
             <button class="g-tab" id="g-tabBtn-report" onclick="Growth.switchTab('report')">Monthly report</button>
           </div>
 
@@ -568,20 +568,20 @@
             </div>
           </div>
 
-          <div id="g-tab-weekly" class="hidden">
+          <div id="g-tab-monthly" class="hidden">
             <div class="card">
-              <h2 style="margin-bottom:4px;">Weekly data pull</h2>
-              <p class="section-note">Every Friday. Enter the raw numbers for the week &mdash; rates compute, months add up automatically. Separate from the client's WIG meeting day.</p>
+              <h2 style="margin-bottom:4px;">Monthly data pull</h2>
+              <p class="section-note">Once a month. Enter the raw numbers for the month &mdash; rates compute automatically. Separate from the client's WIG meeting day. Pick an existing month to edit what was already saved.</p>
               <div class="row" style="max-width:300px;">
-                <div><label for="g-wkDate">Week ending (Friday)</label><input type="date" id="g-wkDate" onchange="Growth.loadWeek()"></div>
+                <div><label for="g-moPicker">Month</label><input type="month" id="g-moPicker" onchange="Growth.loadMonth()"></div>
               </div>
-              <div id="g-weekForm" class="hidden" style="margin-top:18px;">
+              <div id="g-monthForm" class="hidden" style="margin-top:18px;">
                 <h3 style="font-size:17px; margin-bottom:10px;">Ad account</h3>
                 <div class="metric-grid" style="margin-bottom:18px;">
-                  <div><label for="g-aSpend">Ad spend ($)</label><input type="number" id="g-aSpend" min="0" step="0.01" oninput="Growth.recalcWeek()"></div>
-                  <div><label for="g-aImpr">Impressions</label><input type="number" id="g-aImpr" min="0" oninput="Growth.recalcWeek()"></div>
-                  <div><label for="g-aClicks">Link clicks</label><input type="number" id="g-aClicks" min="0" oninput="Growth.recalcWeek()"></div>
-                  <div><label for="g-aLeads">Leads (opt-ins)</label><input type="number" id="g-aLeads" min="0" oninput="Growth.recalcWeek()"></div>
+                  <div><label for="g-aSpend">Ad spend ($)</label><input type="number" id="g-aSpend" min="0" step="0.01" oninput="Growth.recalcMonth()"></div>
+                  <div><label for="g-aImpr">Impressions</label><input type="number" id="g-aImpr" min="0" oninput="Growth.recalcMonth()"></div>
+                  <div><label for="g-aClicks">Link clicks</label><input type="number" id="g-aClicks" min="0" oninput="Growth.recalcMonth()"></div>
+                  <div><label for="g-aLeads">Leads (opt-ins)</label><input type="number" id="g-aLeads" min="0" oninput="Growth.recalcMonth()"></div>
                   <div><label>CPM</label><div class="computed" id="g-xCPM">&mdash;</div></div>
                   <div><label>CTR</label><div class="computed" id="g-xCTR">&mdash;</div></div>
                   <div><label>Opt-in rate</label><div class="computed" id="g-xOpt">&mdash;</div></div>
@@ -589,22 +589,23 @@
                 </div>
                 <h3 style="font-size:17px; margin-bottom:10px;">Pipeline (GHL)</h3>
                 <div class="metric-grid" style="margin-bottom:18px;">
-                  <div><label for="g-pBooked">Booked</label><input type="number" id="g-pBooked" min="0" oninput="Growth.recalcWeek()"></div>
-                  <div><label for="g-pShowed">Showed</label><input type="number" id="g-pShowed" min="0" oninput="Growth.recalcWeek()"></div>
-                  <div><label for="g-pClosed">Closed</label><input type="number" id="g-pClosed" min="0" oninput="Growth.recalcWeek()"></div>
-                  <div><label for="g-pRev">New revenue ($)</label><input type="number" id="g-pRev" min="0" step="0.01" oninput="Growth.recalcWeek()"></div>
+                  <div><label for="g-pBooked">Booked</label><input type="number" id="g-pBooked" min="0" oninput="Growth.recalcMonth()"></div>
+                  <div><label for="g-pShowed">Showed</label><input type="number" id="g-pShowed" min="0" oninput="Growth.recalcMonth()"></div>
+                  <div><label for="g-pClosed">Closed</label><input type="number" id="g-pClosed" min="0" oninput="Growth.recalcMonth()"></div>
+                  <div><label for="g-pRev">New revenue ($)</label><input type="number" id="g-pRev" min="0" step="0.01" oninput="Growth.recalcMonth()"></div>
                   <div><label>Book %</label><div class="computed" id="g-xBook">&mdash;</div></div>
                   <div><label>Show %</label><div class="computed" id="g-xShow">&mdash;</div></div>
                   <div><label>Close %</label><div class="computed" id="g-xClose">&mdash;</div></div>
                 </div>
-                <button class="accent" onclick="Growth.saveWeek()">Save week</button>
+                <button class="accent" onclick="Growth.saveMonth()">Save month</button>
               </div>
             </div>
             <div class="card">
-              <h2 style="margin-bottom:12px;">Saved weeks</h2>
+              <h2 style="margin-bottom:12px;">Saved months</h2>
+              <p class="section-note" style="margin-bottom:12px;">Click edit to load a previous month back into the form above and correct it.</p>
               <div style="overflow-x:auto;" class="week-list">
-                <table id="g-weekTable">
-                  <thead><tr><th>Week ending</th><th>Spend</th><th>Leads</th><th>CPL</th><th>Booked</th><th>Showed</th><th>Closed</th><th>Revenue</th><th></th></tr></thead>
+                <table id="g-monthTable">
+                  <thead><tr><th>Month</th><th>Spend</th><th>Leads</th><th>CPL</th><th>Booked</th><th>Showed</th><th>Closed</th><th>Revenue</th><th></th></tr></thead>
                   <tbody></tbody>
                 </table>
               </div>

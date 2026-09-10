@@ -918,7 +918,7 @@ function ensureGrowth(store) {
   if (!store.growth.data) store.growth.data = {};
 }
 function freshGrowthData() {
-  return { board: null, periods: [], weeks: {}, fees: {}, notes: {} };
+  return { board: null, periods: [], weeks: {}, months: {}, fees: {}, notes: {} };
 }
 
 app.get('/api/growth/clients', requireAuth, (req, res) => {
