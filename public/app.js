@@ -480,6 +480,29 @@ function renderOverview() {
   renderChart('chart-status',   'doughnut', statusChartData());
 }
 
+// Light markdown → HTML for the AI answer — just **bold** and "- " bullets,
+// the two things a model reaches for even when the prompt doesn't ask for
+// markdown. Without this, the answer would show literal asterisks and dashes
+// instead of actual formatting, since the answer isn't otherwise rendered as
+// markdown anywhere in this app.
+function formatAIAnswer(text) {
+  const escInline = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const bold = s => escInline(s).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  let html = '', inList = false;
+  String(text).split('\n').forEach(line => {
+    const t = line.trim();
+    if (/^[-•]\s+/.test(t)) {
+      if (!inList) { html += '<ul>'; inList = true; }
+      html += `<li>${bold(t.replace(/^[-•]\s+/, ''))}</li>`;
+    } else {
+      if (inList) { html += '</ul>'; inList = false; }
+      if (t) html += `<p>${bold(t)}</p>`;
+    }
+  });
+  if (inList) html += '</ul>';
+  return html || '<p>No answer returned.</p>';
+}
+
 /* ── Ask AI (Overview): free-form Q&A grounded in clients, growth/ads data,
    diagnostic assessments and the Knowledge Base — runs fresh every time,
    nothing cached, since it's ad-hoc Q&A rather than a generated report. ── */
@@ -499,7 +522,7 @@ async function askOverviewAI(prefill) {
     if (!r.ok) {
       answerEl.innerHTML = `<div class="ov-ai-error">${escHtml((data && data.detail) || (data && data.error) || 'AI query failed')}</div>`;
     } else {
-      answerEl.innerHTML = `<div class="ov-ai-text">${escHtml(data.answer || 'No answer returned.')}</div>`;
+      answerEl.innerHTML = `<div class="ov-ai-text">${formatAIAnswer(data.answer || 'No answer returned.')}</div>`;
     }
   } catch {
     answerEl.innerHTML = '<div class="ov-ai-error">Could not reach AI.</div>';

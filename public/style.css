@@ -455,8 +455,13 @@ body::before {
 .ov-ai-text {
   font-size: 13.5px; line-height: 1.65; color: var(--text);
   background: var(--surface2); border: 1px solid var(--border); border-radius: 10px;
-  padding: 14px 16px; white-space: pre-wrap;
+  padding: 14px 16px;
 }
+.ov-ai-text p { margin: 0 0 10px; }
+.ov-ai-text p:last-child { margin-bottom: 0; }
+.ov-ai-text ul { margin: 0 0 10px; padding-left: 20px; }
+.ov-ai-text ul:last-child { margin-bottom: 0; }
+.ov-ai-text li { margin-bottom: 4px; }
 .ov-ai-loading { font-size: 12.5px; color: var(--text3); font-style: italic; }
 .ov-ai-error { font-size: 12.5px; color: #c0392b; }
 .chart-wrap { position: relative; }
