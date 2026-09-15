@@ -1345,6 +1345,74 @@ Be concrete and specific throughout, and write like a person talking to a collea
   }
 });
 
+// ── Overview: free-form AI query across the whole CRM ────────────────────────
+// Not a generated/cached report like Diagnostic's — this is ad-hoc Q&A, so it
+// runs fresh every time and returns plain text, no schema. Answers by reading
+// a compact snapshot of clients, growth/ads data, diagnostic assessments and
+// the Knowledge Base in one prompt, rather than the team hunting across tabs.
+app.post('/api/ai-query', requireAuth, async (req, res) => {
+  const client = getAnthropicClient();
+  if (!client) return res.status(503).json({ error: 'AI query is not configured (missing ANTHROPIC_API_KEY).' });
+  const { question } = req.body || {};
+  if (!question || !String(question).trim()) return res.status(400).json({ error: 'Missing question' });
+
+  const store = readStore();
+  ensureGrowth(store); ensureDiagnostic(store); ensureKnowledge(store);
+
+  const clientsSummary = Object.values(store.clients || {}).map(shapeClient).map(c => ({
+    name: c.name || c.businessName, business: c.businessName || c.business, status: c.status,
+    programs: c.programs, currentWeek: c.currentWeek, leadAssignee: c.leadAssignee, techAssignee: c.techAssignee,
+    targetAudience: c.targetAudience, goals: c.goals, servicesAndPricing: c.servicesAndPricing,
+    addOns: c.addOns, notes: (c.notes || '').slice(0, 400),
+  }));
+
+  const growthClients = store.growth.clients.map(gc => {
+    const d = store.growth.data[gc.id] || freshGrowthData();
+    return { name: gc.name, business: gc.business, currency: gc.currency, defaultMonthlyFee: gc.fee, monthlyFees: d.fees, months: d.months };
+  });
+
+  const diagnosticSummaries = Object.values(store.diagnostic.assessments).map(a => ({
+    businessName: a.businessName,
+    practitionerType: a.answers?.practitionerType || null,
+    biggestGapInOwnWords: a.answers?.biggestGap || null,
+    strategySummary: a.aiRecommendation?.priority_summary || null,
+  }));
+
+  const knowledgeDocs = Object.values(store.knowledge.docs).map(d => ({ title: d.title, category: d.category, content: htmlToText(d.content) }));
+
+  const prompt = `You are an internal assistant for the Gathr Grow team, answering a question using their own CRM data below. Answer directly and specifically, naming real clients or businesses by name where it matters. If the data genuinely doesn't cover what's being asked, say so plainly rather than guessing or padding the answer. Write like a sharp colleague giving a quick briefing, not a formal report: plain sentences, no unnecessary headers, a short list only when the question actually calls for a list.
+
+CRM clients (the main client roster, including status, program, assigned team, notes):
+${JSON.stringify(clientsSummary, null, 2)}
+
+Growth / ads clients (raw monthly ad and pipeline figures per month; if asked to compute a rate, CAC = ad spend divided by sales made, ROAS = revenue divided by ad spend, ROI = revenue divided by ad spend plus fee):
+${JSON.stringify(growthClients, null, 2)}
+
+Diagnostic assessments run for prospects or clients, each with a strategy summary if one was ever generated for them:
+${JSON.stringify(diagnosticSummaries, null, 2)}
+
+Internal knowledge base (Gathr's own services, marketing reference material, and SOPs):
+${JSON.stringify(knowledgeDocs, null, 2)}
+
+Question: "${String(question).slice(0, 2000)}"`;
+
+  try {
+    const stream = client.messages.stream({
+      model: 'claude-sonnet-5',
+      max_tokens: 4000,
+      output_config: { effort: 'medium' },
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const message = await stream.finalMessage();
+    const textBlock = message.content.find(b => b.type === 'text');
+    if (!textBlock) return res.status(502).json({ error: 'No AI response', detail: `stop_reason: ${message.stop_reason}` });
+    res.json({ answer: textBlock.text });
+  } catch (err) {
+    console.error('[AI query] failed:', err.status, err.name, err.message, err.error || '');
+    res.status(502).json({ error: 'AI query failed', detail: err.message, status: err.status || null });
+  }
+});
+
 // ── Client CRUD ───────────────────────────────────────────────────────────────
 app.get('/api/clients', requireAuth, (req, res) => {
   const store = readStore();

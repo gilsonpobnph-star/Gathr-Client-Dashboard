@@ -242,6 +242,29 @@
               </div>
             </div>
 
+            <!-- Ask AI: free-form Q&A over the whole CRM (clients, growth/ads
+                 data, diagnostic assessments, knowledge base) -->
+            <div class="dash-card" id="ov-ai-card" style="margin-bottom:16px">
+              <div class="dash-card-header">
+                <div class="dash-card-title">
+                  <span class="dash-card-dot" style="background:var(--accent)"></span>
+                  Ask AI about your CRM
+                </div>
+              </div>
+              <div style="display:flex; gap:8px;">
+                <input type="text" id="ov-ai-question" class="inline-input" style="flex:1"
+                  placeholder="e.g. Which clients are done with their program, and what stood out about them?"
+                  onkeydown="if(event.key==='Enter'){askOverviewAI();event.preventDefault();}">
+                <button class="btn-primary" id="ov-ai-btn" onclick="askOverviewAI()">Ask</button>
+              </div>
+              <div class="ov-ai-examples">
+                <span class="ov-ai-example" onclick="askOverviewAI(this.textContent)">Which clients are done, and what are their top wins?</span>
+                <span class="ov-ai-example" onclick="askOverviewAI(this.textContent)">Looking at what our clients use us for, what might they need next?</span>
+                <span class="ov-ai-example" onclick="askOverviewAI(this.textContent)">Which clients look at risk right now, and why?</span>
+              </div>
+              <div id="ov-ai-answer" class="ov-ai-answer hidden"></div>
+            </div>
+
             <!-- Client Health Board -->
             <div class="dash-card" style="margin-bottom:16px">
               <div class="dash-card-header">

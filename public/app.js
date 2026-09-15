@@ -480,6 +480,34 @@ function renderOverview() {
   renderChart('chart-status',   'doughnut', statusChartData());
 }
 
+/* ── Ask AI (Overview): free-form Q&A grounded in clients, growth/ads data,
+   diagnostic assessments and the Knowledge Base — runs fresh every time,
+   nothing cached, since it's ad-hoc Q&A rather than a generated report. ── */
+async function askOverviewAI(prefill) {
+  const input = document.getElementById('ov-ai-question');
+  const btn = document.getElementById('ov-ai-btn');
+  const answerEl = document.getElementById('ov-ai-answer');
+  const question = (typeof prefill === 'string' ? prefill : input.value).trim();
+  if (!question) return;
+  input.value = question;
+  btn.disabled = true; btn.textContent = 'Thinking…';
+  answerEl.classList.remove('hidden');
+  answerEl.innerHTML = '<div class="ov-ai-loading">Reading the CRM…</div>';
+  try {
+    const r = await fetch('/api/ai-query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question }) });
+    const data = await r.json().catch(() => null);
+    if (!r.ok) {
+      answerEl.innerHTML = `<div class="ov-ai-error">${escHtml((data && data.detail) || (data && data.error) || 'AI query failed')}</div>`;
+    } else {
+      answerEl.innerHTML = `<div class="ov-ai-text">${escHtml(data.answer || 'No answer returned.')}</div>`;
+    }
+  } catch {
+    answerEl.innerHTML = '<div class="ov-ai-error">Could not reach AI.</div>';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Ask';
+  }
+}
+
 /* ── Deadline Health Cards ────────────────────────────────────────────────── */
 function renderDeadlineHealth() {
   const active = clients.filter(c => ACTIVE_STATUSES.includes(c.status));
