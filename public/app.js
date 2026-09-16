@@ -853,6 +853,7 @@ function renderMyTasks() {
       <div class="task-row-col"><span class="task-status-pill ${STATUS_CLASS[t.status]||''}">${t.status}</span></div>
     </div>`;
   }).join('');
+  renderClientModalTasks();
 }
 
 function stringToColor(str) {
@@ -865,7 +866,13 @@ function stringToColor(str) {
 document.getElementById('task-filter-status')?.addEventListener('change', renderMyTasks);
 document.getElementById('task-filter-priority')?.addEventListener('change', renderMyTasks);
 
-function openTaskModal(taskId) {
+// presetClientId locks the client picker to one client — used when a task
+// is started from that client's own profile, so it's automatically linked
+// rather than the person having to pick it from the dropdown themselves.
+// Only applies when creating a new task (taskId is null); editing an
+// existing task never locks the field, since changing its client later is
+// still meant to be possible from either place.
+function openTaskModal(taskId, presetClientId) {
   editingTaskId = taskId || null;
   const t       = taskId ? myTasks.find(x => x.id === taskId) : null;
   const isAdmin = currentUser.role === 'admin';
@@ -878,8 +885,10 @@ function openTaskModal(taskId) {
   document.getElementById('task-status').value   = t?.status      || 'To Do';
 
   const clientSel = document.getElementById('task-client');
+  const lockClient = !!(presetClientId && !taskId);
   clientSel.innerHTML = '<option value="">— No client —</option>' +
-    clients.map(c => `<option value="${c.id}" ${t?.clientId===c.id?'selected':''}>${escHtml(c.name)}${c.businessName?' – '+escHtml(c.businessName):''}</option>`).join('');
+    clients.map(c => `<option value="${c.id}" ${(t?.clientId || (lockClient ? presetClientId : ''))===c.id?'selected':''}>${escHtml(c.name)}${c.businessName?' – '+escHtml(c.businessName):''}</option>`).join('');
+  clientSel.disabled = lockClient;
 
   const renderMemberPicks = (containerId, selected) => {
     const all = [...new Set([...team, myName])].filter(Boolean);
@@ -911,6 +920,44 @@ function openTaskModal(taskId) {
 
   document.getElementById('task-modal').classList.remove('hidden');
   document.getElementById('task-title').focus();
+}
+
+// Entry point for the "+ New Task" button inside a client's profile modal —
+// reads whichever client is currently open and pre-locks the task to them.
+function openNewTaskForModalClient() {
+  if (!modalClient) return;
+  openTaskModal(null, modalClient.id);
+}
+
+// Tasks section inside the client modal — same data as My Tasks, filtered
+// to whichever client is open, so creating/updating a task from either
+// place is immediately reflected in the other (both just read myTasks).
+function renderClientModalTasks() {
+  const el = document.getElementById('cm-tasks-list');
+  if (!el || !modalClient) return;
+  const list = myTasks.filter(t => t.clientId === modalClient.id && !t.archived);
+  if (!list.length) {
+    el.innerHTML = `<div class="task-empty">No tasks for this client yet.</div>`;
+    return;
+  }
+  el.innerHTML = list.map(t => {
+    const dl = taskDeadlineInfo(t);
+    const avatars = (t.assignedTo || []).slice(0, 3).map(n =>
+      `<span class="task-avatar" title="${escHtml(n)}" style="background:${stringToColor(n)}">${initials(n)}</span>`
+    ).join('');
+    return `<div class="cm-task-row" onclick="openTaskModal('${t.id}')">
+      <div class="cm-task-row-top">
+        <span class="task-row-stripe" style="background:${PRIORITY_COLOR[t.priority]||'#8A7A6E'}"></span>
+        <span class="task-row-title">${escHtml(t.title)}</span>
+      </div>
+      <div class="cm-task-row-meta">
+        <span class="task-priority-pill" style="color:${PRIORITY_COLOR[t.priority]||'#8A7A6E'};background:${PRIORITY_COLOR[t.priority]||'#8A7A6E'}18">${PRIORITY_LABEL[t.priority]||t.priority}</span>
+        <span class="task-status-pill ${STATUS_CLASS[t.status]||''}">${t.status}</span>
+        <span style="color:${dl.color};font-weight:${dl.color!=='var(--text3)'?'600':'400'}">${dl.label||'—'}</span>
+        <span class="task-avatars" style="display:flex">${avatars}</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderTaskActivity(t) {
@@ -2402,6 +2449,8 @@ function populateModal() {
 
   // Gathr Space cross-reference
   renderSpaceInfo(findGathrMember(c));
+
+  renderClientModalTasks();
 
   // Program fields
   document.getElementById('cm-business').value = c.business    || '';

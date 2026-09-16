@@ -1761,6 +1761,18 @@
         <!-- Add-on checklists (shown when client has active add-ons) -->
         <div id="addon-checklist-section"></div>
 
+        <!-- Tasks for this client — same task system as My Tasks / the dashboard,
+             just pre-linked and filtered to this client -->
+        <div class="info-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <h3 style="margin-bottom:0">Tasks</h3>
+            <button class="btn-add-note" style="padding:4px 10px;font-size:11px" onclick="openNewTaskForModalClient()">+ New Task</button>
+          </div>
+          <div id="cm-tasks-list">
+            <div class="task-empty">No tasks for this client yet.</div>
+          </div>
+        </div>
+
         <!-- Unified Notes & History -->
         <div class="info-card">
           <h3>Notes &amp; History

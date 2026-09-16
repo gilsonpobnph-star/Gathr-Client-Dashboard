@@ -525,6 +525,11 @@ body::before {
   background: rgba(10,7,4,.75); backdrop-filter: blur(10px);
   display: flex; align-items: center; justify-content: center; padding: 20px;
 }
+/* The task modal can now be opened from inside the client modal (its
+   "+ New Task" button) — without this it shares the same z-index as every
+   other .modal-overlay and DOM order decides which one paints on top,
+   so it can silently open "behind" an already-open client modal. */
+#task-modal { z-index: 600; }
 .modal {
   background: rgba(255,255,255,.9);
   border: 1px solid var(--glass-border);
@@ -1132,6 +1137,15 @@ body::before {
 .task-status-pill   { font-size: 10.5px; font-weight: 600; padding: 3px 10px; border-radius: 20px; white-space: nowrap; }
 .ts-todo   { background: rgba(30,24,18,.08); color: var(--text2); }
 .ts-inprog { background: rgba(240,129,58,.15);  color: var(--accent2); }
+
+/* Compact task rows inside the client modal's Tasks card — same data and
+   click-through as the main task table, just stacked instead of gridded
+   since the modal column is much narrower. */
+.cm-task-row { padding: 9px 0; border-bottom: 1px solid var(--border); cursor: pointer; }
+.cm-task-row:last-child { border-bottom: none; }
+.cm-task-row:hover { background: var(--surface3); }
+.cm-task-row-top { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.cm-task-row-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 11px; color: var(--text3); margin-left: 13px; }
 .ts-done   { background: rgba(90,168,114,.15);  color: #5AA872; }
 
 /* ── Task Detail Panel ───────────────────────────────────────────────────── */
