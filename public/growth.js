@@ -97,6 +97,7 @@
   async function onOpen() {
     setSync('Loading…');
     clients = (await apiGet('/api/growth/clients')) || [];
+    crmClients = (await apiGet('/api/clients')) || [];
     await loadHousekeeping();
     await Promise.all(clients.map(async c => {
       dataCache[c.id] = (await apiGet('/api/growth/data/' + c.id)) || fresh();
@@ -113,6 +114,15 @@
     } else {
       showDash();
     }
+  }
+  // Entry point for the CRM client profile's "Open in Growth" button —
+  // awaits the same load onOpen() already kicks off on the tab switch,
+  // rather than calling openClient() directly (which would race that load
+  // and can find clients/dataCache still empty).
+  async function openClientById(id) {
+    await onOpen();
+    if (!clients.some(c => c.id === id)) { toast('Could not find that Growth client'); return; }
+    openClient(id);
   }
 
   function daysBetween(a, b) { return Math.round((new Date(b + 'T00:00') - new Date(a + 'T00:00')) / 86400000); }
@@ -255,9 +265,26 @@
   function cData() { return dataCache[cur]; }
   function cRec() { return clients.find(x => x.id === cur); }
   async function persist() { return !!(await apiSend('/api/growth/data/' + cur, 'PUT', cData())); }
+  // Linking a Growth card to a real CRM client (store.clients) — lets that
+  // client's own profile surface this WIG/ads performance, and lets any
+  // Housekeeping task created here also carry the CRM clientId so it
+  // shows on that client's own Tasks card, not just here.
+  let crmClients = [];
+  function renderCrmLinkPicker() {
+    const sel = $('crmLink'); if (!sel) return;
+    sel.innerHTML = '<option value="">— Not linked to a client profile —</option>' +
+      crmClients.map(c => `<option value="${c.id}" ${cRec()?.clientId === c.id ? 'selected' : ''}>${esc(c.name)}${c.businessName ? ' – ' + esc(c.businessName) : ''}</option>`).join('');
+  }
+  async function setCrmLink(clientId) {
+    const rec = cRec(); if (!rec) return;
+    rec.clientId = clientId || '';
+    await apiSend('/api/growth/clients/' + cur, 'PUT', { clientId: rec.clientId });
+    toast(clientId ? 'Linked to client profile' : 'Unlinked');
+  }
   function openClient(id) {
     cur = id; curSym = cRec()?.currency || '£'; $('cName').textContent = cRec()?.name || ''; $('cBiz').textContent = cRec()?.business || 'Ads management';
     $('dashView').classList.add('hidden'); $('reportSection').classList.add('hidden'); $('clientView').classList.remove('hidden');
+    renderCrmLinkPicker();
     $('moPicker').value = todayStr().slice(0, 7); switchTab('wig');
   }
   function switchTab(t) {
@@ -470,7 +497,10 @@
   // builds its own task-editing UI, it just points the real one at itself.
   function addHousekeepingTask(pid) {
     if (typeof openTaskModal !== 'function') { toast('Task tool not available'); return; }
-    openTaskModal(null, null, { growthClientId: cur, growthPeriodId: pid });
+    // If this Growth card is linked to a real CRM client, the task is
+    // pre-linked (and locked) to them too — so it shows up on their own
+    // profile's Tasks card automatically, not just here.
+    openTaskModal(null, cRec()?.clientId || null, { growthClientId: cur, growthPeriodId: pid });
   }
   // Called by app.js's closeTaskModal() after any create/edit/delete/
   // archive — keeps the open period's Housekeeping list current without
@@ -871,7 +901,7 @@
   }
 
   window.Growth = {
-    onOpen, toggleAddClient, saveNewClient, deleteClient, showDash, openClient, switchTab,
+    onOpen, toggleAddClient, saveNewClient, deleteClient, showDash, openClient, openClientById, switchTab, setCrmLink,
     saveBoard, saveCurrent, addPerson, updPeriodDate, savePeriodProgress, closePeriod, removePerson,
     addGoal, toggleGoal, updateGoalText, removeGoal,
     addHousekeepingTask, refreshHousekeeping,

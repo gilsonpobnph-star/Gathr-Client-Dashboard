@@ -554,6 +554,15 @@
             <div><div class="eyebrow" id="g-cBiz"></div><h1 id="g-cName"></h1></div>
             <button class="secondary small linkish" onclick="Growth.deleteClient()">Delete client</button>
           </div>
+          <div class="row" style="max-width:420px; margin-bottom:16px;">
+            <div>
+              <label for="g-crmLink">Linked CRM client</label>
+              <select id="g-crmLink" onchange="Growth.setCrmLink(this.value)">
+                <option value="">— Not linked to a client profile —</option>
+              </select>
+              <p class="section-note" style="margin:4px 0 0;">Linking shows this WIG/ads performance on their profile, and any housekeeping task you create here is also added to their Tasks.</p>
+            </div>
+          </div>
           <div class="g-tabs">
             <button class="g-tab active" id="g-tabBtn-wig" onclick="Growth.switchTab('wig')">WIG</button>
             <button class="g-tab" id="g-tabBtn-monthly" onclick="Growth.switchTab('monthly')">Monthly data</button>
@@ -1796,6 +1805,17 @@
           </div>
           <div id="cm-scorecard-list">
             <div class="task-empty">No scorecard yet.</div>
+          </div>
+        </div>
+
+        <!-- Growth / Ads performance — only shows once a Growth card is
+             linked to this client (linking happens from the Growth tab). -->
+        <div class="info-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <h3 style="margin-bottom:0">Growth / Ads Performance</h3>
+          </div>
+          <div id="cm-growth-card">
+            <div class="task-empty">Not linked to a Growth card yet.</div>
           </div>
         </div>
 

@@ -1016,6 +1016,64 @@ async function runDiagnosticForModalClient() {
   await window.Diagnostic.startAssessmentForClient(modalClient.id, modalClient.businessName || modalClient.name, modalClient.name);
 }
 
+// Growth / Ads performance card inside the client modal — only shows once
+// a Growth card has been linked to this client (linking itself happens
+// from the Growth tab's own "Linked CRM client" picker). Reads straight
+// from Growth's own API rather than growth.js's private state, same
+// reasoning as the Scorecard card: accurate even if Growth hasn't been
+// opened yet this session.
+async function renderClientModalGrowth() {
+  const el = document.getElementById('cm-growth-card');
+  if (!el || !modalClient) return;
+  const growthClients = await fetch('/api/growth/clients').then(r => r.ok ? r.json() : []).catch(() => []);
+  const g = growthClients.find(gc => gc.clientId === modalClient.id);
+  if (!g) { el.innerHTML = '<div class="task-empty">Not linked to a Growth card yet.</div>'; return; }
+  const data = await fetch('/api/growth/data/' + g.id).then(r => r.ok ? r.json() : null).catch(() => null);
+  if (!data) { el.innerHTML = '<div class="task-empty">Could not load Growth data.</div>'; return; }
+
+  // Same CAC/ROAS/ROI math as growth.js's longRun() — summed straight
+  // across every campaign in every month.
+  let spend = 0, rev = 0, closed = 0, fees = 0;
+  Object.keys(data.months || {}).forEach(mo => {
+    (data.months[mo].campaigns || []).forEach(c => { spend += c.ads?.spend || 0; rev += c.pipe?.rev || 0; closed += c.pipe?.closed || 0; });
+    fees += (data.fees?.[mo] != null ? data.fees[mo] : g.fee) || 0;
+  });
+  const cac = closed ? spend / closed : null;
+  const roas = spend ? rev / spend : null;
+  const roi = (spend + fees) ? rev / (spend + fees) : null;
+  const money = v => v == null ? '—' : (g.currency || '£') + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtX = v => v == null ? '—' : (Math.round(v * 100) / 100) + 'x';
+
+  // Same WIG pacing logic as growth.js's boardCalc() — a single number (X)
+  // by a date (Y), winning if the current figure is at or ahead of pace.
+  let wigPill = '<span class="task-status-pill ts-todo">No scoreboard</span>';
+  const b = data.board;
+  if (b && b.goal && b.start && b.end) {
+    const dayMs = 86400000;
+    const total = Math.max(1, Math.round((new Date(b.end + 'T00:00') - new Date(b.start + 'T00:00')) / dayMs));
+    const today = new Date().toISOString().slice(0, 10);
+    const ref = today > b.end ? b.end : (today < b.start ? b.start : today);
+    const done = Math.max(0, Math.round((new Date(ref + 'T00:00') - new Date(b.start + 'T00:00')) / dayMs));
+    const pacing = b.goal * done / total;
+    const current = (b.current != null && !isNaN(b.current)) ? Number(b.current) : null;
+    if (current != null) wigPill = `<span class="task-status-pill ${current >= pacing ? 'ts-done' : 'ts-inprog'}">${current >= pacing ? 'Winning' : 'Losing'}</span>`;
+  }
+
+  el.innerHTML = `
+    <div style="margin-bottom:10px">${wigPill}</div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;font-size:13px">
+      <div><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.04em">CAC</div><div>${money(cac)}</div></div>
+      <div><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.04em">ROAS</div><div>${fmtX(roas)}</div></div>
+      <div><div style="color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.04em">ROI</div><div>${fmtX(roi)}</div></div>
+    </div>
+    <button class="btn-add-note" onclick="openGrowthCardForClient('${g.id}')">Open in Growth</button>`;
+}
+async function openGrowthCardForClient(growthClientId) {
+  document.getElementById('client-modal').classList.add('hidden');
+  showTab('growth');
+  if (window.Growth && typeof window.Growth.openClientById === 'function') await window.Growth.openClientById(growthClientId);
+}
+
 function renderTaskActivity(t) {
   const feed = document.getElementById('task-activity-feed');
   if (!feed) return;
@@ -2514,6 +2572,7 @@ function populateModal() {
 
   renderClientModalTasks();
   renderClientModalScorecard();
+  renderClientModalGrowth();
 
   // Program fields
   document.getElementById('cm-business').value = c.business    || '';

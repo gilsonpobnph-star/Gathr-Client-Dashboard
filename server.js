@@ -957,7 +957,11 @@ app.put('/api/growth/clients/:id', requireAuth, (req, res) => {
   ensureGrowth(store);
   const client = store.growth.clients.find(c => c.id === req.params.id);
   if (!client) return res.status(404).json({ error: 'Not found' });
-  const allowed = ['name', 'business', 'currency', 'fee', 'people'];
+  // clientId optionally links this Growth client card to a real CRM client
+  // (store.clients) — lets that client's own profile surface the WIG/ads
+  // performance, and any Housekeeping task created here to also carry the
+  // CRM clientId so it shows on that client's own Tasks card too.
+  const allowed = ['name', 'business', 'currency', 'fee', 'people', 'clientId'];
   allowed.forEach(k => { if (req.body[k] !== undefined) client[k] = req.body[k]; });
   writeStore(store);
   res.json(client);
