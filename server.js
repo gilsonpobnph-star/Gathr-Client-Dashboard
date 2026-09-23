@@ -813,14 +813,12 @@ app.post('/api/chat/dm/start', requireAuth, (req, res) => {
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 function ensureTasks(store) { if (!store.tasks) store.tasks = {}; }
 
+// Tasks are visible to every logged-in team member by default — assignedTo
+// / sharedWith still track who's actually responsible, they just no longer
+// gate visibility. requireAuth on every route below already means only
+// logged-in users reach this at all.
 function canSeeTask(task, session) {
-  const name = session.name || '';
-  // Backward compat: tasks created via the legacy admin login have createdBy:'Admin'
-  // — keep these visible to any admin-role user
-  if (session.role === 'admin' && (task.createdBy === 'Admin' || !task.createdBy)) return true;
-  return task.createdBy === name ||
-    (task.assignedTo || []).includes(name) ||
-    (task.sharedWith || []).includes(name);
+  return true;
 }
 
 app.get('/api/tasks', requireAuth, (req, res) => {

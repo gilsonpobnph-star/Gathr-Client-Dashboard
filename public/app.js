@@ -376,6 +376,15 @@ function populateAssigneeFilters() {
     sel.appendChild(o);
   });
 
+  const taskSel = document.getElementById('task-filter-assignee');
+  if (taskSel) {
+    const prevVal = taskSel.value;
+    taskSel.innerHTML = '<option value="">Everyone\'s tasks</option>' +
+      team.map(t => `<option value="${escHtml(t)}">${escHtml(t)}</option>`).join('') +
+      '<option value="__unassigned__">Unassigned</option>';
+    if ([...taskSel.options].some(o => o.value === prevVal)) taskSel.value = prevVal;
+  }
+
   ['cm-lead', 'cm-tech', 'cm-note-author'].forEach(id => {
     const s = document.getElementById(id);
     if (!s) return;
@@ -822,11 +831,13 @@ function renderMyTasks() {
   if (!el) return;
   const statusF   = document.getElementById('task-filter-status')?.value   || '';
   const priorityF = document.getElementById('task-filter-priority')?.value || '';
+  const assigneeF = document.getElementById('task-filter-assignee')?.value || '';
 
   let list = [...myTasks];
   if (!showArchivedTasks) list = list.filter(t => !t.archived);
   if (statusF)   list = list.filter(t => t.status   === statusF);
   if (priorityF) list = list.filter(t => t.priority === priorityF);
+  if (assigneeF) list = list.filter(t => assigneeF === '__unassigned__' ? !(t.assignedTo||[]).length : (t.assignedTo||[]).includes(assigneeF));
 
   if (!list.length) {
     el.innerHTML = showArchivedTasks
@@ -871,6 +882,7 @@ function stringToColor(str) {
 
 document.getElementById('task-filter-status')?.addEventListener('change', renderMyTasks);
 document.getElementById('task-filter-priority')?.addEventListener('change', renderMyTasks);
+document.getElementById('task-filter-assignee')?.addEventListener('change', renderMyTasks);
 
 // presetClientId locks the client picker to one client — used when a task
 // is started from that client's own profile, so it's automatically linked
