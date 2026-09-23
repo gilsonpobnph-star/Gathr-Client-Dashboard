@@ -1044,8 +1044,10 @@ async function renderClientModalGrowth() {
   const money = v => v == null ? '—' : (g.currency || '£') + v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const fmtX = v => v == null ? '—' : (Math.round(v * 100) / 100) + 'x';
 
-  // Same WIG pacing logic as growth.js's boardCalc() — a single number (X)
-  // by a date (Y), winning if the current figure is at or ahead of pace.
+  // Same WIG pacing logic as growth.js's boardCalc() — pacing is a
+  // run-rate projection (results so far ÷ days elapsed × total days),
+  // i.e. where you'll land if this rate holds; winning means that
+  // projection meets or beats the goal.
   let wigPill = '<span class="task-status-pill ts-todo">No scoreboard</span>';
   const b = data.board;
   if (b && b.goal && b.start && b.end) {
@@ -1054,9 +1056,9 @@ async function renderClientModalGrowth() {
     const today = new Date().toISOString().slice(0, 10);
     const ref = today > b.end ? b.end : (today < b.start ? b.start : today);
     const done = Math.max(0, Math.round((new Date(ref + 'T00:00') - new Date(b.start + 'T00:00')) / dayMs));
-    const pacing = b.goal * done / total;
     const current = (b.current != null && !isNaN(b.current)) ? Number(b.current) : null;
-    if (current != null) wigPill = `<span class="task-status-pill ${current >= pacing ? 'ts-done' : 'ts-inprog'}">${current >= pacing ? 'Winning' : 'Losing'}</span>`;
+    const pacing = (current != null && done > 0) ? (current / done) * total : null;
+    if (pacing != null) wigPill = `<span class="task-status-pill ${pacing >= b.goal ? 'ts-done' : 'ts-inprog'}">${pacing >= b.goal ? 'Winning' : 'Losing'}</span>`;
   }
 
   el.innerHTML = `

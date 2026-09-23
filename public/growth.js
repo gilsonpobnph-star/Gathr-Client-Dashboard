@@ -191,8 +191,15 @@
     const b = d.board; if (!b || !b.goal || !b.start || !b.end) return null;
     const total = Math.max(1, daysBetween(b.start, b.end)); const t = todayStr();
     const ref = t > b.end ? b.end : (t < b.start ? b.start : t); const done = Math.max(0, daysBetween(b.start, ref));
-    const pacing = b.goal * done / total; const current = boardCurrent(d);
-    return { total, done, pacing, current, winning: current != null ? current >= pacing : null };
+    const current = boardCurrent(d);
+    // Pacing = actual results so far ÷ days elapsed × total days in the
+    // window — i.e. if this run-rate holds, where you'll actually land by
+    // the end date. Not a fixed straight-line target to be "ahead of" —
+    // it moves with real progress, so early on (few days elapsed) it can
+    // swing a lot on one good or bad day, and it's undefined until at
+    // least a day has passed and a number's been entered.
+    const pacing = (current != null && done > 0) ? (current / done) * total : null;
+    return { total, done, pacing, current, winning: pacing != null ? pacing >= b.goal : null };
   }
   // Where the board's pacing SHOULD be at an arbitrary date — used to work out
   // how many units are needed by the next weekly meeting to stay on track.
@@ -314,7 +321,7 @@
         <div class="sb-stat"><div class="ss-lbl">By date</div><div class="ss-val">${niceDate(b.end)}</div></div>
         <div class="sb-stat"><div class="ss-lbl">WIG</div><div class="ss-val">${b.goal}</div></div>
         <div class="sb-stat"><div class="ss-lbl">Actual</div><div class="ss-val">${bc.current ?? '—'}</div></div>
-        <div class="sb-stat"><div class="ss-lbl">Pacing</div><div class="ss-val">${Math.round(bc.pacing)}</div></div>
+        <div class="sb-stat"><div class="ss-lbl">Pacing</div><div class="ss-val">${bc.pacing != null ? Math.round(bc.pacing) : '—'}</div></div>
         <div class="sb-stat highlight"><div class="ss-lbl">Needed by ${op ? shortDate(op.end) : 'next meeting'}</div><div class="ss-val">${need != null ? need : '—'}</div></div>`;
     } else {
       entry.classList.add('hidden'); entry.innerHTML = '';
@@ -325,14 +332,20 @@
     renderPeriods();
   }
   function renderScoreBars(d, bc) {
-    const b = d.board; const cur2 = bc.current ?? 0, goal = b.goal, pace = bc.pacing; const max = Math.max(cur2, goal, pace, 1);
+    const b = d.board; const cur2 = bc.current ?? 0, goal = b.goal, pace = bc.pacing ?? 0; const max = Math.max(cur2, goal, pace, 1);
     const bar = (cls, l, v) => `<div class="sb-bar ${cls}"><div class="b-num">${Math.round(v * 10) / 10}</div><div class="b-fill" style="height:${Math.max(2, v / max * 140)}px"></div><div class="b-lbl">${l}</div></div>`;
     $('sbBars').innerHTML = bar('mtd', 'Actual', cur2) + bar('goal', 'WIG', goal) + bar('pace', 'Pacing', pace);
     const cp = commitPct(d);
+    // Pacing is a run-rate projection (results so far ÷ days elapsed ×
+    // total days), not a fixed target to already be at — it's saying
+    // "keep this rate and you'll land here by the end date."
+    const paceLine = bc.pacing != null
+      ? `<div class="sb-line">At this rate you'll land around <b>${Math.round(pace)}</b> by ${niceDate(b.end)} — you have <b>${cur2}</b> so far</div>`
+      : `<div class="sb-line">Enter today's number to see your projected pace</div>`;
     $('sbMeta').innerHTML = `
       <div class="sb-game">${esc(b.metric || 'Goal')}: ${goal} by ${niceDate(b.end)}</div>
       <div class="sb-line">Day ${bc.done} of ${bc.total}</div>
-      <div class="sb-line">On pace you'd need <b>${Math.round(pace)}</b> by today — you have <b>${cur2}</b></div>
+      ${paceLine}
       <div style="margin-top:14px;"><div class="commit-pct">${cp != null ? Math.round(cp) + '%' : '—'}</div><div style="font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#7d766e;">Long-run commitment</div></div>`;
   }
   async function saveBoard() {
@@ -841,11 +854,12 @@
 
     let boardHtml = ''; const bc = boardCalc(d);
     if (bc && bc.current != null) {
-      const max = Math.max(bc.current, d.board.goal, bc.pacing, 1);
+      const pace = bc.pacing ?? 0;
+      const max = Math.max(bc.current, d.board.goal, pace, 1);
       const bar = (cls, l, v) => `<div class="sb-bar ${cls}"><div class="b-num">${Math.round(v * 10) / 10}</div><div class="b-fill" style="height:${Math.max(2, v / max * 120)}px"></div><div class="b-lbl">${l}</div></div>`;
       boardHtml = `<div class="sb-status ${bc.winning ? 'win' : 'lose'}" style="margin-bottom:14px;">${bc.winning ? 'WINNING' : 'LOSING'}</div>
         <div style="font-family:var(--g-serif); font-size:19px; margin-bottom:10px;">${esc(d.board.metric || 'Goal')}: ${d.board.goal} by ${niceDate(d.board.end)}</div>
-        <div class="sb-bars" style="max-width:420px; height:160px; margin-bottom:28px;">${bar('mtd', 'Actual', bc.current)}${bar('goal', 'WIG', d.board.goal)}${bar('pace', 'Pacing', bc.pacing)}</div>`;
+        <div class="sb-bars" style="max-width:420px; height:160px; margin-bottom:28px;">${bar('mtd', 'Actual', bc.current)}${bar('goal', 'WIG', d.board.goal)}${bar('pace', 'Pacing', pace)}</div>`;
     }
     const shades = ['#8a7f6e', '#a5674b', '#b95c3f', '#cd5f39'];
     const stages = [{ n: a.leads, l: 'Leads' }, { n: a.booked, l: 'Booked' }, { n: a.showed, l: 'Showed' }, { n: a.closed, l: 'Closed' }];
