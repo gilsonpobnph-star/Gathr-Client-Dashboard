@@ -504,13 +504,53 @@
       grid.appendChild(card);
     });
   }
-  async function newAssessment() {
-    const name = prompt('Business / prospect name:'); if (!name || !name.trim()) return;
-    const contact = prompt('Contact name (optional):') || '';
-    const payload = fresh(); payload.businessName = name.trim(); payload.contactName = contact.trim();
+  // "New assessment" used to be two browser prompt() calls with no way to
+  // link to a real CRM client. Now it's a small modal: pick an existing
+  // client (so the scorecard shows up on their own profile) or leave it as
+  // a new prospect and just type the name, same as before.
+  let crmClients = [];
+  async function openNewAssessModal() {
+    crmClients = (await apiGet('/api/clients')) || [];
+    const sel = $('na-client');
+    sel.innerHTML = '<option value="">— Not an existing client, type a new name —</option>' +
+      crmClients.map(c => `<option value="${c.id}">${esc(c.name)}${c.businessName ? ' – ' + esc(c.businessName) : ''}</option>`).join('');
+    $('na-name').value = ''; $('na-contact').value = '';
+    $('na-manual').style.display = '';
+    $('newAssessModal').classList.remove('hidden');
+  }
+  function closeNewAssessModal() { $('newAssessModal').classList.add('hidden'); }
+  // Picking a real client pre-fills (and hides) the manual name fields —
+  // their record is the source of truth once linked, same as any other
+  // client-linked feature in this app.
+  function onNewAssessClientChange() {
+    const id = $('na-client').value;
+    const c = crmClients.find(x => x.id === id);
+    $('na-manual').style.display = c ? 'none' : '';
+    if (c) { $('na-name').value = c.businessName || c.name || ''; $('na-contact').value = c.name || ''; }
+  }
+  // Entry point for the CRM client profile's "Run Diagnostic" button — the
+  // client is already known, so this skips the picker modal entirely and
+  // creates the assessment pre-linked, then switches to Diagnostic and
+  // opens it directly.
+  async function startAssessmentForClient(clientId, name, contact) {
+    const payload = fresh(); payload.businessName = name || ''; payload.contactName = contact || ''; payload.clientId = clientId || '';
+    const created = await apiSend('/api/diagnostic/assessments', 'POST', payload);
+    if (!created) { toast('Could not create assessment'); return null; }
+    assessments.push(created);
+    if (typeof showTab === 'function') showTab('diagnostic');
+    openAssessment(created.id);
+    return created;
+  }
+  async function confirmNewAssessment() {
+    const clientId = $('na-client').value;
+    const name = $('na-name').value.trim();
+    if (!name) { toast('Enter a business / prospect name'); return; }
+    const payload = fresh();
+    payload.businessName = name; payload.contactName = $('na-contact').value.trim(); payload.clientId = clientId || '';
     const created = await apiSend('/api/diagnostic/assessments', 'POST', payload);
     if (!created) { toast('Could not create assessment'); return; }
     assessments.push(created);
+    closeNewAssessModal();
     openAssessment(created.id);
   }
   function openAssessment(id) {
@@ -1286,6 +1326,18 @@
     openAssessment(id);
     showReport();
   }
+  // Same race-safe shape as openReportById, but lands on the form rather
+  // than the report — for the CRM client profile's Scorecard card opening
+  // an assessment that hasn't had a report generated yet. Calling
+  // openAssessment() directly right after switching tabs is not safe: this
+  // tab's own onOpen() also runs (fired by the tab switch) and, being
+  // async, can resolve afterward and silently steer back to the dashboard
+  // list once its own fetch completes.
+  async function openAssessmentById(id) {
+    await onOpen();
+    if (!assessments.some(x => x.id === id)) { toast('Could not find that assessment'); return; }
+    openAssessment(id);
+  }
   // Let the team fix wording or fill in a missing detail directly in the
   // rendered report before printing/saving as PDF — window.print() prints
   // the live DOM, so anything typed here is what ends up in the PDF.
@@ -1324,6 +1376,7 @@
   }
 
   window.Diagnostic = {
-    onOpen, showDash, newAssessment, openAssessment, deleteAssessment, showReport, backToForm, toggleReportEdit, refinePlanWithPrompt, regenerateAIRecommendation, clearAICache, openReportById,
+    onOpen, showDash, openAssessment, deleteAssessment, showReport, backToForm, toggleReportEdit, refinePlanWithPrompt, regenerateAIRecommendation, clearAICache, openReportById, openAssessmentById,
+    openNewAssessModal, closeNewAssessModal, onNewAssessClientChange, confirmNewAssessment, startAssessmentForClient,
   };
 })();

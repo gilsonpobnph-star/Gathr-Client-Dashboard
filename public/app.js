@@ -19,6 +19,12 @@ let team = [];
 let myTasks = [];
 let clientLastViewed = {}; // clientId → ISO ts, persisted in localStorage
 let editingTaskId = null;
+// Optional {growthClientId, growthPeriodId} set only when a brand-new task
+// is started as "housekeeping" from inside the Growth tab — carried
+// through to the save payload so the new task links back to that period.
+// Never set when editing an existing task, so editing never overwrites a
+// link that's already there (or adds one that isn't).
+let taskGrowthRef = null;
 let showArchivedTasks = false;
 let gathrMembers = [];
 let localStore = {};
@@ -872,8 +878,9 @@ document.getElementById('task-filter-priority')?.addEventListener('change', rend
 // Only applies when creating a new task (taskId is null); editing an
 // existing task never locks the field, since changing its client later is
 // still meant to be possible from either place.
-function openTaskModal(taskId, presetClientId) {
+function openTaskModal(taskId, presetClientId, growthRef) {
   editingTaskId = taskId || null;
+  taskGrowthRef = (!taskId && growthRef) ? growthRef : null;
   const t       = taskId ? myTasks.find(x => x.id === taskId) : null;
   const isAdmin = currentUser.role === 'admin';
   const myName  = currentUser.name || '';
@@ -960,6 +967,55 @@ function renderClientModalTasks() {
   }).join('');
 }
 
+// Scorecard section inside the client modal — this client's linked
+// Diagnostic assessment(s). Reads straight from Diagnostic's own API
+// (rather than reaching into diagnostic.js's private state) so it's
+// accurate even if the Diagnostic tab hasn't been opened this session yet.
+async function renderClientModalScorecard() {
+  const el = document.getElementById('cm-scorecard-list');
+  if (!el || !modalClient) return;
+  const all = await fetch('/api/diagnostic/assessments').then(r => r.ok ? r.json() : []).catch(() => []);
+  const list = all.filter(a => a.clientId === modalClient.id);
+  const runBtn = `<button class="btn-add-note" style="margin-top:10px" onclick="runDiagnosticForModalClient()">${list.length ? '+ Run another assessment' : 'Run Diagnostic'}</button>`;
+  if (!list.length) {
+    el.innerHTML = `<div class="task-empty">No scorecard yet.</div>${runBtn}`;
+    return;
+  }
+  el.innerHTML = list.map(a => {
+    const hasReport = !!(a.aiRecommendation && a.aiRecommendation.channels && a.aiRecommendation.channels.length);
+    const date = a.updatedAt ? new Date(a.updatedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+    return `<div class="cm-task-row" onclick="openClientScorecard('${a.id}', ${hasReport})">
+      <div class="cm-task-row-top">
+        <span class="task-row-title">${escHtml(a.businessName || 'Diagnostic assessment')}</span>
+      </div>
+      <div class="cm-task-row-meta">
+        <span class="task-status-pill ${hasReport ? 'ts-done' : 'ts-inprog'}">${hasReport ? 'Report generated' : 'In progress'}</span>
+        <span>${escHtml(date)}</span>
+      </div>
+    </div>`;
+  }).join('') + runBtn;
+}
+async function openClientScorecard(id, hasReport) {
+  // The client modal is its own separate overlay that showTab() never
+  // closes — without this, jumping to Diagnostic just switches tabs
+  // invisibly behind the still-open client modal.
+  document.getElementById('client-modal').classList.add('hidden');
+  showTab('diagnostic');
+  if (!window.Diagnostic) return;
+  // Both openReportById and openAssessmentById re-await the tab's own
+  // data load before opening a specific id — calling openAssessment()
+  // directly here would race that same load (fired by showTab above) and
+  // can get silently overridden back to the dashboard list once it
+  // resolves.
+  if (hasReport && typeof window.Diagnostic.openReportById === 'function') await window.Diagnostic.openReportById(id);
+  else if (typeof window.Diagnostic.openAssessmentById === 'function') await window.Diagnostic.openAssessmentById(id);
+}
+async function runDiagnosticForModalClient() {
+  if (!modalClient || !window.Diagnostic || typeof window.Diagnostic.startAssessmentForClient !== 'function') return;
+  document.getElementById('client-modal').classList.add('hidden');
+  await window.Diagnostic.startAssessmentForClient(modalClient.id, modalClient.businessName || modalClient.name, modalClient.name);
+}
+
 function renderTaskActivity(t) {
   const feed = document.getElementById('task-activity-feed');
   if (!feed) return;
@@ -994,6 +1050,11 @@ function renderTaskActivity(t) {
 function closeTaskModal() {
   document.getElementById('task-modal').classList.add('hidden');
   editingTaskId = null;
+  taskGrowthRef = null;
+  // Lets the Growth tab keep its own Housekeeping list in sync without
+  // this file needing to know anything about Growth's internals — a
+  // task edited or created here may belong to an open period card there.
+  if (window.Growth && typeof window.Growth.refreshHousekeeping === 'function') window.Growth.refreshHousekeeping();
 }
 
 async function saveTask() {
@@ -1015,6 +1076,7 @@ async function saveTask() {
     clientId:    document.getElementById('task-client').value,
     assignedTo,
     sharedWith,
+    ...(taskGrowthRef ? { growthClientId: taskGrowthRef.growthClientId, growthPeriodId: taskGrowthRef.growthPeriodId } : {}),
   };
 
   const url    = editingTaskId ? `/api/tasks/${editingTaskId}` : '/api/tasks';
@@ -2451,6 +2513,7 @@ function populateModal() {
   renderSpaceInfo(findGathrMember(c));
 
   renderClientModalTasks();
+  renderClientModalScorecard();
 
   // Program fields
   document.getElementById('cm-business').value = c.business    || '';

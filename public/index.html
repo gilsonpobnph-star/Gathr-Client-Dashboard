@@ -594,33 +594,16 @@
           <div id="g-tab-monthly" class="hidden">
             <div class="card">
               <h2 style="margin-bottom:4px;">Monthly data pull</h2>
-              <p class="section-note">Once a month. Enter the raw numbers for the month &mdash; rates compute automatically. Separate from the client's WIG meeting day. Pick an existing month to edit what was already saved.</p>
+              <p class="section-note">Once a month. A month can have more than one campaign running &mdash; add one row per ad/campaign and each gets its own numbers and its own column in the monthly report, with a total for the month. Pick an existing month to edit what was already saved.</p>
               <div class="row" style="max-width:300px;">
                 <div><label for="g-moPicker">Month</label><input type="month" id="g-moPicker" onchange="Growth.loadMonth()"></div>
               </div>
               <div id="g-monthForm" class="hidden" style="margin-top:18px;">
-                <h3 style="font-size:17px; margin-bottom:10px;">Ad account</h3>
-                <div class="metric-grid" style="margin-bottom:18px;">
-                  <div><label for="g-aSpend">Ad spend ($)</label><input type="number" id="g-aSpend" min="0" step="0.01" oninput="Growth.recalcMonth()"></div>
-                  <div><label for="g-aImpr">Impressions</label><input type="number" id="g-aImpr" min="0" oninput="Growth.recalcMonth()"></div>
-                  <div><label for="g-aClicks">Link clicks</label><input type="number" id="g-aClicks" min="0" oninput="Growth.recalcMonth()"></div>
-                  <div><label for="g-aLeads">Leads (opt-ins)</label><input type="number" id="g-aLeads" min="0" oninput="Growth.recalcMonth()"></div>
-                  <div><label>CPM</label><div class="computed" id="g-xCPM">&mdash;</div></div>
-                  <div><label>CTR</label><div class="computed" id="g-xCTR">&mdash;</div></div>
-                  <div><label>Opt-in rate</label><div class="computed" id="g-xOpt">&mdash;</div></div>
-                  <div><label>CPL</label><div class="computed" id="g-xCPL">&mdash;</div></div>
+                <div id="g-campaignsHost"></div>
+                <div style="margin-top:10px; display:flex; gap:10px; align-items:center;">
+                  <button class="secondary" onclick="Growth.addCampaignRow()">+ Add another campaign for this month</button>
                 </div>
-                <h3 style="font-size:17px; margin-bottom:10px;">Pipeline (GHL)</h3>
-                <div class="metric-grid" style="margin-bottom:18px;">
-                  <div><label for="g-pBooked">Booked</label><input type="number" id="g-pBooked" min="0" oninput="Growth.recalcMonth()"></div>
-                  <div><label for="g-pShowed">Showed</label><input type="number" id="g-pShowed" min="0" oninput="Growth.recalcMonth()"></div>
-                  <div><label for="g-pClosed">Closed</label><input type="number" id="g-pClosed" min="0" oninput="Growth.recalcMonth()"></div>
-                  <div><label for="g-pRev">New revenue ($)</label><input type="number" id="g-pRev" min="0" step="0.01" oninput="Growth.recalcMonth()"></div>
-                  <div><label>Book %</label><div class="computed" id="g-xBook">&mdash;</div></div>
-                  <div><label>Show %</label><div class="computed" id="g-xShow">&mdash;</div></div>
-                  <div><label>Close %</label><div class="computed" id="g-xClose">&mdash;</div></div>
-                </div>
-                <button class="accent" onclick="Growth.saveMonth()">Save month</button>
+                <button class="accent" style="margin-top:16px" onclick="Growth.saveMonth()">Save month</button>
               </div>
             </div>
             <div class="card">
@@ -683,7 +666,7 @@
             <div><div class="eyebrow">Diagnostic</div><h1>Assessments</h1></div>
             <div style="display:flex; gap:10px;">
               <button class="secondary small" onclick="Diagnostic.clearAICache()" title="Clears the saved AI recommendation off every assessment below, so the next Generate on each one does a genuine fresh AI pass">Clear AI cache</button>
-              <button class="accent" onclick="Diagnostic.newAssessment()">+ New assessment</button>
+              <button class="accent" onclick="Diagnostic.openNewAssessModal()">+ New assessment</button>
             </div>
           </div>
           <div id="dg-assessGrid" class="assess-grid"></div>
@@ -749,6 +732,38 @@
           </div>
         </section>
 
+      </div>
+
+      <!-- New assessment: pick a real CRM client (so the scorecard links back
+           to their profile) or type a new prospect name if they're not a
+           client yet. -->
+      <div id="dg-newAssessModal" class="modal-overlay hidden" onclick="if(event.target===this)Diagnostic.closeNewAssessModal()">
+        <div class="modal" style="max-width:480px;min-height:auto">
+          <button class="modal-close" onclick="Diagnostic.closeNewAssessModal()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+          <div class="modal-header"><h2>New assessment</h2></div>
+          <div style="margin-bottom:14px">
+            <label for="dg-na-client">Client</label>
+            <select id="dg-na-client" class="inline-select" style="width:100%" onchange="Diagnostic.onNewAssessClientChange()">
+              <option value="">— Not an existing client, type a new name —</option>
+            </select>
+          </div>
+          <div id="dg-na-manual">
+            <div style="margin-bottom:14px">
+              <label for="dg-na-name">Business / prospect name</label>
+              <input type="text" id="dg-na-name" class="inline-input" style="width:100%" placeholder="Business name">
+            </div>
+            <div style="margin-bottom:14px">
+              <label for="dg-na-contact">Contact name (optional)</label>
+              <input type="text" id="dg-na-contact" class="inline-input" style="width:100%" placeholder="Contact name">
+            </div>
+          </div>
+          <div style="display:flex; justify-content:flex-end; gap:10px">
+            <button class="btn-secondary" onclick="Diagnostic.closeNewAssessModal()">Cancel</button>
+            <button class="btn-primary" onclick="Diagnostic.confirmNewAssessment()">Create</button>
+          </div>
+        </div>
       </div>
 
       <!-- Full-screen blocking modal while the AI writes the report the first
@@ -1770,6 +1785,17 @@
           </div>
           <div id="cm-tasks-list">
             <div class="task-empty">No tasks for this client yet.</div>
+          </div>
+        </div>
+
+        <!-- Scorecard — this client's linked Diagnostic assessment(s). Same
+             instrument as the Diagnostic tab, just reachable from here too. -->
+        <div class="info-card">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <h3 style="margin-bottom:0">Scorecard</h3>
+          </div>
+          <div id="cm-scorecard-list">
+            <div class="task-empty">No scorecard yet.</div>
           </div>
         </div>
 

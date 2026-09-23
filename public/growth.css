@@ -172,9 +172,29 @@
 #tab-growth .goal-add-row{display:flex; gap:10px; margin-top:10px;}
 #tab-growth .goal-add-row input{flex:1;}
 
+#tab-growth .housekeeping-block{padding:16px 0; border-top:1px solid var(--g-warmgrey);}
+#tab-growth .hk-row{display:flex; align-items:center; gap:10px; padding:8px 0; cursor:pointer;}
+#tab-growth .hk-row:hover .hk-title{color:var(--g-orange);}
+#tab-growth .hk-stripe{width:3px; height:22px; border-radius:2px; flex-shrink:0;}
+#tab-growth .hk-title{font-size:14px; flex-shrink:0;}
+#tab-growth .hk-meta{font-size:12px; color:#7d766e; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+
 #tab-growth .period-actions{margin-top:16px; padding-top:16px; border-top:1px solid var(--g-lightgrey); display:flex; align-items:center; gap:12px; flex-wrap:wrap;}
 
 #tab-growth .metric-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); gap:12px;}
+
+/* Multiple campaigns per month — one card per ad/campaign in the data-entry
+   form, each with its own name and numbers. */
+#tab-growth .campaign-row{border:1px solid var(--g-warmgrey); border-radius:4px; padding:16px 18px; margin-bottom:14px; background:var(--g-lightgrey);}
+#tab-growth .campaign-row-head{display:flex; align-items:center; gap:10px; margin-bottom:14px;}
+#tab-growth .campaign-row-head .camp-name{flex:1; font-size:15px; font-weight:600; padding:8px 10px;}
+#tab-growth .campaign-row h3{font-size:14px; margin:10px 0 8px; color:#7d766e; text-transform:uppercase; letter-spacing:.04em;}
+
+/* Monthly report — per-campaign sub-columns under each month's header,
+   with a "Total" sub-column summing them back to the month figure. */
+#tab-growth table.mreport th.camp-subhead{font-weight:normal; font-size:11px; color:#7d766e;}
+#tab-growth table.mreport td.camp-total, #tab-growth table.mreport th.camp-subhead:last-of-type{background:#faf8f4; font-weight:600;}
+#tab-growth table.mreport td.muted-cell{color:var(--g-dust);}
 #tab-growth .computed{background:var(--g-lightgrey); border:1px solid var(--g-warmgrey); border-radius:3px; padding:8px 10px; font-size:14px; min-height:38px; display:flex; align-items:center;}
 #tab-growth .computed.on{color:var(--g-orange); font-weight:bold;}
 #tab-growth .section-note{font-size:13px; color:#7d766e; margin:-6px 0 14px;}

@@ -846,6 +846,12 @@ app.post('/api/tasks', requireAuth, (req, res) => {
     status:      req.body.status       || 'To Do',
     deadline:    req.body.deadline     || '',
     clientId:    req.body.clientId     || '',
+    // Optional link back to a Growth client + period — set only when a task
+    // is created as "housekeeping" from inside the Growth tab, so it can be
+    // filtered back onto that period while still being a completely normal
+    // task everywhere else (My Tasks, assignee visibility, status, etc.).
+    growthClientId: req.body.growthClientId || '',
+    growthPeriodId: req.body.growthPeriodId || '',
     assignedTo:  Array.isArray(req.body.assignedTo) ? req.body.assignedTo : [],
     sharedWith:  Array.isArray(req.body.sharedWith) ? req.body.sharedWith : [],
     createdBy:   req.session.name      || 'Admin',
@@ -865,7 +871,7 @@ app.patch('/api/tasks/:id', requireAuth, (req, res) => {
   const task = store.tasks[req.params.id];
   if (!task) return res.status(404).json({ error: 'Not found' });
   if (!canSeeTask(task, req.session)) return res.status(403).json({ error: 'Forbidden' });
-  const allowed = ['title','description','priority','status','deadline','clientId','assignedTo','sharedWith','archived'];
+  const allowed = ['title','description','priority','status','deadline','clientId','growthClientId','growthPeriodId','assignedTo','sharedWith','archived'];
   allowed.forEach(k => { if (req.body[k] !== undefined) task[k] = req.body[k]; });
   task.updatedAt = new Date().toISOString();
   store.tasks[req.params.id] = task;
@@ -1001,6 +1007,10 @@ app.post('/api/diagnostic/assessments', requireAuth, (req, res) => {
     id,
     businessName: req.body.businessName || '',
     contactName: req.body.contactName || '',
+    // Optional link to a real CRM client (store.clients) — lets that
+    // client's own profile show and open this scorecard directly, rather
+    // than the assessment only existing as a standalone Diagnostic entry.
+    clientId: req.body.clientId || '',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     answers: req.body.answers || {},

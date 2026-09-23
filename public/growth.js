@@ -68,15 +68,42 @@
     return true;
   }
 
+  // One-time, idempotent migration: a month used to be one flat entry
+  // (ads + pipe). Multiple campaigns can now run in the same month, so
+  // each month becomes a list of named campaigns instead — an existing
+  // month's numbers become its first campaign ("Campaign 1") so nothing
+  // already recorded is lost. Runs once per month: once .campaigns exists
+  // (even as an empty array), this never re-wraps it.
+  function migrateMonthsToCampaigns(d) {
+    let changed = false;
+    Object.keys(d.months || {}).forEach(mo => {
+      const m = d.months[mo];
+      if (m.campaigns) return; // already migrated
+      d.months[mo] = { campaigns: [{ id: 'camp_legacy_' + mo, name: 'Campaign 1', ads: m.ads || {}, pipe: m.pipe || {} }] };
+      changed = true;
+    });
+    return changed;
+  }
+
+  // Housekeeping tasks are real tasks in the app's one shared task system
+  // (My Tasks, assignee visibility, status — all identical), just tagged
+  // with growthClientId/growthPeriodId so a period card can show its own
+  // slice of them. Loaded as a flat list once and filtered per period at
+  // render time, same pattern as everything else in this file.
+  let housekeepingTasks = [];
+  async function loadHousekeeping() { housekeepingTasks = (await apiGet('/api/tasks')) || []; }
+
   let booted = false;
   async function onOpen() {
     setSync('Loading…');
     clients = (await apiGet('/api/growth/clients')) || [];
+    await loadHousekeeping();
     await Promise.all(clients.map(async c => {
       dataCache[c.id] = (await apiGet('/api/growth/data/' + c.id)) || fresh();
       const changed1 = migrateClientData(dataCache[c.id]);
       const changed2 = migrateWeeksToMonths(dataCache[c.id]);
-      if (changed1 || changed2) await apiSend('/api/growth/data/' + c.id, 'PUT', dataCache[c.id]);
+      const changed3 = migrateMonthsToCampaigns(dataCache[c.id]);
+      if (changed1 || changed2 || changed3) await apiSend('/api/growth/data/' + c.id, 'PUT', dataCache[c.id]);
     }));
     setSync('Synced · shared with your team');
     if (!booted) { booted = true; }
@@ -96,13 +123,25 @@
   function monthLabel(mo) { const [y, m] = mo.split('-'); return ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][+m - 1] + ' ' + y; }
 
   function monthKeys(d) { return Object.keys(d.months || {}).sort(); }
-  // A single month's raw, manually-entered numbers — the base unit now that
-  // data is entered monthly, no more summing several weeks into one month.
-  function monthRaw(d, mo) {
-    const m = (d.months || {})[mo] || {};
+  function campaignsFor(d, mo) { return (d.months || {})[mo]?.campaigns || []; }
+  // A single campaign's raw numbers, zero-filled for summing.
+  function campaignRaw(c) {
     const s = { spend: 0, impr: 0, clicks: 0, leads: 0, booked: 0, showed: 0, closed: 0, rev: 0, any: false };
-    if (m.ads) ['spend', 'impr', 'clicks', 'leads'].forEach(x => { if (m.ads[x] != null) { s[x] = m.ads[x]; s.any = true; } });
-    if (m.pipe) ['booked', 'showed', 'closed', 'rev'].forEach(x => { if (m.pipe[x] != null) { s[x] = m.pipe[x]; s.any = true; } });
+    if (c.ads) ['spend', 'impr', 'clicks', 'leads'].forEach(x => { if (c.ads[x] != null) { s[x] = c.ads[x]; s.any = true; } });
+    if (c.pipe) ['booked', 'showed', 'closed', 'rev'].forEach(x => { if (c.pipe[x] != null) { s[x] = c.pipe[x]; s.any = true; } });
+    return s;
+  }
+  // A month's raw numbers — the sum of every campaign that ran that month.
+  // Everything downstream (monthAgg, totalAgg, longRun, the narrative
+  // report) reads this, so multiple campaigns in one month just add up
+  // exactly like a single campaign always did.
+  function monthRaw(d, mo) {
+    const s = { spend: 0, impr: 0, clicks: 0, leads: 0, booked: 0, showed: 0, closed: 0, rev: 0, any: false };
+    campaignsFor(d, mo).forEach(c => {
+      const r = campaignRaw(c);
+      if (r.any) s.any = true;
+      ['spend', 'impr', 'clicks', 'leads', 'booked', 'showed', 'closed', 'rev'].forEach(x => { s[x] += r[x] || 0; });
+    });
     return s;
   }
   function sumAllMonths(d, f) {
@@ -315,7 +354,7 @@
              <label class="ph-field"><span>Next meeting date</span><input type="date" value="${p.end}" onchange="Growth.updPeriodDate('${p.id}','end',this.value)"></label>
            </div></div>`
       : `<div class="period-head"><div class="ph-title">${shortDate(p.start)} → ${shortDate(p.end)}</div><span class="ph-tag past">Locked</span></div>`;
-    let bodyHtml = (isOpen ? '' : snapshotBlock(p)) + goalsBlock(p, isOpen) + '<div class="pb-people"></div>';
+    let bodyHtml = (isOpen ? '' : snapshotBlock(p)) + goalsBlock(p, isOpen) + housekeepingBlock(p, isOpen) + '<div class="pb-people"></div>';
     if (isOpen) {
       bodyHtml += `<div class="period-actions">
         <button class="secondary" onclick="Growth.savePeriodProgress('${p.id}')">Save</button>
@@ -400,6 +439,48 @@
     const p = cData().periods.find(x => x.id === pid); if (!p) return;
     p.goals = (p.goals || []).filter(x => x.id !== gid); await persist(); renderWig(); renderDash();
   }
+  const HK_PRIORITY_COLOR = { High: '#c0392b', Medium: '#cd5f39', Low: '#7a8f6b' };
+  // Housekeeping list for one period — real tasks (openTaskModal handles
+  // create/edit/status/assignee/due-date identically to My Tasks or a
+  // client's own profile), just filtered to this client + this period.
+  function housekeepingBlock(p, isOpen) {
+    const tasks = housekeepingTasks.filter(t => t.growthClientId === cur && t.growthPeriodId === p.id && !t.archived);
+    const rows = tasks.map(t => {
+      const color = HK_PRIORITY_COLOR[t.priority] || '#8A7A6E';
+      const who = (t.assignedTo || []).join(', ') || 'Unassigned';
+      const due = t.deadline ? shortDate(t.deadline) : 'No due date';
+      return `<div class="hk-row" onclick="openTaskModal('${t.id}')">
+        <span class="hk-stripe" style="background:${color}"></span>
+        <span class="hk-title">${esc(t.title)}</span>
+        <span class="hk-meta">${esc(who)} &middot; ${esc(t.status)} &middot; ${esc(due)}</span>
+      </div>`;
+    }).join('');
+    const empty = !tasks.length ? `<p class="muted" style="font-size:13px; margin:6px 0 10px;">${isOpen ? 'No housekeeping tasks yet — add one below.' : 'No housekeeping tasks this period.'}</p>` : '';
+    const addRow = isOpen ? `<button class="secondary small" onclick="Growth.addHousekeepingTask('${p.id}')">+ Add housekeeping task</button>` : '';
+    return `<div class="housekeeping-block">
+      <div class="pb-head" style="margin-bottom:8px;">
+        <h4 style="font-size:17px;">Housekeeping</h4>
+        <span class="muted" style="font-size:13px;">${tasks.length ? `${tasks.length} task${tasks.length === 1 ? '' : 's'}` : ''}</span>
+      </div>
+      ${empty}${rows}${addRow}
+    </div>`;
+  }
+  // Opens the app's own shared task modal (My Tasks / client-profile tasks
+  // all use it too) pre-linked to this client and period — this file never
+  // builds its own task-editing UI, it just points the real one at itself.
+  function addHousekeepingTask(pid) {
+    if (typeof openTaskModal !== 'function') { toast('Task tool not available'); return; }
+    openTaskModal(null, null, { growthClientId: cur, growthPeriodId: pid });
+  }
+  // Called by app.js's closeTaskModal() after any create/edit/delete/
+  // archive — keeps the open period's Housekeeping list current without
+  // this file and app.js needing to know anything else about each other.
+  async function refreshHousekeeping() {
+    if (!cur) return;
+    await loadHousekeeping();
+    const wigTab = document.getElementById('g-tab-wig');
+    if (wigTab && !wigTab.classList.contains('hidden')) renderPeriods();
+  }
   function personBlock(period, pn, isOpen) {
     const div = document.createElement('div'); div.className = 'person-block'; div.dataset.name = pn.name;
     const headRight = isOpen ? `<button class="linkish" onclick="Growth.removePerson('${period.id}','${esc(pn.name)}')">remove</button>` : '';
@@ -481,105 +562,208 @@
   }
   async function removePerson(pid, name) { const o = cData().periods.find(p => p.id === pid); if (!o) return; o.people = o.people.filter(x => x.name !== name); await persist(); renderWig(); }
 
+  // Working copy of the campaigns for whichever month is loaded in the
+  // data-entry form — a deep clone, so nothing touches the real data until
+  // "Save month" is clicked (same rule the old single-campaign form had).
+  let workingCampaigns = [];
+  function blankCampaign() { return { name: '', ads: {}, pipe: {} }; }
   function loadMonth() {
     const mo = $('moPicker').value; if (!mo) { $('monthForm').classList.add('hidden'); return; }
-    const m = (cData().months || {})[mo] || {};
-    $('aSpend').value = m.ads?.spend ?? ''; $('aImpr').value = m.ads?.impr ?? ''; $('aClicks').value = m.ads?.clicks ?? ''; $('aLeads').value = m.ads?.leads ?? '';
-    $('pBooked').value = m.pipe?.booked ?? ''; $('pShowed').value = m.pipe?.showed ?? ''; $('pClosed').value = m.pipe?.closed ?? ''; $('pRev').value = m.pipe?.rev ?? '';
-    $('monthForm').classList.remove('hidden'); recalcMonth();
+    const existing = campaignsFor(cData(), mo);
+    workingCampaigns = existing.length ? JSON.parse(JSON.stringify(existing)) : [blankCampaign()];
+    renderCampaignRows();
+    $('monthForm').classList.remove('hidden');
   }
-  function nv(id) { const v = parseFloat($(id).value); return isNaN(v) ? null : v; }
-  function recalcMonth() {
-    const spend = nv('aSpend'), impr = nv('aImpr'), clicks = nv('aClicks'), leads = nv('aLeads');
-    const booked = nv('pBooked'), showed = nv('pShowed'), closed = nv('pClosed');
-    const set = (id, v) => { const e = $(id); e.textContent = v; e.classList.toggle('on', v !== '—'); };
-    set('xCPM', (spend != null && impr) ? fmt$(spend / impr * 1000) : '—');
-    set('xCTR', (clicks != null && impr) ? fmtP(clicks / impr * 100) : '—');
-    set('xOpt', (leads != null && clicks) ? fmtP(leads / clicks * 100) : '—');
-    set('xCPL', (spend != null && leads) ? fmt$(spend / leads) : '—');
-    set('xBook', (booked != null && leads) ? fmtP(booked / leads * 100) : '—');
-    set('xShow', (showed != null && booked) ? fmtP(showed / booked * 100) : '—');
-    set('xClose', (closed != null && showed) ? fmtP(closed / showed * 100) : '—');
+  function renderCampaignRows() {
+    $('campaignsHost').innerHTML = workingCampaigns.map((c, i) => campaignRowHtml(c, i)).join('');
+    workingCampaigns.forEach((c, i) => recalcCampaignRow(i)); // populate computed cells for any values already saved
+  }
+  function campaignRowHtml(c, idx) {
+    const a = c.ads || {}, p = c.pipe || {};
+    const field = (label, path, val) => `<div><label>${label}</label><input type="number" step="any" class="camp-f" value="${val ?? ''}" oninput="Growth.updateCampaignField(${idx},'${path}',this.value)"></div>`;
+    const computed = (label, cls) => `<div><label>${label}</label><div class="computed ${cls}">&mdash;</div></div>`;
+    return `<div class="campaign-row" data-idx="${idx}">
+      <div class="campaign-row-head">
+        <input type="text" class="camp-name" placeholder="Ad / campaign name" value="${esc(c.name || '')}" oninput="Growth.updateCampaignField(${idx},'name',this.value)">
+        ${workingCampaigns.length > 1 ? `<button class="linkish" onclick="Growth.removeCampaignRow(${idx})">remove</button>` : ''}
+      </div>
+      <h3>Ad account</h3>
+      <div class="metric-grid" style="margin-bottom:14px;">
+        ${field('Ad spend ($)', 'ads.spend', a.spend)}
+        ${field('Impressions', 'ads.impr', a.impr)}
+        ${field('Link clicks', 'ads.clicks', a.clicks)}
+        ${field('Leads (opt-ins)', 'ads.leads', a.leads)}
+        ${computed('CPM', 'camp-cpm')}
+        ${computed('CTR', 'camp-ctr')}
+        ${computed('Opt-in rate', 'camp-opt')}
+        ${computed('CPL', 'camp-cpl')}
+      </div>
+      <h3>Pipeline (GHL)</h3>
+      <div class="metric-grid">
+        ${field('Booked', 'pipe.booked', p.booked)}
+        ${field('Showed', 'pipe.showed', p.showed)}
+        ${field('Closed', 'pipe.closed', p.closed)}
+        ${field('New revenue ($)', 'pipe.rev', p.rev)}
+        ${computed('Book %', 'camp-book')}
+        ${computed('Show %', 'camp-show')}
+        ${computed('Close %', 'camp-close')}
+      </div>
+    </div>`;
+  }
+  // Fired on every keystroke — keeps workingCampaigns in sync (so adding or
+  // removing a row never loses what's already typed elsewhere) and updates
+  // just that row's live computed rates without a full re-render.
+  function updateCampaignField(idx, path, value) {
+    const c = workingCampaigns[idx]; if (!c) return;
+    if (path === 'name') { c.name = value; return; }
+    const [group, field] = path.split('.');
+    if (!c[group]) c[group] = {};
+    const v = parseFloat(value);
+    c[group][field] = isNaN(v) ? null : v;
+    recalcCampaignRow(idx);
+  }
+  function recalcCampaignRow(idx) {
+    const c = workingCampaigns[idx]; if (!c) return;
+    const row = document.querySelector(`#g-campaignsHost .campaign-row[data-idx="${idx}"]`); if (!row) return;
+    const a = c.ads || {}, p = c.pipe || {};
+    const set = (cls, v) => { const e = row.querySelector('.' + cls); if (e) { e.textContent = v; e.classList.toggle('on', v !== '—'); } };
+    set('camp-cpm',  (a.spend != null && a.impr) ? fmt$(a.spend / a.impr * 1000) : '—');
+    set('camp-ctr',  (a.clicks != null && a.impr) ? fmtP(a.clicks / a.impr * 100) : '—');
+    set('camp-opt',  (a.leads != null && a.clicks) ? fmtP(a.leads / a.clicks * 100) : '—');
+    set('camp-cpl',  (a.spend != null && a.leads) ? fmt$(a.spend / a.leads) : '—');
+    set('camp-book', (p.booked != null && a.leads) ? fmtP(p.booked / a.leads * 100) : '—');
+    set('camp-show', (p.showed != null && p.booked) ? fmtP(p.showed / p.booked * 100) : '—');
+    set('camp-close',(p.closed != null && p.showed) ? fmtP(p.closed / p.showed * 100) : '—');
+  }
+  function addCampaignRow() { workingCampaigns.push(blankCampaign()); renderCampaignRows(); }
+  function removeCampaignRow(idx) {
+    workingCampaigns.splice(idx, 1);
+    if (!workingCampaigns.length) workingCampaigns.push(blankCampaign());
+    renderCampaignRows();
   }
   async function saveMonth() {
     const mo = $('moPicker').value; if (!mo) { toast('Pick the month'); return; }
     if (!cData().months) cData().months = {};
-    cData().months[mo] = { ads: { spend: nv('aSpend'), impr: nv('aImpr'), clicks: nv('aClicks'), leads: nv('aLeads') }, pipe: { booked: nv('pBooked'), showed: nv('pShowed'), closed: nv('pClosed'), rev: nv('pRev') } };
+    // Drop rows nobody filled in (a spare "+ Add another campaign" left
+    // blank) so they don't get saved as ghost zero-value campaigns.
+    const campaigns = workingCampaigns
+      .filter(c => (c.name && c.name.trim()) || Object.values(c.ads || {}).some(v => v != null) || Object.values(c.pipe || {}).some(v => v != null))
+      .map((c, i) => ({ id: c.id || ('camp_' + Date.now() + '_' + i), name: (c.name || '').trim() || `Campaign ${i + 1}`, ads: c.ads || {}, pipe: c.pipe || {} }));
+    cData().months[mo] = { campaigns };
     const ok = await persist(); toast(ok ? 'Month saved' : 'Save failed'); renderMonthTable(); renderDash();
   }
   function renderMonthTable() {
     const tb = $('monthTable').querySelector('tbody'); tb.innerHTML = ''; const d = cData();
     monthKeys(d).slice().reverse().forEach(mo => {
-      const m = d.months[mo]; const cpl = (m.ads?.spend != null && m.ads?.leads) ? m.ads.spend / m.ads.leads : null;
+      const r = monthRaw(d, mo); const cpl = (r.spend && r.leads) ? r.spend / r.leads : null;
+      const n = campaignsFor(d, mo).length;
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td>${monthLabel(mo)}</td><td>${fmt$(m.ads?.spend)}</td><td>${fmtN(m.ads?.leads)}</td><td>${fmt$(cpl)}</td><td>${fmtN(m.pipe?.booked)}</td><td>${fmtN(m.pipe?.showed)}</td><td>${fmtN(m.pipe?.closed)}</td><td>${fmt$(m.pipe?.rev)}</td><td><button class="linkish" onclick="Growth.editMonth('${mo}')">edit</button> <button class="linkish" onclick="Growth.delMonth('${mo}')">delete</button></td>`;
+      tr.innerHTML = `<td>${monthLabel(mo)}${n > 1 ? ` <span class="muted" style="font-size:11px">(${n} campaigns)</span>` : ''}</td><td>${fmt$(r.spend || null)}</td><td>${fmtN(r.leads || null)}</td><td>${fmt$(cpl)}</td><td>${fmtN(r.booked || null)}</td><td>${fmtN(r.showed || null)}</td><td>${fmtN(r.closed || null)}</td><td>${fmt$(r.rev || null)}</td><td><button class="linkish" onclick="Growth.editMonth('${mo}')">edit</button> <button class="linkish" onclick="Growth.delMonth('${mo}')">delete</button></td>`;
       tb.appendChild(tr);
     });
   }
   function editMonth(mo) { $('moPicker').value = mo; loadMonth(); document.getElementById('tab-growth')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
   async function delMonth(mo) { if (!confirm('Delete data for ' + monthLabel(mo) + '?')) return; delete cData().months[mo]; await persist(); renderMonthTable(); renderDash(); }
-  // Lets the Monthly Report table itself double as an edit surface for the
-  // manually-entered raw figures (ad spend, impressions, clicks, leads,
-  // bookings, shows, sales made, revenue) — the computed rates (CPM, CTR,
-  // CAC, ROAS, ROI, etc.) are never editable since they're always derived
-  // from these, never entered directly.
-  async function setMonthField(mo, group, field, val) {
+  // Lets the Monthly Report table itself double as an edit surface for a
+  // specific campaign's raw figures — the computed rates (CPM, CTR, CAC,
+  // ROAS, ROI, etc.) are never editable since they're always derived, never
+  // entered directly.
+  async function setCampaignField(mo, campId, group, field, val) {
     const d = cData(); if (!d.months) d.months = {};
-    if (!d.months[mo]) d.months[mo] = { ads: {}, pipe: {} };
-    if (!d.months[mo][group]) d.months[mo][group] = {};
+    if (!d.months[mo]) d.months[mo] = { campaigns: [] };
+    const camp = d.months[mo].campaigns.find(c => c.id === campId);
+    if (!camp) return;
+    if (!camp[group]) camp[group] = {};
     const v = parseFloat(val);
-    d.months[mo][group][field] = isNaN(v) ? null : v;
+    camp[group][field] = isNaN(v) ? null : v;
     await persist(); renderMonthlyTables(); renderDash();
   }
+  // A campaign's own rates, computed straight from its own numbers (fee is
+  // a monthly retainer, never split per campaign, so it plays no part here
+  // — only the month-total and grand-total columns ever show ROI).
+  function campaignRates(c) { return deriveRates(campaignRaw(c), 0); }
 
   function renderMonthlyTables() {
     const d = cData(), mosAsc = monthKeys(d), host = $('monthlyTables');
     if (!mosAsc.length) { host.innerHTML = '<div class="card"><p class="muted">This table builds itself once monthly data is entered.</p></div>'; return; }
     const cols = mosAsc.slice().reverse();
     const tot = totalAgg(d);
-    const aggByMo = {}; cols.forEach(mo => aggByMo[mo] = monthAgg(d, mo));
+    const aggByMo = {}; const campsByMo = {};
+    cols.forEach(mo => { aggByMo[mo] = monthAgg(d, mo); campsByMo[mo] = campaignsFor(d, mo); });
     const sym = cRec()?.currency || '£';
-
-    const head = '<tr><th></th><th>Total</th>' + cols.map(m => '<th>' + monthLabel(m) + '</th>').join('') + '</tr>';
-    // Calculated rows (CPM, CTR, CAC, ROAS, ROI, etc.) are always derived —
-    // never editable, there's nothing to type in.
-    const calcRow = (label, fn, cls) => `<tr><td>${label}</td><td class="${cls || ''}">${fn(tot)}</td>` + cols.map(mo => `<td class="${cls || ''}">${fn(aggByMo[mo])}</td>`).join('') + '</tr>';
-    // Raw, manually-entered rows are editable right here — the Total column
-    // stays a computed, read-only sum since it isn't something anyone types.
-    const rawRow = (label, group, field, fmtFn) => `<tr><td>${label}</td><td>${fmtFn(tot[field] || null)}</td>` +
-      cols.map(mo => {
-        const v = d.months[mo]?.[group]?.[field];
-        return `<td><input class="fee-in" type="number" step="any" value="${v ?? ''}" onchange="Growth.setMonthField('${mo}','${group}','${field}',this.value)"></td>`;
-      }).join('') + '</tr>';
-    const spacer = `<tr class="tspace"><td colspan="${cols.length + 2}"></td></tr>`;
-
-    let feeTotal = 0; cols.forEach(mo => feeTotal += feeFor(d, mo));
-    const feeRow = `<tr><td>Our fee</td><td>${money(feeTotal, sym)}</td>` +
-      cols.map(mo => `<td><input class="fee-in" type="number" min="0" step="0.01" value="${d.fees[mo] ?? ''}" placeholder="${cRec()?.fee ?? ''}" onchange="Growth.setFee('${mo}',this.value)"></td>`).join('') + '</tr>';
-
     const rc = v => v == null ? '' : (v >= 1.5 ? 'roi-cell-good' : v >= 1 ? 'roi-cell-warn' : 'roi-cell-bad');
 
+    // Two header rows: month names spanning their campaign columns (plus
+    // one "Total" sub-column each), then the campaign names themselves.
+    const head = `<tr><th rowspan="2"></th><th rowspan="2">Total</th>${cols.map(mo => `<th colspan="${Math.max(campsByMo[mo].length, 1) + 1}">${monthLabel(mo)}</th>`).join('')}</tr>` +
+      `<tr>${cols.map(mo => {
+        const camps = campsByMo[mo];
+        const names = camps.length ? camps.map(c => esc(c.name)) : ['—'];
+        return names.map(n => `<th class="camp-subhead">${n}</th>`).join('') + '<th class="camp-subhead">Total</th>';
+      }).join('')}</tr>`;
+
+    // Calculated rows (CPM, CTR, CAC, ROAS, etc.) — never editable, always
+    // derived. Per-campaign cells use that campaign's own numbers; the
+    // month sub-total cell uses the month's combined numbers.
+    const calcRow = (label, key, fmtFn, cls) => {
+      const cells = cols.map(mo => {
+        const camps = campsByMo[mo];
+        const perCamp = camps.length ? camps.map(c => `<td class="${cls || ''}">${fmtFn(campaignRates(c)[key])}</td>`).join('') : `<td class="${cls || ''} muted-cell">${fmtFn(null)}</td>`;
+        return perCamp + `<td class="camp-total ${cls || ''}">${fmtFn(aggByMo[mo][key])}</td>`;
+      }).join('');
+      return `<tr><td>${label}</td><td class="${cls || ''}">${fmtFn(tot[key])}</td>${cells}</tr>`;
+    };
+    // Raw, manually-entered rows — one editable cell per campaign, plus a
+    // computed (read-only) month sub-total and grand total.
+    const rawRow = (label, group, field, fmtFn) => {
+      const cells = cols.map(mo => {
+        const camps = campsByMo[mo];
+        if (!camps.length) return `<td class="muted-cell">${fmtFn(null)}</td><td class="camp-total">${fmtFn(null)}</td>`;
+        const perCamp = camps.map(c => `<td><input class="fee-in" type="number" step="any" value="${c[group]?.[field] ?? ''}" onchange="Growth.setCampaignField('${mo}','${c.id}','${group}','${field}',this.value)"></td>`).join('');
+        const sum = camps.reduce((s, c) => s + (c[group]?.[field] || 0), 0);
+        const hasAny = camps.some(c => c[group]?.[field] != null);
+        return perCamp + `<td class="camp-total">${fmtFn(hasAny ? sum : null)}</td>`;
+      }).join('');
+      return `<tr><td>${label}</td><td>${fmtFn(tot[field] || null)}</td>${cells}</tr>`;
+    };
+    // ROI needs the monthly fee, which isn't split per campaign — so it's
+    // shown only at the month-total and grand-total level.
+    const roiRow = () => {
+      const cells = cols.map(mo => {
+        const n = Math.max(campsByMo[mo].length, 1);
+        return Array(n).fill('<td class="muted-cell">—</td>').join('') + `<td class="camp-total ${rc(aggByMo[mo].roi)}">${fmt2(aggByMo[mo].roi)}</td>`;
+      }).join('');
+      return `<tr><td>ROI</td><td class="${rc(tot.roi)}">${fmt2(tot.roi)}</td>${cells}</tr>`;
+    };
+    const spacer = () => `<tr class="tspace"><td colspan="${2 + cols.reduce((s, mo) => s + Math.max(campsByMo[mo].length, 1) + 1, 0)}"></td></tr>`;
+
+    // Fee is a monthly retainer, not per campaign — one input spanning the
+    // whole month's column group rather than duplicated per campaign.
+    let feeTotal = 0; cols.forEach(mo => feeTotal += feeFor(d, mo));
+    const feeRow = `<tr><td>Our fee</td><td>${money(feeTotal, sym)}</td>` +
+      cols.map(mo => `<td colspan="${Math.max(campsByMo[mo].length, 1) + 1}"><input class="fee-in" type="number" min="0" step="0.01" value="${d.fees[mo] ?? ''}" placeholder="${cRec()?.fee ?? ''}" onchange="Growth.setFee('${mo}',this.value)"></td>`).join('') + '</tr>';
+
     const body =
-      feeRow + spacer +
+      feeRow + spacer() +
       rawRow('Ad spend', 'ads', 'spend', a => money(a, sym)) +
-      calcRow('CPM', a => money(a.cpm, sym)) +
+      calcRow('CPM', 'cpm', a => money(a, sym)) +
       rawRow('Impressions', 'ads', 'impr', a => fmtN(a)) +
-      calcRow('Link CTR', a => fmtP2(a.ctr)) +
+      calcRow('Link CTR', 'ctr', a => fmtP2(a)) +
       rawRow('Clicks', 'ads', 'clicks', a => fmtN(a)) +
-      calcRow('Opt in %', a => fmtP2(a.optin)) +
+      calcRow('Opt in %', 'optin', a => fmtP2(a)) +
       rawRow('Leads', 'ads', 'leads', a => fmtN(a)) +
-      calcRow('Booking %', a => fmtP0(a.bookPct)) +
+      calcRow('Booking %', 'bookPct', a => fmtP0(a)) +
       rawRow('Bookings', 'pipe', 'booked', a => fmtN(a)) +
-      calcRow('Show rate %', a => fmtP0(a.showPct)) +
+      calcRow('Show rate %', 'showPct', a => fmtP0(a)) +
       rawRow('Shows', 'pipe', 'showed', a => fmtN(a)) +
-      calcRow('Close rate %', a => fmtP0(a.closePct)) +
+      calcRow('Close rate %', 'closePct', a => fmtP0(a)) +
       rawRow('Sales Made', 'pipe', 'closed', a => fmtN(a)) +
-      spacer +
-      calcRow('CAC', a => money(a.cac, sym)) +
+      spacer() +
+      calcRow('CAC', 'cac', a => money(a, sym)) +
       rawRow('Total New Revenue', 'pipe', 'rev', a => money(a, sym)) +
-      spacer +
-      calcRow('ROAS', a => fmt2(a.roas)) +
-      `<tr><td>ROI</td><td class="${rc(tot.roi)}">${fmt2(tot.roi)}</td>` + cols.map(mo => `<td class="${rc(aggByMo[mo].roi)}">${fmt2(aggByMo[mo].roi)}</td>`).join('') + '</tr>';
+      spacer() +
+      calcRow('ROAS', 'roas', a => fmt2(a)) +
+      roiRow();
 
     host.innerHTML = `
       <div class="card">
@@ -690,7 +874,9 @@
     onOpen, toggleAddClient, saveNewClient, deleteClient, showDash, openClient, switchTab,
     saveBoard, saveCurrent, addPerson, updPeriodDate, savePeriodProgress, closePeriod, removePerson,
     addGoal, toggleGoal, updateGoalText, removeGoal,
-    loadMonth, recalcMonth, saveMonth, editMonth, delMonth, setMonthField, setFee, setClientCurrency,
+    addHousekeepingTask, refreshHousekeeping,
+    loadMonth, saveMonth, editMonth, delMonth, setFee, setClientCurrency,
+    addCampaignRow, removeCampaignRow, updateCampaignField, setCampaignField,
     showReport, saveMonthNotes, backToClient,
   };
 })();
