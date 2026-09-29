@@ -196,7 +196,7 @@ let timeEntries = [];
     return `<div class="pt-project-section">
       <div class="pt-project-header" onclick="ProjectsTasks.toggleSection('${key}')">
         <span class="pt-collapse-caret">${collapsed ? '▸' : '▾'}</span>
-        <span class="pt-project-name">${project ? esc(project.name) : 'No project'}</span>
+        <span class="pt-project-name">${project ? esc(project.name) : 'Uncategorized'}</span>
         ${project ? `<span class="pt-project-status-pill">${esc(project.status)}</span>` : ''}
         <span class="pt-project-count">${doneCount}/${tasksInSection.length} done</span>
         <div class="pt-project-bar-track"><div class="pt-project-bar-fill" style="width:${pct}%"></div></div>
@@ -513,7 +513,7 @@ let timeEntries = [];
     render();
   }
   async function deleteProject() {
-    if (!editingProjectId || !confirm('Delete this project? Its tasks move to "No project".')) return;
+    if (!editingProjectId || !confirm('Delete this project? Its tasks move to "Uncategorized".')) return;
     const res = await fetch(`/api/projects/${editingProjectId}`, { method: 'DELETE' });
     if (!res.ok) return;
     projects = projects.filter(p => p.id !== editingProjectId);
