@@ -1828,10 +1828,17 @@ body::before {
 .pt-project-bar-fill { height: 100%; background: var(--green); }
 .pt-project-due { font-size: 11px; }
 .pt-task-table { border-top: 1px solid var(--border); padding: 6px 14px 12px; }
-.pt-task-row, .pt-quick-add {
+.pt-task-row, .pt-quick-add, .pt-task-col-header {
   display: grid; grid-template-columns: 20px 1fr 120px 100px 130px 60px 30px 50px;
   align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border);
 }
+.pt-task-col-header {
+  margin-bottom: 8px; padding: 0 14px 8px;
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--text3); border-bottom: 1px solid var(--border2);
+}
+.pt-sort-h { cursor: pointer; user-select: none; }
+.pt-sort-h:hover { color: var(--accent); }
 .pt-task-row-sub { padding-left: 24px; opacity: .85; }
 .pt-task-title { cursor: pointer; font-size: 12.5px; color: var(--text); }
 .pt-task-title:hover { color: var(--accent); }

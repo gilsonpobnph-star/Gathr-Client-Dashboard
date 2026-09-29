@@ -20,8 +20,13 @@ let timeEntries = [];
   let toolbarClientId = '';
   let toolbarProjectId = '';
   let toolbarAssignee = '';
+  let toolbarStatus = '';
+  let toolbarPriority = '';
+  let toolbarDueBucket = '';
   let toolbarSearch = '';
   let hideDone = false;
+  let sortField = 'due'; // 'due' | 'title' | 'status' | 'priority'
+  let sortDir = 'asc';
   let myClientsCache = [];
   let collapsedSections = {}; // UI-only, not persisted
   let editingProjectId = null;
@@ -50,6 +55,7 @@ let timeEntries = [];
       wireToolbar();
     }
     await Promise.all([loadConfig(), loadProjects(), loadTimeEntries()]);
+    populateStatusPriorityFilters();
     render();
   }
   function refresh() {
@@ -68,6 +74,14 @@ let timeEntries = [];
         <select id="pt-filter-client" class="inline-select"><option value="">All clients</option></select>
         <select id="pt-filter-project" class="inline-select"><option value="">All projects</option></select>
         <select id="pt-filter-assignee" class="inline-select"><option value="">Everyone's tasks</option></select>
+        <select id="pt-filter-status" class="inline-select"><option value="">All statuses</option></select>
+        <select id="pt-filter-priority" class="inline-select"><option value="">All priorities</option></select>
+        <select id="pt-filter-due" class="inline-select">
+          <option value="">Any due date</option>
+          <option value="overdue">Overdue</option>
+          <option value="week">Due this week</option>
+          <option value="none">No due date</option>
+        </select>
         <input id="pt-filter-search" class="pt-search" placeholder="Search tasks…">
         <label class="pt-hide-done"><input type="checkbox" id="pt-hide-done"> Hide done</label>
         <div class="pt-toolbar-spacer"></div>
@@ -76,6 +90,7 @@ let timeEntries = [];
         <button class="btn-view" style="font-size:12px;padding:6px 14px" onclick="ProjectsTasks.openProjectModal()">+ Project</button>
         <button class="btn-primary" style="font-size:12px;padding:6px 14px" onclick="openTaskModal()">+ Task</button>
       </div>
+      <div id="pt-list-col-header" class="pt-task-row pt-task-col-header"></div>
       <div id="pt-view-list" class="pt-view"></div>
       <div id="pt-view-board" class="pt-view hidden"></div>
       <div id="pt-view-health" class="pt-view hidden"></div>
@@ -98,11 +113,40 @@ let timeEntries = [];
       '<option value="__unassigned__">Unassigned</option>' +
       everyone.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
     assigneeSel.onchange = () => { toolbarAssignee = assigneeSel.value; render(); };
+
+    document.getElementById('pt-filter-status').onchange = e => { toolbarStatus = e.target.value; render(); };
+    document.getElementById('pt-filter-priority').onchange = e => { toolbarPriority = e.target.value; render(); };
+    document.getElementById('pt-filter-due').onchange = e => { toolbarDueBucket = e.target.value; render(); };
+  }
+  // Status/priority options come from taskConfig, which loads async after
+  // the toolbar's first mount — call again whenever taskConfig changes
+  // (initial load, and after the Fields manager saves).
+  function populateStatusPriorityFilters() {
+    const statusSel = document.getElementById('pt-filter-status');
+    const prioritySel = document.getElementById('pt-filter-priority');
+    if (!statusSel || !prioritySel) return;
+    const keepIfValid = (sel, current, options) => options.includes(current) ? current : '';
+    statusSel.innerHTML = '<option value="">All statuses</option>' + taskConfig.statuses.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+    prioritySel.innerHTML = '<option value="">All priorities</option>' + taskConfig.priorities.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+    toolbarStatus = keepIfValid(statusSel, toolbarStatus, taskConfig.statuses);
+    toolbarPriority = keepIfValid(prioritySel, toolbarPriority, taskConfig.priorities);
+    statusSel.value = toolbarStatus;
+    prioritySel.value = toolbarPriority;
   }
   function matchesAssignee(t) {
     if (!toolbarAssignee) return true;
     if (toolbarAssignee === '__unassigned__') return !(t.assignedTo || []).length;
     return (t.assignedTo || []).includes(toolbarAssignee);
+  }
+  function matchesDueBucket(t) {
+    if (!toolbarDueBucket) return true;
+    if (toolbarDueBucket === 'none') return !t.deadline;
+    if (!t.deadline) return false;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const dl = new Date(t.deadline + 'T00:00');
+    if (toolbarDueBucket === 'overdue') return dl < today && !t.done;
+    if (toolbarDueBucket === 'week') { const weekOut = new Date(today.getTime() + 7 * 86400000); return dl >= today && dl <= weekOut; }
+    return true;
   }
   function refreshProjectFilterOptions() {
     const sel = document.getElementById('pt-filter-project');
@@ -119,11 +163,12 @@ let timeEntries = [];
     // Project filter doesn't apply to Client Health, which is already grouped by client.
     document.getElementById('pt-filter-project').style.display = tab === 'health' ? 'none' : '';
     document.getElementById('pt-hide-done').closest('.pt-hide-done').style.display = tab === 'list' ? '' : 'none';
+    document.getElementById('pt-list-col-header').classList.toggle('hidden', tab !== 'list');
     render();
   }
 
   function render() {
-    if (activeSubTab === 'list') renderList();
+    if (activeSubTab === 'list') { renderListColHeader(); renderList(); }
     else if (activeSubTab === 'board') renderBoard();
     else renderClientHealth();
   }
@@ -135,9 +180,46 @@ let timeEntries = [];
     let list = [...myTasks];
     if (toolbarClientId) list = list.filter(t => t.clientId === toolbarClientId);
     if (toolbarProjectId) list = list.filter(t => t.projectId === toolbarProjectId);
+    if (toolbarStatus) list = list.filter(t => t.status === toolbarStatus);
+    if (toolbarPriority) list = list.filter(t => t.priority === toolbarPriority);
     if (toolbarSearch) list = list.filter(t => (t.title || '').toLowerCase().includes(toolbarSearch));
     list = list.filter(matchesAssignee);
+    list = list.filter(matchesDueBucket);
     return list;
+  }
+  function sortTasks(list) {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return [...list].sort((a, b) => {
+      let av, bv;
+      if (sortField === 'due')            { av = a.deadline || '9999-99-99'; bv = b.deadline || '9999-99-99'; }
+      else if (sortField === 'priority')  { av = taskConfig.priorities.indexOf(a.priority); bv = taskConfig.priorities.indexOf(b.priority); }
+      else if (sortField === 'status')    { av = taskConfig.statuses.indexOf(a.status); bv = taskConfig.statuses.indexOf(b.status); }
+      else                                 { av = (a.title || '').toLowerCase(); bv = (b.title || '').toLowerCase(); }
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      return 0;
+    });
+  }
+  function setSort(field) {
+    if (sortField === field) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    else { sortField = field; sortDir = 'asc'; }
+    renderListColHeader();
+    render();
+  }
+  function sortArrow(field) { return sortField === field ? (sortDir === 'asc' ? ' &#9650;' : ' &#9660;') : ''; }
+  function renderListColHeader() {
+    const el = document.getElementById('pt-list-col-header');
+    if (!el) return;
+    el.innerHTML = `
+      <span></span>
+      <span class="pt-sort-h" onclick="ProjectsTasks.setSort('title')">Task${sortArrow('title')}</span>
+      <span class="pt-sort-h" onclick="ProjectsTasks.setSort('status')">Status${sortArrow('status')}</span>
+      <span class="pt-sort-h" onclick="ProjectsTasks.setSort('priority')">Priority${sortArrow('priority')}</span>
+      <span class="pt-sort-h" onclick="ProjectsTasks.setSort('due')">Due${sortArrow('due')}</span>
+      <span>Time</span>
+      <span></span>
+      <span></span>
+    `;
   }
   function priorityColor(name) {
     const idx = taskConfig.priorities.indexOf(name);
@@ -220,7 +302,7 @@ let timeEntries = [];
         ${project ? `<button class="tda-link-btn" onclick="event.stopPropagation();ProjectsTasks.openProjectModal('${project.id}')">Edit</button>` : ''}
       </div>
       ${collapsed ? '' : `<div class="pt-task-table">
-        ${tasksInSection.map(t => taskRowHtml(t)).join('')}
+        ${sortTasks(tasksInSection).map(t => taskRowHtml(t)).join('')}
         <div class="pt-quick-add">
           <input placeholder="Add a task… (Enter)" onkeydown="if(event.key==='Enter'){event.preventDefault();ProjectsTasks.quickAdd(this,'${clientId}','${projectId}')}">
         </div>
@@ -340,8 +422,15 @@ let timeEntries = [];
   }
 
   /* ── Client Health view ────────────────────────────────────────────────── */
-  function clientOpenTasks(clientId) { return myTasks.filter(t => t.clientId === clientId && !t.parentId && !t.done).filter(matchesAssignee); }
-  function clientAllTasks(clientId)  { return myTasks.filter(t => t.clientId === clientId && !t.parentId).filter(matchesAssignee); }
+  function matchesSharedFilters(t) {
+    if (toolbarStatus && t.status !== toolbarStatus) return false;
+    if (toolbarPriority && t.priority !== toolbarPriority) return false;
+    if (!matchesAssignee(t)) return false;
+    if (!matchesDueBucket(t)) return false;
+    return true;
+  }
+  function clientOpenTasks(clientId) { return myTasks.filter(t => t.clientId === clientId && !t.parentId && !t.done).filter(matchesSharedFilters); }
+  function clientAllTasks(clientId)  { return myTasks.filter(t => t.clientId === clientId && !t.parentId).filter(matchesSharedFilters); }
 
   function renderClientHealth() {
     const el = document.getElementById('pt-view-health');
@@ -640,12 +729,13 @@ let timeEntries = [];
   async function saveFieldsManager() {
     const saved = await apiSend('/api/task-config', 'PATCH', taskConfig);
     if (saved) taskConfig = saved;
+    populateStatusPriorityFilters();
     closeFieldsManager();
     render();
   }
 
   window.ProjectsTasks = {
-    onOpen, refresh, switchSubTab,
+    onOpen, refresh, switchSubTab, setSort,
     toggleSection, quickAdd, quickToggleDone, quickSetField, quickDelete,
     boardDrop, boardQuickAdd,
     openProjectModal, closeProjectModal, saveProject, deleteProject,
