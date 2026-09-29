@@ -164,18 +164,34 @@ let timeEntries = [];
     let list = baseFiltered().filter(t => !t.parentId); // sections show top-level tasks + their subtasks inline
     if (hideDone) list = list.filter(t => !t.done);
 
+    // byClient[clientId][projectId] -> tasks[]. Seeded from tasks first...
     const byClient = {};
-    list.forEach(t => { (byClient[t.clientId || ''] = byClient[t.clientId || ''] || []).push(t); });
+    list.forEach(t => {
+      const cid = t.clientId || '';
+      byClient[cid] = byClient[cid] || {};
+      const pid = t.projectId || '';
+      (byClient[cid][pid] = byClient[cid][pid] || []).push(t);
+    });
+
+    // ...then every project matching the current filters gets its own
+    // (possibly empty) bucket too — otherwise a brand-new project with no
+    // tasks yet is invisible, which is exactly what happened here: the
+    // project existed but nothing showed until a task was added under it.
+    let projectsToShow = projects;
+    if (toolbarClientId) projectsToShow = projectsToShow.filter(p => p.clientId === toolbarClientId);
+    if (toolbarProjectId) projectsToShow = projectsToShow.filter(p => p.id === toolbarProjectId);
+    projectsToShow.forEach(p => {
+      byClient[p.clientId] = byClient[p.clientId] || {};
+      byClient[p.clientId][p.id] = byClient[p.clientId][p.id] || [];
+    });
 
     const clientIds = Object.keys(byClient);
-    if (!clientIds.length) { el.innerHTML = '<div class="task-empty">No tasks match — hit <strong>+ Task</strong> to get started.</div>'; return; }
+    if (!clientIds.length) { el.innerHTML = '<div class="task-empty">No tasks or projects match — hit <strong>+ Task</strong> or <strong>+ Project</strong> to get started.</div>'; return; }
 
     el.innerHTML = clientIds.map(cid => {
       const client = clients.find(c => c.id === cid);
       const clientName = client ? esc(client.name) : 'No client';
-      const tasksForClient = byClient[cid];
-      const byProject = {};
-      tasksForClient.forEach(t => { (byProject[t.projectId || ''] = byProject[t.projectId || ''] || []).push(t); });
+      const byProject = byClient[cid];
       const projIds = Object.keys(byProject).sort((a, b) => (a === '' ? 1 : 0) - (b === '' ? 1 : 0));
 
       return `<div class="pt-client-block">
@@ -494,7 +510,7 @@ let timeEntries = [];
   function closeProjectModal() { document.getElementById('pt-project-modal')?.classList.add('hidden'); }
   async function saveProject() {
     const name = document.getElementById('pj-name').value.trim();
-    if (!name) return;
+    if (!name) { alert('Please enter a project name.'); document.getElementById('pj-name').focus(); return; }
     const payload = {
       name,
       clientId: document.getElementById('pj-client').value,
@@ -503,10 +519,23 @@ let timeEntries = [];
       due: document.getElementById('pj-due').value,
       notes: document.getElementById('pj-notes').value,
     };
-    const saved = editingProjectId
-      ? await apiSend(`/api/projects/${editingProjectId}`, 'PATCH', payload)
-      : await apiSend('/api/projects', 'POST', payload);
-    if (!saved) return;
+    const url    = editingProjectId ? `/api/projects/${editingProjectId}` : '/api/projects';
+    const method = editingProjectId ? 'PATCH' : 'POST';
+    // Bypass the shared apiSend() here (it swallows errors and returns null)
+    // so a failed save is never silent — this is exactly what let a project
+    // creation fail with zero feedback.
+    let res, saved;
+    try {
+      res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      saved = await res.json();
+    } catch (e) {
+      alert('Could not save project — network error. Please try again.');
+      return;
+    }
+    if (!res.ok) {
+      alert(`Could not save project: ${saved?.error || res.status}`);
+      return;
+    }
     const idx = projects.findIndex(p => p.id === saved.id);
     if (idx !== -1) projects[idx] = saved; else projects.push(saved);
     closeProjectModal();
