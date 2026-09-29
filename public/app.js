@@ -734,61 +734,10 @@ async function renderMyDash() {
   document.getElementById('my-kpi-ok').textContent         = ok;
   document.getElementById('my-kpi-active-sub').textContent = 'as lead or tech';
 
-  renderClientHealthBoard('my-client-health', myClients);
-  await renderMyPriorities(myClients);
-  await initCalendar(myClients);
-  renderMyTasks();
-}
-
-async function renderMyPriorities(myClients) {
-  const el = document.getElementById('my-priorities');
-  if (!el) return;
-  el.innerHTML = '<div style="color:var(--text3);font-size:12.5px;padding:6px 0">Loading next tasks…</div>';
-
-  const tasks = [];
-  for (const c of myClients) {
-    const progs = c.programs?.length ? c.programs : (c.program ? [c.program] : []);
-    for (const prog of progs) {
-      if (!programsMap[prog]) continue;
-      const week = (c.programWeeks?.[prog]) || c.currentWeek || 1;
-      const def  = getWeekDef(prog, week);
-      if (!def || !def.items?.length) continue;
-      let fields = {};
-      try {
-        const r = await fetch(`/api/clients/${c.id}/checklist/${week}?program=${encodeURIComponent(prog)}`);
-        if (r.ok) { const d = await r.json(); fields = d.fields || {}; }
-      } catch {}
-      const ds = deadlineStatus(c);
-      const urgency = { overdue: 0, delayed: 1, 'at-risk': 2, 'on-track': 3 }[ds?.state || 'on-track'];
-      for (const item of def.items) {
-        if (!fields[item.id]) {
-          tasks.push({ client: c, prog, week, item, phase: def.phase, urgency, ds });
-        }
-      }
-    }
-  }
-
-  if (!tasks.length) {
-    el.innerHTML = `<div class="tr-all-good"><span>✅</span><span>All checklist tasks for your clients are complete!</span></div>`;
-    return;
-  }
-
-  tasks.sort((a, b) => a.urgency - b.urgency);
-  const top5 = tasks.slice(0, 5);
-
-  const urgencyColor = { 0: '#ef4444', 1: '#f97316', 2: '#f59e0b', 3: 'var(--text3)' };
-  const urgencyIcon  = { 0: '🔴', 1: '🟠', 2: '🟡', 3: '⬜' };
-
-  el.innerHTML = top5.map(t => `
-    <div class="priority-task-item" onclick="openModal('${t.client.id}')">
-      <div class="priority-task-top">
-        <span class="priority-task-icon">${urgencyIcon[t.urgency]}</span>
-        <span class="priority-task-client">${escHtml(t.client.name)}</span>
-        <span class="priority-task-badge" style="color:${urgencyColor[t.urgency]}">${t.ds?.state === 'overdue' ? 'Overdue' : t.ds?.state === 'delayed' ? 'Behind' : t.ds?.state === 'at-risk' ? 'At Risk' : 'On Track'}</span>
-      </div>
-      <div class="priority-task-label">${t.prog ? escHtml(t.prog) + ' · ' : ''}Wk ${t.week}${t.phase ? ` · ${escHtml(t.phase)}` : ''}</div>
-      <div class="priority-task-task">${escHtml(t.item.label)}</div>
-    </div>`).join('');
+  // Today's Priorities and the personal calendar were removed from My
+  // Dashboard in favor of the Projects & Tasks module below, which now owns
+  // everything under the KPI row (List/Board/Client Health sub-tabs).
+  window.ProjectsTasks && window.ProjectsTasks.onOpen(myClients);
 }
 
 /* ── My Tasks ─────────────────────────────────────────────────────────────── */
@@ -812,6 +761,10 @@ function initials(name) {
   return (name || '?').split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase();
 }
 
+// The "My Tasks" table UI is gone (superseded by the Projects & Tasks
+// module's List/Board views), but the underlying archived/active toggle is
+// a real feature worth keeping — the new module's toolbar calls this same
+// function and re-renders itself afterward.
 async function toggleArchivedTasks() {
   showArchivedTasks = !showArchivedTasks;
   const btn = document.getElementById('btn-toggle-archived');
@@ -823,54 +776,15 @@ async function toggleArchivedTasks() {
     const res = await fetch('/api/tasks');
     if (res.ok) myTasks = await res.json();
   }
-  renderMyTasks();
+  refreshTaskDependents();
 }
 
-function renderMyTasks() {
-  const el = document.getElementById('my-tasks-list');
-  if (!el) return;
-  const statusF   = document.getElementById('task-filter-status')?.value   || '';
-  const priorityF = document.getElementById('task-filter-priority')?.value || '';
-  const assigneeF = document.getElementById('task-filter-assignee')?.value || '';
-
-  let list = [...myTasks];
-  if (!showArchivedTasks) list = list.filter(t => !t.archived);
-  if (statusF)   list = list.filter(t => t.status   === statusF);
-  if (priorityF) list = list.filter(t => t.priority === priorityF);
-  if (assigneeF) list = list.filter(t => assigneeF === '__unassigned__' ? !(t.assignedTo||[]).length : (t.assignedTo||[]).includes(assigneeF));
-
-  if (!list.length) {
-    el.innerHTML = showArchivedTasks
-      ? `<div class="task-empty">No archived tasks.</div>`
-      : `<div class="task-empty">No tasks yet — hit <strong>+ New Task</strong> to get started.</div>`;
-    return;
-  }
-
-  el.innerHTML = list.map(t => {
-    const client = t.clientId ? clients.find(c => c.id === t.clientId) : null;
-    const dl     = taskDeadlineInfo(t);
-    const avatars = (t.assignedTo || []).slice(0,3).map(n =>
-      `<span class="task-avatar" title="${escHtml(n)}" style="background:${stringToColor(n)}">${initials(n)}</span>`
-    ).join('');
-    return `<div class="task-row${t.archived?' task-row-archived':''}" onclick="openTaskModal('${t.id}')">
-      <div class="task-row-name">
-        <span class="task-row-stripe" style="background:${PRIORITY_COLOR[t.priority]||'#8A7A6E'}"></span>
-        <div class="task-row-info">
-          <span class="task-row-title">${escHtml(t.title)}${t.archived?' <span class="task-archived-banner">Archived</span>':''}</span>
-          ${client ? `<span class="task-row-client">🔗 ${escHtml(client.name)}</span>` : ''}
-        </div>
-      </div>
-      <div class="task-row-col task-avatars">${avatars || '<span style="color:var(--text3);font-size:11px">—</span>'}</div>
-      <div class="task-row-col">
-        <span class="task-priority-pill" style="color:${PRIORITY_COLOR[t.priority]||'#8A7A6E'};background:${PRIORITY_COLOR[t.priority]||'#8A7A6E'}18">
-          ${PRIORITY_LABEL[t.priority]||t.priority}
-        </span>
-      </div>
-      <div class="task-row-col" style="color:${dl.color};font-size:12px;font-weight:${dl.color!=='var(--text3)'?'600':'400'}">${dl.label||'—'}</div>
-      <div class="task-row-col"><span class="task-status-pill ${STATUS_CLASS[t.status]||''}">${t.status}</span></div>
-    </div>`;
-  }).join('');
+// Keeps every UI surface that reads myTasks in sync after any task
+// mutation — the client-profile modal's task list, and (if My Dashboard's
+// Projects & Tasks module is mounted) its List/Board/Client Health views.
+function refreshTaskDependents() {
   renderClientModalTasks();
+  window.ProjectsTasks && window.ProjectsTasks.refresh();
 }
 
 function stringToColor(str) {
@@ -880,9 +794,61 @@ function stringToColor(str) {
   return `hsl(${h},45%,35%)`;
 }
 
-document.getElementById('task-filter-status')?.addEventListener('change', renderMyTasks);
-document.getElementById('task-filter-priority')?.addEventListener('change', renderMyTasks);
-document.getElementById('task-filter-assignee')?.addEventListener('change', renderMyTasks);
+/* ── Task timer ───────────────────────────────────────────────────────────── *
+ * Global, single-timer-at-a-time model, kept here (not in projects.js) so the
+ * sidebar pill and the task modal's Start/Stop button both reach it as a
+ * plain global — the sidebar pill is visible from every tab, not just My
+ * Dashboard, so it can't live inside projects.js's module closure. */
+let activeTimer = null; // {taskId, startTs} — not a time entry until stopped
+let timerTickInterval = null;
+
+function startTaskTimer(taskId) {
+  if (activeTimer && activeTimer.taskId !== taskId) stopTaskTimer();
+  activeTimer = { taskId, startTs: Date.now() };
+  renderTimerPill();
+  if (!timerTickInterval) timerTickInterval = setInterval(renderTimerPill, 1000);
+}
+async function stopTaskTimer() {
+  if (!activeTimer) return;
+  const { taskId, startTs } = activeTimer;
+  const endTs = Date.now();
+  activeTimer = null;
+  if (timerTickInterval) { clearInterval(timerTickInterval); timerTickInterval = null; }
+  renderTimerPill();
+  // Guards against accidental start/stop clicks the same way the server
+  // does — under 5 seconds isn't worth a saved entry.
+  if (endTs - startTs < 5000) return;
+  const res = await fetch('/api/time-entries', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ taskId, start: startTs, end: endTs }),
+  });
+  if (!res.ok) return;
+  const entry = await res.json();
+  if (typeof timeEntries !== 'undefined') timeEntries.push(entry);
+  if (editingTaskId === taskId) renderTaskTimeSummary(myTasks.find(x => x.id === taskId));
+  window.ProjectsTasks && window.ProjectsTasks.refresh();
+}
+function toggleTaskTimer(taskId) {
+  taskId = taskId || editingTaskId;
+  if (!taskId) return;
+  if (activeTimer && activeTimer.taskId === taskId) stopTaskTimer();
+  else startTaskTimer(taskId);
+}
+function renderTimerPill() {
+  const pill = document.getElementById('sidebar-timer-pill');
+  if (!pill) return;
+  if (!activeTimer) {
+    pill.classList.add('hidden');
+    if (document.getElementById('task-timer-btn')) renderTaskTimeSummary(myTasks.find(x => x.id === editingTaskId));
+    return;
+  }
+  pill.classList.remove('hidden');
+  const t = myTasks.find(x => x.id === activeTimer.taskId);
+  const secs = Math.floor((Date.now() - activeTimer.startTs) / 1000);
+  document.getElementById('sidebar-timer-label').textContent = t?.title || 'Task';
+  document.getElementById('sidebar-timer-duration').textContent = fmtDuration(secs);
+  if (editingTaskId === activeTimer.taskId) renderTaskTimeSummary(t);
+}
 
 // presetClientId locks the client picker to one client — used when a task
 // is started from that client's own profile, so it's automatically linked
@@ -905,25 +871,240 @@ function rteLink(editorId) {
   if (el) el.focus();
   document.execCommand('createLink', false, url);
 }
+// execCommand('fontSize') only supports the legacy 1-7 scale and emits
+// <font size="N">, which most editors then can't resize further — the
+// standard workaround is to apply it with a throwaway size, then swap the
+// <font> tags it produced for <span style="font-size:...">.
+function rteFontSize(editorId, px) {
+  const el = document.getElementById(editorId);
+  if (el) el.focus();
+  document.execCommand('fontSize', false, '7');
+  el.querySelectorAll('font[size="7"]').forEach(f => {
+    const span = document.createElement('span');
+    span.style.fontSize = px + 'px';
+    span.innerHTML = f.innerHTML;
+    f.replaceWith(span);
+  });
+}
+function rteColor(editorId, cmd, color) {
+  const el = document.getElementById(editorId);
+  if (el) el.focus();
+  document.execCommand(cmd, false, color);
+}
 
-function openTaskModal(taskId, presetClientId, growthRef) {
+// Renders the field-type-specific input for one custom field row inside the
+// task modal's right rail — `value` is whatever's currently in task.custom.
+function renderCustomFieldInput(col, value) {
+  const id = `task-custom-${col.id}`;
+  if (col.type === 'checkbox') return `<input id="${id}" type="checkbox" ${value ? 'checked' : ''}>`;
+  if (col.type === 'select')   return `<select id="${id}" class="tdp-pill-select">${(col.options||[]).map(o => `<option value="${escHtml(o)}" ${value===o?'selected':''}>${escHtml(o)}</option>`).join('')}</select>`;
+  if (col.type === 'date')     return `<input id="${id}" type="date" class="tdp-pill-select" value="${escHtml(value||'')}">`;
+  if (col.type === 'number')   return `<input id="${id}" type="number" class="tdp-pill-select" value="${value!=null?value:''}">`;
+  return `<input id="${id}" class="tdp-pill-select" value="${escHtml(value||'')}">`;
+}
+function renderTaskCustomFields(t) {
+  const wrap = document.getElementById('task-custom-fields');
+  if (!wrap) return;
+  const cols = (typeof taskConfig !== 'undefined' && taskConfig.columns) || [];
+  wrap.innerHTML = cols.map(col => `<div class="tdp-field-group">
+    <span class="tdp-field-label">${escHtml(col.label)}</span>
+    ${renderCustomFieldInput(col, t?.custom ? t.custom[col.id] : undefined)}
+  </div>`).join('');
+}
+function collectTaskCustomFields() {
+  const cols = (typeof taskConfig !== 'undefined' && taskConfig.columns) || [];
+  const out = {};
+  cols.forEach(col => {
+    const el = document.getElementById(`task-custom-${col.id}`);
+    if (!el) return;
+    out[col.id] = col.type === 'checkbox' ? el.checked : el.value;
+  });
+  return out;
+}
+
+function renderTaskBreadcrumb(t) {
+  const el = document.getElementById('task-breadcrumb');
+  if (!el) return;
+  const parts = [];
+  const client = t?.clientId ? clients.find(c => c.id === t.clientId) : null;
+  if (client) parts.push(escHtml(client.name));
+  const project = t?.projectId && typeof projects !== 'undefined' ? projects.find(p => p.id === t.projectId) : null;
+  if (project) parts.push(escHtml(project.name));
+  const parent = t?.parentId ? myTasks.find(x => x.id === t.parentId) : null;
+  if (parent) parts.push(`Subtask of ${escHtml(parent.title)}`);
+  el.innerHTML = parts.length ? parts.join(' <span class="tdp-breadcrumb-sep">/</span> ') : '';
+}
+
+function renderTaskSubtasks(t) {
+  const wrap = document.getElementById('task-subtasks-wrap');
+  const list = document.getElementById('task-subtasks-list');
+  if (!wrap || !list) return;
+  // Only top-level tasks show a subtasks section — one level deep only.
+  if (!t || t.parentId) { wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  const subs = myTasks.filter(x => x.parentId === t.id);
+  const last = (typeof taskConfig !== 'undefined' && taskConfig.statuses[taskConfig.statuses.length - 1]) || 'Done';
+  list.innerHTML = subs.length ? subs.map(s => `<div class="tdp-subtask-row">
+    <input type="checkbox" ${s.status===last?'checked':''} onchange="toggleSubtaskDone('${s.id}', this.checked)">
+    <span class="tdp-subtask-title" contenteditable="true" onblur="renameSubtask('${s.id}', this.textContent)">${escHtml(s.title)}</span>
+    <button class="tda-link-btn" onclick="deleteSubtask('${s.id}')">delete</button>
+  </div>`).join('') : '<div style="color:var(--text3);font-size:12px;padding:4px 0">No subtasks yet.</div>';
+}
+async function addSubtask() {
+  if (!editingTaskId) return;
+  const input = document.getElementById('task-subtask-input');
+  const title = input?.value.trim();
+  if (!title) return;
+  const parent = myTasks.find(x => x.id === editingTaskId);
+  const res = await fetch('/api/tasks', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title, parentId: editingTaskId, clientId: parent?.clientId || '', projectId: parent?.projectId || '' }),
+  });
+  if (!res.ok) return;
+  const saved = await res.json();
+  myTasks.push(saved);
+  input.value = '';
+  renderTaskSubtasks(parent);
+  refreshTaskDependents();
+}
+async function toggleSubtaskDone(id, checked) {
+  const res = await fetch(`/api/tasks/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ done: checked }) });
+  if (!res.ok) return;
+  const saved = await res.json();
+  const idx = myTasks.findIndex(x => x.id === id);
+  if (idx !== -1) myTasks[idx] = saved;
+  renderTaskSubtasks(myTasks.find(x => x.id === editingTaskId));
+  refreshTaskDependents();
+}
+async function renameSubtask(id, title) {
+  title = (title || '').trim();
+  if (!title) return;
+  const res = await fetch(`/api/tasks/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title }) });
+  if (!res.ok) return;
+  const saved = await res.json();
+  const idx = myTasks.findIndex(x => x.id === id);
+  if (idx !== -1) myTasks[idx] = saved;
+  refreshTaskDependents();
+}
+async function deleteSubtask(id) {
+  if (!confirm('Delete this subtask?')) return;
+  const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+  if (!res.ok) return;
+  myTasks = myTasks.filter(x => x.id !== id);
+  renderTaskSubtasks(myTasks.find(x => x.id === editingTaskId));
+  refreshTaskDependents();
+}
+
+function renderTaskLinks(t) {
+  const list = document.getElementById('task-links-list');
+  if (!list) return;
+  const links = t?.links || [];
+  list.innerHTML = links.length ? links.map((l, i) => `<div class="tdp-link-row">
+    <a href="${escHtml(l.url)}" target="_blank" rel="noopener">${escHtml(l.label || l.url)}</a>
+    <button class="tda-link-btn" onclick="removeTaskLink(${i})">remove</button>
+  </div>`).join('') : '<div style="color:var(--text3);font-size:12px;padding:4px 0">No links yet.</div>';
+}
+async function addTaskLink() {
+  if (!editingTaskId) return;
+  const labelEl = document.getElementById('task-link-label');
+  const urlEl   = document.getElementById('task-link-url');
+  const url = urlEl?.value.trim();
+  if (!url) return;
+  const t = myTasks.find(x => x.id === editingTaskId);
+  const links = [...(t?.links || []), { label: labelEl?.value.trim() || url, url }];
+  const res = await fetch(`/api/tasks/${editingTaskId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ links }) });
+  if (!res.ok) return;
+  const saved = await res.json();
+  const idx = myTasks.findIndex(x => x.id === editingTaskId);
+  if (idx !== -1) myTasks[idx] = saved;
+  labelEl.value = ''; urlEl.value = '';
+  renderTaskLinks(saved);
+  refreshTaskDependents();
+}
+async function removeTaskLink(index) {
+  const t = myTasks.find(x => x.id === editingTaskId);
+  const links = (t?.links || []).filter((_, i) => i !== index);
+  const res = await fetch(`/api/tasks/${editingTaskId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ links }) });
+  if (!res.ok) return;
+  const saved = await res.json();
+  const idx = myTasks.findIndex(x => x.id === editingTaskId);
+  if (idx !== -1) myTasks[idx] = saved;
+  renderTaskLinks(saved);
+  refreshTaskDependents();
+}
+
+function renderTaskLog(t) {
+  const el = document.getElementById('task-log-feed');
+  if (!el) return;
+  const entries = [...(t?.log || [])].sort((a, b) => new Date(b.t) - new Date(a.t)).slice(0, 12);
+  el.innerHTML = entries.length ? entries.map(e => `<div class="tdp-log-row">
+    <span class="tdp-log-text">${escHtml(e.text)}</span>
+    <span class="tdp-log-date">${new Date(e.t).toLocaleDateString('en-GB', { day:'numeric', month:'short' })}</span>
+  </div>`).join('') : '<div style="color:var(--text3);font-size:12px;padding:4px 0">No changes logged yet.</div>';
+}
+
+function fmtDuration(secs) {
+  const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60);
+  return `${h}h ${m}m`;
+}
+function renderTaskTimeSummary(t) {
+  const totalEl = document.getElementById('task-time-total');
+  const btn = document.getElementById('task-timer-btn');
+  const barWrap = document.getElementById('task-estimate-bar-wrap');
+  const barFill = document.getElementById('task-estimate-bar-fill');
+  if (!totalEl || !t) return;
+  const entries = (typeof timeEntries !== 'undefined' ? timeEntries : []).filter(e => e.taskId === t.id);
+  const totalSecs = entries.reduce((s, e) => s + (e.secs || 0), 0);
+  totalEl.textContent = fmtDuration(totalSecs);
+  const running = typeof activeTimer !== 'undefined' && activeTimer && activeTimer.taskId === t.id;
+  if (btn) btn.textContent = running ? 'Stop timer' : 'Start timer';
+  if (t.estimate) {
+    barWrap.classList.remove('hidden');
+    const pct = Math.min(100, Math.round((totalSecs / 3600 / t.estimate) * 100));
+    barFill.style.width = pct + '%';
+    barFill.style.background = pct >= 100 ? '#ef4444' : 'var(--accent)';
+  } else if (barWrap) {
+    barWrap.classList.add('hidden');
+  }
+}
+
+function openTaskModal(taskId, presetClientId, growthRef, presetProjectId) {
   editingTaskId = taskId || null;
   taskGrowthRef = (!taskId && growthRef) ? growthRef : null;
   const t       = taskId ? myTasks.find(x => x.id === taskId) : null;
   const isAdmin = currentUser.role === 'admin';
   const myName  = currentUser.name || '';
+  const cfg     = typeof taskConfig !== 'undefined' ? taskConfig : { statuses: ['To Do','In Progress','Done'], priorities: ['Low','Medium','High'] };
 
   document.getElementById('task-title').value    = t?.title       || '';
   document.getElementById('task-desc').innerHTML = t?.description || '';
-  document.getElementById('task-priority').value = t?.priority    || 'Medium';
   document.getElementById('task-deadline').value = t?.deadline    || '';
-  document.getElementById('task-status').value   = t?.status      || 'To Do';
+  document.getElementById('task-estimate').value = t?.estimate != null ? t.estimate : '';
+  document.getElementById('task-tags').value     = t?.tags        || '';
+
+  const statusSel = document.getElementById('task-status');
+  statusSel.innerHTML = cfg.statuses.map(s => `<option value="${escHtml(s)}" ${(t?.status||cfg.statuses[0])===s?'selected':''}>${escHtml(s)}</option>`).join('');
+  const prioritySel = document.getElementById('task-priority');
+  prioritySel.innerHTML = cfg.priorities.map(p => `<option value="${escHtml(p)}" ${(t?.priority||cfg.priorities[0])===p?'selected':''}>${escHtml(p)}</option>`).join('');
 
   const clientSel = document.getElementById('task-client');
   const lockClient = !!(presetClientId && !taskId);
+  const activeClientId = t?.clientId || (lockClient ? presetClientId : '');
   clientSel.innerHTML = '<option value="">— No client —</option>' +
-    clients.map(c => `<option value="${c.id}" ${(t?.clientId || (lockClient ? presetClientId : ''))===c.id?'selected':''}>${escHtml(c.name)}${c.businessName?' – '+escHtml(c.businessName):''}</option>`).join('');
+    clients.map(c => `<option value="${c.id}" ${activeClientId===c.id?'selected':''}>${escHtml(c.name)}${c.businessName?' – '+escHtml(c.businessName):''}</option>`).join('');
   clientSel.disabled = lockClient;
+
+  const projectSel = document.getElementById('task-project');
+  const allProjects = typeof projects !== 'undefined' ? projects : [];
+  const scoped = activeClientId ? allProjects.filter(p => p.clientId === activeClientId) : allProjects;
+  const activeProjectId = t?.projectId || (!taskId ? (presetProjectId || '') : '');
+  projectSel.innerHTML = '<option value="">— No project —</option>' +
+    scoped.map(p => `<option value="${p.id}" ${activeProjectId===p.id?'selected':''}>${escHtml(p.name)}</option>`).join('');
+  clientSel.onchange = () => {
+    const cid = clientSel.value;
+    const list = cid ? allProjects.filter(p => p.clientId === cid) : allProjects;
+    projectSel.innerHTML = '<option value="">— No project —</option>' + list.map(p => `<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
+  };
 
   const renderMemberPicks = (containerId, selected) => {
     const all = [...new Set([...team, myName])].filter(Boolean);
@@ -951,7 +1132,13 @@ function openTaskModal(taskId, presetClientId, growthRef) {
     archiveBtn.textContent = t?.archived ? 'Unarchive' : 'Archive';
   }
 
+  renderTaskBreadcrumb(t);
+  renderTaskCustomFields(t);
+  renderTaskSubtasks(t);
+  renderTaskLinks(t);
   renderTaskActivity(t);
+  renderTaskLog(t);
+  renderTaskTimeSummary(t);
 
   document.getElementById('task-modal').classList.remove('hidden');
   document.getElementById('task-title').focus();
@@ -1219,6 +1406,10 @@ async function saveTask() {
     status:      document.getElementById('task-status').value,
     deadline:    document.getElementById('task-deadline').value,
     clientId:    document.getElementById('task-client').value,
+    projectId:   document.getElementById('task-project').value,
+    estimate:    document.getElementById('task-estimate').value ? Number(document.getElementById('task-estimate').value) : null,
+    tags:        document.getElementById('task-tags').value.trim(),
+    custom:      collectTaskCustomFields(),
     assignedTo,
     sharedWith,
     ...(taskGrowthRef ? { growthClientId: taskGrowthRef.growthClientId, growthPeriodId: taskGrowthRef.growthPeriodId } : {}),
@@ -1246,7 +1437,7 @@ async function saveTask() {
     myTasks.push(saved);
   }
   closeTaskModal();
-  renderMyTasks();
+  refreshTaskDependents();
 }
 
 async function deleteTask() {
@@ -1257,7 +1448,7 @@ async function deleteTask() {
   if (!res.ok) return;
   myTasks = myTasks.filter(x => x.id !== editingTaskId);
   closeTaskModal();
-  renderMyTasks();
+  refreshTaskDependents();
 }
 
 async function archiveTask() {
@@ -1276,7 +1467,7 @@ async function archiveTask() {
   if (idx !== -1) myTasks[idx] = saved;
   closeTaskModal();
   if (!showArchivedTasks) myTasks = myTasks.filter(x => !x.archived);
-  renderMyTasks();
+  refreshTaskDependents();
 }
 
 async function postTaskComment() {
@@ -1295,155 +1486,13 @@ async function postTaskComment() {
   if (idx !== -1) myTasks[idx] = data.task;
   if (input) input.value = '';
   renderTaskActivity(data.task);
-  renderMyTasks();
+  refreshTaskDependents();
 }
 
-/* ── Calendar ─────────────────────────────────────────────────────────────── */
-let calYear, calMonth, calEntries = [], calSelectedDate = null, calMyClients = [];
-
+// The personal calendar widget (My Dashboard) was removed per the Projects
+// & Tasks rebuild — Team Calendar below shares the same /api/calendar
+// backend and is untouched, so toYMD stays (it's still used there).
 function toYMD(d) { return d.toISOString().slice(0,10); }
-
-async function initCalendar(myClients) {
-  calMyClients = myClients;
-  const now = new Date();
-  if (!calYear) { calYear = now.getFullYear(); calMonth = now.getMonth(); }
-  calEntries = await fetchCalendarEntries(calYear, calMonth);
-  renderCalendar();
-  // default select today
-  const todayStr = toYMD(now);
-  selectCalDay(todayStr);
-}
-
-async function fetchCalendarEntries(year, month) {
-  const from = `${year}-${String(month+1).padStart(2,'0')}-01`;
-  const last = new Date(year, month+1, 0);
-  const to   = toYMD(last);
-  const res  = await fetch(`/api/calendar?from=${from}&to=${to}`);
-  return res.ok ? res.json() : [];
-}
-
-function calNav(dir) {
-  calMonth += dir;
-  if (calMonth > 11) { calMonth = 0; calYear++; }
-  if (calMonth < 0)  { calMonth = 11; calYear--; }
-  fetchCalendarEntries(calYear, calMonth).then(e => { calEntries = e; renderCalendar(); });
-}
-
-function renderCalendar() {
-  const label = new Date(calYear, calMonth, 1).toLocaleDateString('en-AU', { month: 'long', year: 'numeric' });
-  document.getElementById('cal-month-label').textContent = label;
-
-  const firstDay = new Date(calYear, calMonth, 1).getDay();
-  const daysInMonth = new Date(calYear, calMonth+1, 0).getDate();
-  const todayStr = toYMD(new Date());
-
-  // Build map of date → entries count
-  const entryMap = {};
-  calEntries.forEach(e => { entryMap[e.date] = (entryMap[e.date] || 0) + 1; });
-  // Build map of date → has deliverables (client week start)
-  const delivMap = {};
-  calMyClients.forEach(c => {
-    if (!c.startDate || !c.program) return;
-    const start = new Date(c.startDate);
-    if (isNaN(start)) return;
-    const dur = progDuration(c.program);
-    for (let w = 1; w <= dur; w++) {
-      const weekStart = new Date(start.getTime() + (w-1)*7*24*60*60*1000);
-      const d = toYMD(weekStart);
-      if (d.startsWith(`${calYear}-${String(calMonth+1).padStart(2,'0')}`)) {
-        delivMap[d] = (delivMap[d] || 0) + 1;
-      }
-    }
-  });
-
-  let html = '';
-  for (let i = 0; i < firstDay; i++) html += '<div class="cal-cell cal-cell-empty"></div>';
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const isToday    = dateStr === todayStr;
-    const isSelected = dateStr === calSelectedDate;
-    const hasEntry   = entryMap[dateStr] > 0;
-    const hasDeliv   = delivMap[dateStr] > 0;
-    html += `<div class="cal-cell${isToday?' cal-today':''}${isSelected?' cal-selected':''}" onclick="selectCalDay('${dateStr}')">
-      <span class="cal-day-num">${d}</span>
-      <div class="cal-dots">
-        ${hasEntry ? '<span class="cal-dot cal-dot-log"></span>' : ''}
-        ${hasDeliv ? '<span class="cal-dot cal-dot-deliv"></span>' : ''}
-      </div>
-    </div>`;
-  }
-  document.getElementById('cal-grid').innerHTML = html;
-}
-
-function selectCalDay(dateStr) {
-  calSelectedDate = dateStr;
-  renderCalendar();
-  const panel     = document.getElementById('cal-day-panel');
-  const titleEl   = document.getElementById('cal-day-panel-title');
-  const entriesEl = document.getElementById('cal-day-entries');
-  const addRow    = document.getElementById('cal-add-row');
-  const d = new Date(dateStr + 'T00:00:00');
-  titleEl.textContent = d.toLocaleDateString('en-AU', { weekday:'long', day:'numeric', month:'long' });
-  addRow.style.display = 'flex';
-
-  // Entries for this day
-  const dayEntries = calEntries.filter(e => e.date === dateStr);
-  // Deliverables for this day
-  const dayDelivs = [];
-  calMyClients.forEach(c => {
-    if (!c.startDate || !c.program) return;
-    const start = new Date(c.startDate);
-    if (isNaN(start)) return;
-    const dur = progDuration(c.program);
-    for (let w = 1; w <= dur; w++) {
-      const weekStart = toYMD(new Date(start.getTime() + (w-1)*7*24*60*60*1000));
-      if (weekStart === dateStr) {
-        const def = getWeekDef(c.program, w);
-        dayDelivs.push({ client: c.name, week: w, items: def?.items || [], phase: def?.phase || '' });
-      }
-    }
-  });
-
-  let html = '';
-  if (!dayEntries.length && !dayDelivs.length) {
-    html = '<div class="cal-no-entries">No entries yet. Log what you worked on today.</div>';
-  }
-  dayEntries.forEach(e => {
-    html += `<div class="cal-entry-item">
-      <div class="cal-entry-text">${escHtml(e.text)}</div>
-      <button class="cal-entry-del" onclick="deleteCalEntry('${e.id}')">✕</button>
-    </div>`;
-  });
-  dayDelivs.forEach(d => {
-    html += `<div class="cal-deliv-block">
-      <div class="cal-deliv-title">📋 ${escHtml(d.client)} — Wk ${d.week}${d.phase ? ` · ${escHtml(d.phase)}` : ''}</div>
-      ${d.items.length ? d.items.map(i => `<div class="cal-deliv-item">· ${escHtml(i.label)}</div>`).join('') : '<div class="cal-deliv-item" style="color:var(--text3)">No checklist items defined.</div>'}
-    </div>`;
-  });
-  entriesEl.innerHTML = html;
-}
-
-async function submitCalEntry() {
-  const text = document.getElementById('cal-entry-text').value.trim();
-  if (!text) return;
-  const res = await fetch('/api/calendar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ date: calSelectedDate, text, type: 'log' }) });
-  if (res.ok) {
-    const entry = await res.json();
-    calEntries.push(entry);
-    document.getElementById('cal-entry-text').value = '';
-    renderCalendar();
-    selectCalDay(calSelectedDate);
-  }
-}
-
-async function deleteCalEntry(id) {
-  const res = await fetch(`/api/calendar/${id}`, { method:'DELETE' });
-  if (res.ok) {
-    calEntries = calEntries.filter(e => e.id !== id);
-    renderCalendar();
-    selectCalDay(calSelectedDate);
-  }
-}
 
 /* ── Team Calendar (admin-only tab) ───────────────────────────────────────── */
 let teamCalYear, teamCalMonth, teamCalEntries = [];

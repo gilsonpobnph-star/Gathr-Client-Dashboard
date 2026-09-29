@@ -811,7 +811,37 @@ app.post('/api/chat/dm/start', requireAuth, (req, res) => {
 });
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────
-function ensureTasks(store) { if (!store.tasks) store.tasks = {}; }
+// Backfills every field the Projects & Tasks module needs so older tasks
+// (or ones created before a given field existed) always have a safe default
+// — there are zero real tasks in production as of this module's build, so
+// this is pure future-proofing, not an active migration.
+function ensureTasks(store) {
+  if (!store.tasks) store.tasks = {};
+  Object.values(store.tasks).forEach(t => {
+    if (t.projectId === undefined) t.projectId = '';
+    if (t.parentId === undefined) t.parentId = null;
+    if (t.done === undefined) t.done = false;
+    if (t.completedAt === undefined) t.completedAt = '';
+    if (t.estimate === undefined) t.estimate = null;
+    if (t.tags === undefined) t.tags = '';
+    if (!t.custom) t.custom = {};
+    if (!t.links) t.links = [];
+    if (!t.log) t.log = [];
+  });
+}
+
+function ensureTaskConfig(store) {
+  if (!store.taskConfig) store.taskConfig = {};
+  // Seeded from what the UI already used before this module existed, so
+  // the "last status = done" convention lines up with the "Done" status
+  // that was already hardcoded everywhere.
+  if (!Array.isArray(store.taskConfig.statuses) || !store.taskConfig.statuses.length) store.taskConfig.statuses = ['To Do', 'In Progress', 'Done'];
+  if (!Array.isArray(store.taskConfig.priorities) || !store.taskConfig.priorities.length) store.taskConfig.priorities = ['Low', 'Medium', 'High'];
+  if (!Array.isArray(store.taskConfig.columns)) store.taskConfig.columns = [];
+}
+
+function ensureProjects(store) { if (!store.projects) store.projects = {}; }
+function ensureTimeEntries(store) { if (!store.timeEntries) store.timeEntries = {}; }
 
 // Tasks are visible to every logged-in team member by default — assignedTo
 // / sharedWith still track who's actually responsible, they just no longer
@@ -820,6 +850,145 @@ function ensureTasks(store) { if (!store.tasks) store.tasks = {}; }
 function canSeeTask(task, session) {
   return true;
 }
+
+// Keeps `done`/`completedAt`/`status` in sync no matter which side of the
+// pair a request changes — a direct done-checkbox toggle is really just a
+// shortcut for snapping status to the first/last configured status, and a
+// status change into/out of the last status is really just a shortcut for
+// toggling done. If a request sets both, status wins (matches the done
+// checkbox being presented as a status shortcut, not an independent field).
+function syncTaskDoneState(task, patch, statuses) {
+  const last = statuses[statuses.length - 1];
+  const first = statuses[0];
+  if (patch.status !== undefined) {
+    task.status = patch.status;
+    if (task.status === last) { task.done = true; task.completedAt = new Date().toISOString(); }
+    else { task.done = false; task.completedAt = ''; }
+  } else if (patch.done !== undefined) {
+    task.done = !!patch.done;
+    task.status = task.done ? last : first;
+    task.completedAt = task.done ? new Date().toISOString() : '';
+  }
+}
+
+// Appends a short one-line activity entry only for the fields the handoff
+// spec calls out (status/priority/due date) — title, description and
+// custom-field edits stay silent so the log doesn't turn into noise.
+function logTaskChange(task, field, label, before, after) {
+  if (before === after) return;
+  task.log = task.log || [];
+  task.log.push({ t: new Date().toISOString(), text: `${label}: ${before || '—'} to ${after || '—'}` });
+}
+
+app.get('/api/task-config', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureTaskConfig(store);
+  res.json(store.taskConfig);
+});
+
+app.patch('/api/task-config', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureTaskConfig(store);
+  ['statuses', 'priorities', 'columns'].forEach(k => {
+    if (Array.isArray(req.body[k])) store.taskConfig[k] = req.body[k];
+  });
+  writeStore(store);
+  res.json(store.taskConfig);
+});
+
+app.get('/api/projects', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureProjects(store);
+  let list = Object.values(store.projects);
+  if (req.query.clientId) list = list.filter(p => p.clientId === req.query.clientId);
+  res.json(list);
+});
+
+app.post('/api/projects', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureProjects(store);
+  const id = 'proj_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  const project = {
+    id,
+    clientId: req.body.clientId || '',
+    name:     req.body.name     || 'Untitled project',
+    status:   req.body.status   || 'planned',
+    start:    req.body.start    || '',
+    due:      req.body.due      || '',
+    notes:    req.body.notes    || '',
+    createdAt: new Date().toISOString(),
+  };
+  store.projects[id] = project;
+  writeStore(store);
+  res.json(project);
+});
+
+app.patch('/api/projects/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureProjects(store);
+  const project = store.projects[req.params.id];
+  if (!project) return res.status(404).json({ error: 'Not found' });
+  ['clientId', 'name', 'status', 'start', 'due', 'notes'].forEach(k => { if (req.body[k] !== undefined) project[k] = req.body[k]; });
+  store.projects[req.params.id] = project;
+  writeStore(store);
+  res.json(project);
+});
+
+app.delete('/api/projects/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureProjects(store);
+  ensureTasks(store);
+  if (!store.projects[req.params.id]) return res.status(404).json({ error: 'Not found' });
+  // Cascade to "No project" rather than deleting the tasks themselves.
+  Object.values(store.tasks).forEach(t => { if (t.projectId === req.params.id) t.projectId = ''; });
+  delete store.projects[req.params.id];
+  writeStore(store);
+  res.json({ ok: true });
+});
+
+app.get('/api/time-entries', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureTimeEntries(store);
+  let list = Object.values(store.timeEntries);
+  if (req.query.taskId) list = list.filter(e => e.taskId === req.query.taskId);
+  if (req.query.clientId) list = list.filter(e => e.clientId === req.query.clientId);
+  res.json(list);
+});
+
+app.post('/api/time-entries', requireAuth, (req, res) => {
+  const { taskId, start, end, note } = req.body;
+  const secs = Math.round((Number(end) - Number(start)) / 1000);
+  // Guards against accidental start/stop clicks the same way a real
+  // stopwatch app would, rather than saving a near-zero-length entry.
+  if (!taskId || !start || !end || secs < 5) return res.status(400).json({ error: 'Entry too short or invalid' });
+  const store = readStore();
+  ensureTimeEntries(store);
+  ensureTasks(store);
+  const task = store.tasks[taskId];
+  if (!task) return res.status(404).json({ error: 'Task not found' });
+  const id = 'time_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
+  const entry = {
+    id, taskId,
+    clientId: task.clientId || '',
+    projectId: task.projectId || '',
+    date: new Date(Number(start)).toISOString().slice(0, 10),
+    start: Number(start), end: Number(end), secs,
+    note: note || '',
+    billed: null,
+  };
+  store.timeEntries[id] = entry;
+  writeStore(store);
+  res.json(entry);
+});
+
+app.delete('/api/time-entries/:id', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureTimeEntries(store);
+  if (!store.timeEntries[req.params.id]) return res.status(404).json({ error: 'Not found' });
+  delete store.timeEntries[req.params.id];
+  writeStore(store);
+  res.json({ ok: true });
+});
 
 app.get('/api/tasks', requireAuth, (req, res) => {
   const store = readStore();
@@ -835,6 +1004,7 @@ app.get('/api/tasks', requireAuth, (req, res) => {
 app.post('/api/tasks', requireAuth, (req, res) => {
   const store = readStore();
   ensureTasks(store);
+  ensureTaskConfig(store);
   const id = 'task_' + Date.now() + '_' + Math.random().toString(36).slice(2, 7);
   const task = {
     id,
@@ -843,10 +1013,12 @@ app.post('/api/tasks', requireAuth, (req, res) => {
     // the same way Knowledge Base docs are, since it's stored and later
     // rendered as HTML.
     description: sanitizeDocHtml(req.body.description || ''),
-    priority:    req.body.priority     || 'Medium',
-    status:      req.body.status       || 'To Do',
+    priority:    req.body.priority     || store.taskConfig.priorities[0],
+    status:      req.body.status       || store.taskConfig.statuses[0],
     deadline:    req.body.deadline     || '',
     clientId:    req.body.clientId     || '',
+    projectId:   req.body.projectId    || '',
+    parentId:    req.body.parentId     || null,
     // Optional link back to a Growth client + period — set only when a task
     // is created as "housekeeping" from inside the Growth tab, so it can be
     // filtered back onto that period while still being a completely normal
@@ -855,11 +1027,22 @@ app.post('/api/tasks', requireAuth, (req, res) => {
     growthPeriodId: req.body.growthPeriodId || '',
     assignedTo:  Array.isArray(req.body.assignedTo) ? req.body.assignedTo : [],
     sharedWith:  Array.isArray(req.body.sharedWith) ? req.body.sharedWith : [],
+    estimate:    req.body.estimate != null ? Number(req.body.estimate) : null,
+    tags:        req.body.tags || '',
+    custom:      req.body.custom && typeof req.body.custom === 'object' ? req.body.custom : {},
+    links:       Array.isArray(req.body.links) ? req.body.links : [],
+    done:        false,
+    completedAt: '',
+    log:         [],
     createdBy:   req.session.name      || 'Admin',
     createdAt:   new Date().toISOString(),
     updatedAt:   new Date().toISOString(),
     archived:    false,
   };
+  if (task.status === store.taskConfig.statuses[store.taskConfig.statuses.length - 1]) {
+    task.done = true;
+    task.completedAt = task.createdAt;
+  }
   store.tasks[id] = task;
   logActivity(store, req, 'Task created', { details: task.title });
   writeStore(store);
@@ -869,11 +1052,37 @@ app.post('/api/tasks', requireAuth, (req, res) => {
 app.patch('/api/tasks/:id', requireAuth, (req, res) => {
   const store = readStore();
   ensureTasks(store);
+  ensureTaskConfig(store);
   const task = store.tasks[req.params.id];
   if (!task) return res.status(404).json({ error: 'Not found' });
   if (!canSeeTask(task, req.session)) return res.status(403).json({ error: 'Forbidden' });
-  const allowed = ['title','description','priority','status','deadline','clientId','growthClientId','growthPeriodId','assignedTo','sharedWith','archived'];
+
+  // Log status/priority/deadline changes before they're overwritten below —
+  // title, description and custom-field edits stay silent by design.
+  if (req.body.status !== undefined && req.body.status !== task.status) logTaskChange(task, 'status', 'Status', task.status, req.body.status);
+  if (req.body.priority !== undefined && req.body.priority !== task.priority) logTaskChange(task, 'priority', 'Priority', task.priority, req.body.priority);
+  if (req.body.deadline !== undefined && req.body.deadline !== task.deadline) logTaskChange(task, 'deadline', 'Due date', task.deadline || 'none', req.body.deadline || 'none');
+
+  const allowed = ['title','description','priority','deadline','clientId','projectId','growthClientId','growthPeriodId','assignedTo','sharedWith','archived','estimate','tags','custom','links'];
   allowed.forEach(k => { if (req.body[k] !== undefined) task[k] = k === 'description' ? sanitizeDocHtml(req.body[k]) : req.body[k]; });
+
+  // status/done are coupled — handled together regardless of which one the
+  // request actually sent.
+  if (req.body.status !== undefined || req.body.done !== undefined) {
+    syncTaskDoneState(task, req.body, store.taskConfig.statuses);
+  }
+
+  // A parent's client/project change cascades to its subtasks so they never
+  // point at a client/project their parent has moved away from.
+  if (req.body.clientId !== undefined || req.body.projectId !== undefined) {
+    Object.values(store.tasks).forEach(sub => {
+      if (sub.parentId === task.id) {
+        if (req.body.clientId !== undefined) sub.clientId = task.clientId;
+        if (req.body.projectId !== undefined) sub.projectId = task.projectId;
+      }
+    });
+  }
+
   task.updatedAt = new Date().toISOString();
   store.tasks[req.params.id] = task;
   logActivity(store, req, 'Task updated', { details: task.title });
@@ -1097,8 +1306,19 @@ function sanitizeDocHtml(html) {
   return String(html || '')
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<iframe[\s\S]*?<\/iframe>/gi, '')
+    .replace(/<iframe[^>]*\/?>/gi, '')
     .replace(/\son\w+\s*=\s*"[^"]*"/gi, '')
-    .replace(/\son\w+\s*=\s*'[^']*'/gi, '');
+    .replace(/\son\w+\s*=\s*'[^']*'/gi, '')
+    .replace(/\son\w+\s*=\s*[^\s>]+/gi, '')
+    .replace(/(href|src)\s*=\s*"javascript:[^"]*"/gi, '$1="#"')
+    .replace(/(href|src)\s*=\s*'javascript:[^']*'/gi, "$1='#'")
+    // Force every link to open safely in a new tab rather than trusting
+    // whatever target/rel (if any) the editor happened to produce.
+    .replace(/<a\s+([^>]*?)href="(https?:\/\/[^"]*)"([^>]*?)>/gi, (m, before, href, after) => {
+      const rest = (before + after).replace(/\s*(target|rel)\s*=\s*"[^"]*"/gi, '');
+      return `<a ${rest} href="${href}" target="_blank" rel="noopener">`;
+    });
 }
 // Flattens a doc's rich-text HTML into plain text for the AI prompt —
 // keeps bullet/paragraph structure (as "- " lines and blank lines) but

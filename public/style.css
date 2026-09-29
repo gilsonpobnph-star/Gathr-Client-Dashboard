@@ -1254,9 +1254,40 @@ body::before {
 .btn-toggle-archived.active { border-color: #f59e0b; color: #f59e0b; background: #f59e0b18; }
 .task-row-archived { opacity: .6; }
 .tdp-right {
-  width: 300px; flex-shrink: 0; display: flex; flex-direction: column;
-  background: var(--bg2); padding: 24px 20px 16px;
+  width: 300px; flex-shrink: 0; display: flex; flex-direction: column; gap: 14px;
+  background: var(--bg2); padding: 24px 20px 16px; overflow-y: auto;
 }
+.tdp-right .tdp-field-group { gap: 4px; }
+.tdp-right .tdp-pill-select { width: 100%; box-sizing: border-box; }
+.tdp-breadcrumb { font-size: 11.5px; color: var(--text3); margin: -12px 0 16px; }
+.tdp-breadcrumb-sep { margin: 0 4px; }
+.tdp-subtasks-wrap, .tdp-links-wrap { margin-top: 18px; display: flex; flex-direction: column; gap: 8px; }
+.tdp-subtasks-list, .tdp-links-list { display: flex; flex-direction: column; gap: 4px; }
+.tdp-subtask-row, .tdp-link-row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 0;
+  border-bottom: 1px solid var(--border); font-size: 12.5px;
+}
+.tdp-subtask-title { flex: 1; outline: none; }
+.tdp-subtask-title:focus { background: var(--surface3); border-radius: 4px; padding: 0 4px; }
+.tdp-link-row a { flex: 1; color: var(--accent); text-decoration: none; word-break: break-all; }
+.tdp-link-row a:hover { text-decoration: underline; }
+.tdp-subtask-add, .tdp-link-add { display: flex; gap: 8px; }
+.tdp-subtask-add input, .tdp-link-add input {
+  flex: 1; background: var(--surface); border: 1px solid var(--border2); border-radius: 6px;
+  padding: 6px 10px; font-size: 12.5px; color: var(--text); outline: none; font-family: inherit;
+}
+.tdp-subtask-add input:focus, .tdp-link-add input:focus { border-color: var(--accent); }
+.tdp-comments-wrap { margin-top: 18px; display: flex; flex-direction: column; flex: 1; min-height: 160px; }
+.tdp-comments-wrap .tdp-feed { max-height: 320px; }
+.rte-toolbar-color { width: 26px; height: 26px; padding: 0; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; background: none; }
+.tdp-time-summary { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 4px; }
+.tdp-time-total { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
+.tdp-estimate-bar-wrap { margin-top: 10px; }
+.tdp-estimate-bar-track { height: 6px; border-radius: 3px; background: var(--surface3); overflow: hidden; }
+.tdp-estimate-bar-fill { height: 100%; background: var(--accent); border-radius: 3px; transition: width .2s; }
+.tdp-log-feed { display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; }
+.tdp-log-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--text2); padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+.tdp-log-date { color: var(--text3); flex-shrink: 0; }
 .tdp-activity-header {
   font-size: 11px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .07em; color: var(--text3); margin-bottom: 14px;
@@ -1701,3 +1732,153 @@ body::before {
 
 /* Chat tab needs flex layout when visible */
 .tab-chat-section:not(.hidden) { display: flex; flex-direction: column; height: 100%; }
+
+/* ── Sidebar timer pill ───────────────────────────────────────────────────── *
+ * Visible from every tab while a task timer is running — the sidebar is the
+ * only DOM persistent across tab switches, so it lives here rather than in
+ * a global header (the app has none). */
+.sidebar-timer-pill {
+  display: flex; align-items: center; gap: 8px; margin: 0 12px 10px;
+  padding: 8px 10px; border-radius: 10px; background: var(--accent-dim);
+  border: 1px solid rgba(224,91,46,.3);
+}
+.sidebar-timer-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink: 0; animation: sidebarTimerPulse 1.4s ease-in-out infinite; }
+@keyframes sidebarTimerPulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+.sidebar-timer-info { flex: 1; min-width: 0; }
+.sidebar-timer-label { font-size: 11.5px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidebar-timer-duration { font-size: 11px; color: var(--accent2); font-variant-numeric: tabular-nums; }
+.sidebar-timer-stop {
+  width: 22px; height: 22px; flex-shrink: 0; border-radius: 6px; border: none;
+  background: var(--accent); color: #fff; cursor: pointer; font-size: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.sidebar-timer-stop:hover { background: var(--accent-hover); }
+
+/* ── Projects & Tasks module (My Dashboard) ──────────────────────────────────
+ * List / Board / Client Health sub-tabs, sharing one toolbar, all built from
+ * the same --accent/--surface/--border tokens and .dash-card conventions
+ * used everywhere else in the app. */
+.pt-subtabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.pt-subtab {
+  background: none; border: 1px solid var(--border); color: var(--text2);
+  font-size: 12.5px; font-weight: 600; padding: 7px 16px; border-radius: 8px; cursor: pointer;
+  transition: all .12s;
+}
+.pt-subtab:hover { border-color: var(--accent); color: var(--text); }
+.pt-subtab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+.pt-toolbar {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-bottom: 16px; padding: 12px 14px; background: var(--glass);
+  border: 1px solid var(--glass-border); border-radius: var(--radius);
+}
+.pt-search {
+  background: var(--surface3); border: 1px solid var(--border2); border-radius: 8px;
+  padding: 6px 12px; font-size: 12.5px; color: var(--text); outline: none; min-width: 180px;
+}
+.pt-search:focus { border-color: var(--accent); }
+.pt-hide-done { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text2); cursor: pointer; }
+.pt-toolbar-spacer { flex: 1; }
+.pt-view.hidden { display: none; }
+
+/* List view */
+.pt-client-block { margin-bottom: 22px; }
+.pt-client-block-title { font-size: 13px; font-weight: 700; color: var(--text2); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+.pt-project-section { background: var(--glass); border: 1px solid var(--glass-border); border-radius: var(--radius); margin-bottom: 10px; overflow: hidden; }
+.pt-project-header {
+  display: flex; align-items: center; gap: 10px; padding: 12px 14px; cursor: pointer;
+  font-size: 12.5px; color: var(--text2);
+}
+.pt-project-header:hover { background: var(--surface3); }
+.pt-collapse-caret { color: var(--text3); width: 10px; }
+.pt-project-name { font-weight: 700; color: var(--text); }
+.pt-project-status-pill { font-size: 10.5px; padding: 2px 8px; border-radius: 20px; background: var(--surface3); color: var(--text2); text-transform: capitalize; }
+.pt-project-count { color: var(--text3); font-size: 11.5px; }
+.pt-project-bar-track { width: 90px; height: 5px; border-radius: 3px; background: var(--surface3); overflow: hidden; }
+.pt-project-bar-fill { height: 100%; background: var(--green); }
+.pt-project-due { font-size: 11px; }
+.pt-task-table { border-top: 1px solid var(--border); padding: 6px 14px 12px; }
+.pt-task-row, .pt-quick-add {
+  display: grid; grid-template-columns: 20px 1fr 120px 100px 130px 60px 30px 50px;
+  align-items: center; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--border);
+}
+.pt-task-row-sub { padding-left: 24px; opacity: .85; }
+.pt-task-title { cursor: pointer; font-size: 12.5px; color: var(--text); }
+.pt-task-title:hover { color: var(--accent); }
+.pt-inline-select {
+  background: var(--surface3); border: 1px solid var(--border); border-radius: 6px;
+  font-size: 11px; padding: 3px 6px; color: var(--text); outline: none; font-family: inherit;
+}
+.pt-task-time { font-size: 11px; color: var(--text3); text-align: right; }
+.pt-timer-btn { background: none; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 12px; padding: 2px 6px; }
+.pt-timer-btn.running { background: var(--accent); border-color: var(--accent); }
+.pt-quick-add { grid-template-columns: 1fr; border-bottom: none; padding-top: 8px; }
+.pt-quick-add input {
+  background: none; border: none; outline: none; font-size: 12.5px; color: var(--text);
+  font-family: inherit; width: 100%;
+}
+.pt-quick-add input::placeholder { color: var(--text3); }
+
+/* Board view */
+.pt-board { display: flex; gap: 14px; overflow-x: auto; padding-bottom: 8px; }
+.pt-board-col { flex: 0 0 260px; background: var(--surface2); border-radius: var(--radius); padding: 10px; }
+.pt-board-col-header { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--text2); padding: 4px 4px 10px; }
+.pt-board-col-count { color: var(--text3); font-weight: 500; }
+.pt-board-add { margin-left: auto; background: none; border: 1px solid var(--border); border-radius: 6px; width: 20px; height: 20px; cursor: pointer; color: var(--text2); }
+.pt-board-col-body { display: flex; flex-direction: column; gap: 8px; min-height: 40px; }
+.pt-board-card {
+  background: var(--surface-solid); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 12px; cursor: grab; box-shadow: var(--shadow);
+}
+.pt-board-card:active { cursor: grabbing; }
+.pt-board-card-top { display: flex; align-items: center; gap: 6px; font-size: 10.5px; color: var(--text3); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+.pt-priority-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.pt-board-card-title { font-size: 13px; color: var(--text); font-weight: 600; margin-bottom: 6px; }
+.pt-board-card-meta { font-size: 11px; color: var(--text3); margin-bottom: 6px; }
+.pt-board-card-bottom { display: flex; gap: 10px; font-size: 10.5px; color: var(--text3); }
+.pt-board-badge { background: var(--surface3); border-radius: 10px; padding: 1px 7px; }
+
+/* Client Health view */
+.pt-health-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 16px; }
+.pt-health-card { background: var(--glass); border: 1px solid var(--glass-border); border-radius: var(--radius-lg); padding: 18px 20px; }
+.pt-health-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.pt-health-card-name { font-size: 15px; font-weight: 700; color: var(--text); }
+.pt-health-badge { font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+.pt-health-ok    { background: var(--green-dim);  color: var(--green); }
+.pt-health-watch { background: var(--amber-dim);  color: var(--amber); }
+.pt-health-risk  { background: rgba(239,68,68,.15); color: #ef4444; }
+.pt-health-none  { background: var(--surface3); color: var(--text3); }
+.pt-health-kpis { display: grid; grid-template-columns: repeat(5,1fr); gap: 6px; margin-bottom: 14px; text-align: center; }
+.pt-health-kpi-val { display: block; font-size: 17px; font-weight: 700; color: var(--text); }
+.pt-health-kpi-label { display: block; font-size: 9.5px; color: var(--text3); text-transform: uppercase; letter-spacing: .04em; margin-top: 2px; }
+.pt-pace-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.pt-pace-row { display: flex; align-items: center; gap: 8px; font-size: 11.5px; }
+.pt-pace-name { font-weight: 600; color: var(--text2); min-width: 90px; }
+.pt-pace-pct { flex: 1; color: var(--text3); }
+.pt-pace-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 20px; }
+.pt-pace-ok  { background: var(--green-dim); color: var(--green); }
+.pt-pace-bad { background: rgba(239,68,68,.15); color: #ef4444; }
+.pt-health-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.pt-health-next { border-top: 1px solid var(--border); padding-top: 12px; }
+.pt-field-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--text3); margin-bottom: 8px; display: block;
+}
+.pt-next-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer; font-size: 12px; }
+.pt-next-row:hover .pt-next-title { color: var(--accent); }
+.pt-next-title { flex: 1; color: var(--text); }
+.pt-next-due { font-size: 11px; }
+
+/* Fields manager + Project modal (reuse .modal/.detail-row for the shell) */
+.pt-fields-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.pt-fields-row input, .pt-fields-row select {
+  background: var(--surface3); border: 1px solid var(--border2); border-radius: 6px;
+  padding: 5px 8px; font-size: 12.5px; color: var(--text); outline: none; font-family: inherit;
+}
+.pt-fields-row input:first-child { flex: 1; }
+.pt-fields-hint { font-size: 10.5px; color: var(--text3); }
+.pt-fields-add { display: flex; gap: 8px; margin-top: 6px; }
+.pt-fields-add input {
+  flex: 1; background: var(--surface3); border: 1px solid var(--border2); border-radius: 6px;
+  padding: 6px 10px; font-size: 12.5px; color: var(--text); outline: none; font-family: inherit;
+}

@@ -158,6 +158,16 @@
       </button>
     </div>
 
+    <!-- Live timer pill — visible from every tab while a task timer is running -->
+    <div id="sidebar-timer-pill" class="sidebar-timer-pill hidden">
+      <span class="sidebar-timer-dot"></span>
+      <div class="sidebar-timer-info">
+        <div id="sidebar-timer-label" class="sidebar-timer-label">—</div>
+        <div id="sidebar-timer-duration" class="sidebar-timer-duration">0h 0m</div>
+      </div>
+      <button class="sidebar-timer-stop" onclick="stopTaskTimer()" title="Stop timer">■</button>
+    </div>
+
     <div class="sidebar-footer">
       <div class="sync-info">
         <span class="sync-dot"></span>
@@ -1090,85 +1100,8 @@
           </div>
         </div>
 
-        <!-- Main 2-col: Tasks left, Priorities+Calendar right -->
-        <div class="ov-layout">
-
-          <!-- Left: My Tasks (Asana-style) -->
-          <div class="ov-main">
-            <div class="dash-card tasks-panel">
-              <div class="dash-card-header">
-                <div class="dash-card-title"><span class="dash-card-dot" style="background:var(--accent)"></span>My Tasks</div>
-                <div style="display:flex;gap:8px;align-items:center">
-                  <select id="task-filter-status" class="inline-select" style="font-size:12px;padding:4px 8px">
-                    <option value="">All statuses</option>
-                    <option value="To Do">To Do</option>
-                    <option value="In Progress">In Progress</option>
-                    <option value="Done">Done</option>
-                  </select>
-                  <select id="task-filter-priority" class="inline-select" style="font-size:12px;padding:4px 8px">
-                    <option value="">All priorities</option>
-                    <option value="High">High</option>
-                    <option value="Medium">Medium</option>
-                    <option value="Low">Low</option>
-                  </select>
-                  <select id="task-filter-assignee" class="inline-select" style="font-size:12px;padding:4px 8px">
-                    <option value="">Everyone's tasks</option>
-                  </select>
-                  <button id="btn-toggle-archived" class="btn-toggle-archived" onclick="toggleArchivedTasks()">Archived</button>
-                  <button class="btn-primary" style="font-size:12px;padding:6px 14px" onclick="openTaskModal()">+ New Task</button>
-                </div>
-              </div>
-              <!-- Table header -->
-              <div class="task-table-header">
-                <div class="tth-name">Task</div>
-                <div class="tth-col">Assignee</div>
-                <div class="tth-col">Priority</div>
-                <div class="tth-col">Due</div>
-                <div class="tth-col">Status</div>
-              </div>
-              <div id="my-tasks-list"></div>
-            </div>
-
-            <!-- My Clients health -->
-            <div class="dash-card">
-              <div class="dash-card-header">
-                <div class="dash-card-title"><span class="dash-card-dot" style="background:var(--blue)"></span>My Clients</div>
-              </div>
-              <div id="my-client-health"></div>
-            </div>
-          </div>
-
-          <!-- Right: Today's Priorities + Calendar -->
-          <div class="ov-sidebar">
-            <div class="dash-card">
-              <div class="dash-card-header">
-                <div class="dash-card-title"><span class="dash-card-dot" style="background:var(--accent)"></span>Today's Priorities</div>
-              </div>
-              <div id="my-priorities" class="todays-read-wrap"></div>
-            </div>
-
-            <div class="dash-card" style="padding:0;overflow:hidden">
-              <div class="cal-header">
-                <button class="cal-nav-btn" onclick="calNav(-1)">&#8249;</button>
-                <span class="cal-month-label" id="cal-month-label">—</span>
-                <button class="cal-nav-btn" onclick="calNav(1)">&#8250;</button>
-              </div>
-              <div class="cal-dow-row">
-                <span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span>
-              </div>
-              <div class="cal-grid" id="cal-grid"></div>
-              <div class="cal-day-panel" id="cal-day-panel">
-                <div class="cal-day-panel-title" id="cal-day-panel-title">Select a day</div>
-                <div id="cal-day-entries" class="cal-entries-list"></div>
-                <div class="cal-add-row" id="cal-add-row" style="display:none">
-                  <textarea id="cal-entry-text" class="cal-entry-textarea" placeholder="What did you work on today?"></textarea>
-                  <button class="btn-primary" style="font-size:11.5px;padding:7px 14px" onclick="submitCalEntry()">Log Entry</button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        </div>
+        <!-- Projects & Tasks module (List / Board / Client Health) -->
+        <div id="projects-tasks-root"></div>
 
       </div>
     </section>
@@ -1557,35 +1490,14 @@
 <div id="task-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeTaskModal()">
   <div class="task-detail-panel">
 
-    <!-- Left: task fields -->
+    <!-- Left: title, description, subtasks, links, comments -->
     <div class="tdp-left">
       <div class="tdp-header">
         <input id="task-title" class="tdp-title-input" placeholder="Task title…" autocomplete="off">
         <button class="tdp-close-btn" onclick="closeTaskModal()">×</button>
       </div>
 
-      <div class="tdp-pills-row">
-        <div class="tdp-field-group">
-          <span class="tdp-field-label">Status</span>
-          <select id="task-status" class="tdp-pill-select">
-            <option value="To Do">To Do</option>
-            <option value="In Progress">In Progress</option>
-            <option value="Done">Done</option>
-          </select>
-        </div>
-        <div class="tdp-field-group">
-          <span class="tdp-field-label">Priority</span>
-          <select id="task-priority" class="tdp-pill-select">
-            <option value="High">🔴 High</option>
-            <option value="Medium">🟡 Medium</option>
-            <option value="Low">🟢 Low</option>
-          </select>
-        </div>
-        <div class="tdp-field-group">
-          <span class="tdp-field-label">Due Date</span>
-          <input id="task-deadline" type="date" class="tdp-pill-select">
-        </div>
-      </div>
+      <div id="task-breadcrumb" class="tdp-breadcrumb"></div>
 
       <div class="tdp-field-row">
         <span class="tdp-field-label">Client</span>
@@ -1609,17 +1521,67 @@
         <div class="rte-toolbar">
           <button type="button" title="Bold" onclick="rteCmd('task-desc','bold')"><b>B</b></button>
           <button type="button" title="Italic" onclick="rteCmd('task-desc','italic')"><i>I</i></button>
-          <select title="Heading size" onchange="rteCmd('task-desc','formatBlock', this.value); this.selectedIndex=0" class="rte-toolbar-select">
+          <select title="Font" onchange="rteCmd('task-desc','fontName', this.value); this.selectedIndex=0" class="rte-toolbar-select">
+            <option value="" selected disabled>Font</option>
+            <option value="Interstate">Interstate</option>
+            <option value="Georgia">Georgia</option>
+            <option value="Courier New">Courier New</option>
+          </select>
+          <select title="Font size" onchange="rteFontSize('task-desc', this.value); this.selectedIndex=0" class="rte-toolbar-select">
             <option value="" selected disabled>Size</option>
+            <option value="12">Small</option>
+            <option value="15">Normal</option>
+            <option value="20">Large</option>
+            <option value="28">Huge</option>
+          </select>
+          <select title="Heading size" onchange="rteCmd('task-desc','formatBlock', this.value); this.selectedIndex=0" class="rte-toolbar-select">
+            <option value="" selected disabled>Block</option>
             <option value="h3">Heading</option>
             <option value="p">Normal</option>
+            <option value="blockquote">Quote</option>
           </select>
+          <input type="color" title="Text color" class="rte-toolbar-color" onchange="rteColor('task-desc','foreColor', this.value)">
+          <input type="color" title="Highlight" class="rte-toolbar-color" onchange="rteColor('task-desc','hiliteColor', this.value)">
           <button type="button" title="Bullet list" onclick="rteCmd('task-desc','insertUnorderedList')">&#8226; List</button>
           <button type="button" title="Numbered list" onclick="rteCmd('task-desc','insertOrderedList')">1. List</button>
+          <button type="button" title="Indent" onclick="rteCmd('task-desc','indent')">&#8594;|</button>
+          <button type="button" title="Outdent" onclick="rteCmd('task-desc','outdent')">|&#8592;</button>
+          <button type="button" title="Align left" onclick="rteCmd('task-desc','justifyLeft')">&#8676;</button>
+          <button type="button" title="Align center" onclick="rteCmd('task-desc','justifyCenter')">&#8596;</button>
           <button type="button" title="Link" onclick="rteLink('task-desc')">Link</button>
           <button type="button" title="Clear formatting" onclick="rteCmd('task-desc','removeFormat')">Clear</button>
         </div>
         <div id="task-desc" class="tdp-desc rte-editor" contenteditable="true" data-placeholder="Add details, links, context…"></div>
+      </div>
+
+      <div class="tdp-subtasks-wrap" id="task-subtasks-wrap">
+        <span class="tdp-field-label">Subtasks</span>
+        <div id="task-subtasks-list" class="tdp-subtasks-list"></div>
+        <div class="tdp-subtask-add">
+          <input id="task-subtask-input" placeholder="Add a subtask… (Enter)" onkeydown="if(event.key==='Enter'){event.preventDefault();addSubtask();}">
+          <button class="btn-view" style="font-size:11.5px;padding:5px 12px" onclick="addSubtask()">Add</button>
+        </div>
+      </div>
+
+      <div class="tdp-links-wrap">
+        <span class="tdp-field-label">Links</span>
+        <div id="task-links-list" class="tdp-links-list"></div>
+        <div class="tdp-link-add">
+          <input id="task-link-label" placeholder="Label">
+          <input id="task-link-url" placeholder="https://…">
+          <button class="btn-view" style="font-size:11.5px;padding:5px 12px" onclick="addTaskLink()">Add</button>
+        </div>
+      </div>
+
+      <div class="tdp-comments-wrap">
+        <span class="tdp-field-label">Comments</span>
+        <div id="task-activity-feed" class="tdp-feed"></div>
+        <div class="tdp-comment-box">
+          <textarea id="task-comment-input" class="tdp-comment-textarea" placeholder="Post an update…" rows="2"></textarea>
+          <div style="display:flex;justify-content:flex-end;margin-top:8px">
+            <button class="btn-primary" style="font-size:12px;padding:6px 16px" onclick="postTaskComment()">Post</button>
+          </div>
+        </div>
       </div>
 
       <div class="tdp-footer">
@@ -1634,16 +1596,48 @@
       </div>
     </div>
 
-    <!-- Right: activity + comments -->
+    <!-- Right: fields rail, time tracking, activity log -->
     <div class="tdp-right">
-      <div class="tdp-activity-header">Activity</div>
-      <div id="task-activity-feed" class="tdp-feed"></div>
-      <div class="tdp-comment-box">
-        <textarea id="task-comment-input" class="tdp-comment-textarea" placeholder="Post an update…" rows="2"></textarea>
-        <div style="display:flex;justify-content:flex-end;margin-top:8px">
-          <button class="btn-primary" style="font-size:12px;padding:6px 16px" onclick="postTaskComment()">Post</button>
+      <div class="tdp-field-group">
+        <span class="tdp-field-label">Status</span>
+        <select id="task-status" class="tdp-pill-select"></select>
+      </div>
+      <div class="tdp-field-group">
+        <span class="tdp-field-label">Priority</span>
+        <select id="task-priority" class="tdp-pill-select"></select>
+      </div>
+      <div class="tdp-field-group">
+        <span class="tdp-field-label">Due Date</span>
+        <input id="task-deadline" type="date" class="tdp-pill-select">
+      </div>
+      <div class="tdp-field-group">
+        <span class="tdp-field-label">Project</span>
+        <select id="task-project" class="tdp-pill-select">
+          <option value="">— No project —</option>
+        </select>
+      </div>
+      <div class="tdp-field-group">
+        <span class="tdp-field-label">Estimate (hrs)</span>
+        <input id="task-estimate" type="number" min="0" step="0.5" class="tdp-pill-select">
+      </div>
+      <div class="tdp-field-group">
+        <span class="tdp-field-label">Tags</span>
+        <input id="task-tags" placeholder="e.g. urgent, client-review" class="tdp-pill-select">
+      </div>
+
+      <div id="task-custom-fields"></div>
+
+      <div class="tdp-time-summary">
+        <div class="tdp-activity-header">Time tracked</div>
+        <div id="task-time-total" class="tdp-time-total">0h 0m</div>
+        <button id="task-timer-btn" class="btn-view" style="width:100%" onclick="toggleTaskTimer()">Start timer</button>
+        <div id="task-estimate-bar-wrap" class="tdp-estimate-bar-wrap hidden">
+          <div class="tdp-estimate-bar-track"><div id="task-estimate-bar-fill" class="tdp-estimate-bar-fill"></div></div>
         </div>
       </div>
+
+      <div class="tdp-activity-header">Activity</div>
+      <div id="task-log-feed" class="tdp-log-feed"></div>
     </div>
 
   </div>
@@ -2055,6 +2049,7 @@
 <script src="growth.js"></script>
 <script src="diagnostic.js"></script>
 <script src="knowledge.js"></script>
+<script src="projects.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
