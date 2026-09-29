@@ -90,8 +90,10 @@ let timeEntries = [];
         <button class="btn-view" style="font-size:12px;padding:6px 14px" onclick="ProjectsTasks.openProjectModal()">+ Project</button>
         <button class="btn-primary" style="font-size:12px;padding:6px 14px" onclick="openTaskModal()">+ Task</button>
       </div>
-      <div id="pt-list-col-header" class="pt-task-row pt-task-col-header"></div>
-      <div id="pt-view-list" class="pt-view"></div>
+      <div class="pt-list-scroll">
+        <div id="pt-list-col-header" class="pt-task-row pt-task-col-header"></div>
+        <div id="pt-view-list" class="pt-view"></div>
+      </div>
       <div id="pt-view-board" class="pt-view hidden"></div>
       <div id="pt-view-health" class="pt-view hidden"></div>
     `;
