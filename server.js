@@ -1101,7 +1101,9 @@ app.post('/api/tasks/:id/comments', requireAuth, (req, res) => {
   task.comments = task.comments || [];
   const comment = {
     id: 'cmt_' + Date.now(),
-    text: text.trim(),
+    // Comments are posted as rich text (same toolbar as the description) —
+    // sanitize the same way.
+    text: sanitizeDocHtml(text.trim()),
     author: req.session.name || 'Team',
     ts: new Date().toISOString(),
   };
@@ -1125,7 +1127,7 @@ app.patch('/api/tasks/:id/comments/:commentId', requireAuth, (req, res) => {
   // same rule as deleting a whole task.
   const isAdmin = req.session.role === 'admin';
   if (!isAdmin && comment.author !== (req.session.name || '')) return res.status(403).json({ error: 'Forbidden' });
-  comment.text = text.trim();
+  comment.text = sanitizeDocHtml(text.trim());
   comment.editedAt = new Date().toISOString();
   task.updatedAt = new Date().toISOString();
   store.tasks[req.params.id] = task;

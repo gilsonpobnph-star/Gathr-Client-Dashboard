@@ -794,6 +794,60 @@ function stringToColor(str) {
   return `hsl(${h},45%,35%)`;
 }
 
+/* ── Member dropdown (Assign To / Share With) ────────────────────────────────
+ * A closed-by-default multi-select: a trigger showing avatar chips for
+ * whoever's picked, and a checkbox panel that opens on click. Replaces the
+ * old always-expanded row of chips, which ate a lot of vertical space for
+ * every team member whether picked or not. `containerId`'s own element gets
+ * both the trigger and the panel, so saveTask()'s existing
+ * `querySelectorAll('input[type=checkbox]:checked')` on that same id still
+ * works untouched. */
+function memberSummaryHtml(selected) {
+  if (!selected.length) return '<span class="tdp-mdrop-placeholder">Select…</span>';
+  const shown = selected.slice(0, 4).map(m =>
+    `<span class="tdp-mdrop-av" style="background:${stringToColor(m)}" title="${escHtml(m)}">${initials(m)}</span>`
+  ).join('');
+  const rest = selected.length > 4 ? `<span class="tdp-mdrop-more">+${selected.length - 4}</span>` : '';
+  return shown + rest;
+}
+function renderMemberDropdown(containerId, selected) {
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  const myName = currentUser.name || '';
+  const all = [...new Set([...team, myName])].filter(Boolean);
+  wrap.innerHTML = `
+    <button type="button" class="tdp-mdrop-trigger" onclick="toggleMemberDropdown('${containerId}')">
+      <span class="tdp-mdrop-summary">${memberSummaryHtml(selected)}</span>
+      <span class="tdp-mdrop-caret">&#9662;</span>
+    </button>
+    <div class="tdp-mdrop-panel hidden">
+      ${all.map(m => {
+        const checked = selected.includes(m);
+        return `<label class="tdp-mdrop-row">
+          <input type="checkbox" value="${escHtml(m)}" ${checked ? 'checked' : ''} onchange="onMemberCheckboxChange('${containerId}')">
+          <span class="tdp-member-av" style="background:${stringToColor(m)}">${initials(m)}</span>
+          <span>${escHtml(m)}</span>
+        </label>`;
+      }).join('')}
+    </div>`;
+}
+function onMemberCheckboxChange(containerId) {
+  const wrap = document.getElementById(containerId);
+  const selected = [...wrap.querySelectorAll('input[type=checkbox]:checked')].map(cb => cb.value);
+  wrap.querySelector('.tdp-mdrop-summary').innerHTML = memberSummaryHtml(selected);
+}
+function toggleMemberDropdown(containerId) {
+  const panel = document.getElementById(containerId)?.querySelector('.tdp-mdrop-panel');
+  if (!panel) return;
+  const wasHidden = panel.classList.contains('hidden');
+  document.querySelectorAll('.tdp-mdrop-panel').forEach(p => p.classList.add('hidden'));
+  if (wasHidden) panel.classList.remove('hidden');
+}
+document.addEventListener('click', e => {
+  if (e.target.closest('.tdp-mdrop')) return;
+  document.querySelectorAll('.tdp-mdrop-panel').forEach(p => p.classList.add('hidden'));
+});
+
 /* ── Task timer ───────────────────────────────────────────────────────────── *
  * Global, single-timer-at-a-time model, kept here (not in projects.js) so the
  * sidebar pill and the task modal's Start/Stop button both reach it as a
@@ -944,7 +998,7 @@ function renderTaskSubtasks(t) {
   wrap.classList.remove('hidden');
   const subs = myTasks.filter(x => x.parentId === t.id);
   const last = (typeof taskConfig !== 'undefined' && taskConfig.statuses[taskConfig.statuses.length - 1]) || 'Done';
-  list.innerHTML = subs.length ? subs.map(s => `<div class="tdp-subtask-row">
+  list.innerHTML = subs.length ? subs.map(s => `<div class="tdp-subtask-row${s.status===last?' tdp-subtask-done':''}">
     <input type="checkbox" ${s.status===last?'checked':''} onchange="toggleSubtaskDone('${s.id}', this.checked)">
     <span class="tdp-subtask-title" contenteditable="true" onblur="renameSubtask('${s.id}', this.textContent)">${escHtml(s.title)}</span>
     <button class="tda-link-btn" onclick="deleteSubtask('${s.id}')">delete</button>
@@ -1106,19 +1160,8 @@ function openTaskModal(taskId, presetClientId, growthRef, presetProjectId) {
     projectSel.innerHTML = '<option value="">— No project —</option>' + list.map(p => `<option value="${p.id}">${escHtml(p.name)}</option>`).join('');
   };
 
-  const renderMemberPicks = (containerId, selected) => {
-    const all = [...new Set([...team, myName])].filter(Boolean);
-    document.getElementById(containerId).innerHTML = all.map(m => {
-      const checked = selected.includes(m);
-      return `<label class="tdp-member-chip ${checked?'checked':''}">
-        <input type="checkbox" value="${escHtml(m)}" ${checked?'checked':''} onchange="this.closest('label').classList.toggle('checked',this.checked)">
-        <span class="tdp-member-av" style="background:${stringToColor(m)}">${initials(m)}</span>
-        <span>${escHtml(m)}</span>
-      </label>`;
-    }).join('');
-  };
-  renderMemberPicks('task-assignees', t?.assignedTo || [myName]);
-  renderMemberPicks('task-shared',    t?.sharedWith || []);
+  renderMemberDropdown('task-assignees', t?.assignedTo || [myName]);
+  renderMemberDropdown('task-shared',    t?.sharedWith || []);
 
   document.getElementById('task-assign-wrap').style.display = '';
 
@@ -1321,12 +1364,20 @@ function renderTaskActivity(t) {
     }
     const canEdit = isAdmin || item.author === myName;
     if (editingCommentId === item.id) {
+      const editId = 'tda-edit-' + item.id;
       return `<div class="tda-comment">
         <span class="tda-av" style="background:${stringToColor(item.author)}">${initials(item.author)}</span>
         <div class="tda-body">
           <div class="tda-author">${escHtml(item.author)} <span class="tda-time">${time}</span></div>
           <div class="tda-edit-box">
-            <textarea id="tda-edit-${item.id}" rows="2">${escHtml(item.text)}</textarea>
+            <div class="rte-toolbar rte-toolbar-compact">
+              <button type="button" title="Bold" onclick="rteCmd('${editId}','bold')"><b>B</b></button>
+              <button type="button" title="Italic" onclick="rteCmd('${editId}','italic')"><i>I</i></button>
+              <button type="button" title="Bullet list" onclick="rteCmd('${editId}','insertUnorderedList')">&#8226; List</button>
+              <button type="button" title="Link" onclick="rteLink('${editId}')">Link</button>
+              <button type="button" title="Clear formatting" onclick="rteCmd('${editId}','removeFormat')">Clear</button>
+            </div>
+            <div id="${editId}" class="tdp-comment-editor rte-editor" contenteditable="true">${item.text}</div>
             <div style="display:flex;gap:8px;margin-top:6px">
               <button class="btn-primary" style="font-size:11px;padding:4px 10px" onclick="saveEditedComment('${item.id}')">Save</button>
               <button class="btn-view" style="font-size:11px;padding:4px 10px" onclick="cancelEditComment()">Cancel</button>
@@ -1339,7 +1390,7 @@ function renderTaskActivity(t) {
       <span class="tda-av" style="background:${stringToColor(item.author)}">${initials(item.author)}</span>
       <div class="tda-body">
         <div class="tda-author">${escHtml(item.author)} <span class="tda-time">${time}</span>${item.editedAt ? ' <span class="tda-time">(edited)</span>' : ''}</div>
-        <div class="tda-text">${escHtml(item.text).replace(/\n/g,'<br>')}</div>
+        <div class="tda-text rte-editor">${item.text}</div>
         ${canEdit ? `<div class="tda-actions"><button class="tda-link-btn" onclick="editComment('${item.id}')">edit</button><button class="tda-link-btn" onclick="deleteComment('${item.id}')">delete</button></div>` : ''}
       </div>
     </div>`;
@@ -1348,17 +1399,25 @@ function renderTaskActivity(t) {
 function editComment(commentId) {
   editingCommentId = commentId;
   renderTaskActivity(myTasks.find(x => x.id === editingTaskId));
-  const ta = document.getElementById('tda-edit-' + commentId);
-  if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+  const el = document.getElementById('tda-edit-' + commentId);
+  if (el) {
+    el.focus();
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
 }
 function cancelEditComment() {
   editingCommentId = null;
   renderTaskActivity(myTasks.find(x => x.id === editingTaskId));
 }
 async function saveEditedComment(commentId) {
-  const ta = document.getElementById('tda-edit-' + commentId);
-  const text = ta?.value.trim();
-  if (!text) return;
+  const el = document.getElementById('tda-edit-' + commentId);
+  if (!el || !el.textContent.trim()) return;
+  const text = el.innerHTML;
   const res = await fetch(`/api/tasks/${editingTaskId}/comments/${commentId}`, {
     method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }),
   });
@@ -1473,8 +1532,8 @@ async function archiveTask() {
 async function postTaskComment() {
   if (!editingTaskId) return;
   const input = document.getElementById('task-comment-input');
-  const text  = input?.value.trim();
-  if (!text) return;
+  if (!input || !input.textContent.trim()) return;
+  const text = input.innerHTML;
   const res = await fetch(`/api/tasks/${editingTaskId}/comments`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -1484,7 +1543,7 @@ async function postTaskComment() {
   const data = await res.json();
   const idx  = myTasks.findIndex(t => t.id === editingTaskId);
   if (idx !== -1) myTasks[idx] = data.task;
-  if (input) input.value = '';
+  if (input) input.innerHTML = '';
   renderTaskActivity(data.task);
   refreshTaskDependents();
 }

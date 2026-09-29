@@ -1190,18 +1190,41 @@ body::before {
   flex: 1; background: none; border: none; color: var(--text); font-size: 13px;
   cursor: pointer; outline: none; font-family: inherit; padding: 0;
 }
-.tdp-member-picks { display: flex; flex-wrap: wrap; gap: 6px; padding-top: 2px; }
-.tdp-member-chip {
-  display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 5px;
-  border-radius: 20px; border: 1px solid var(--border2); cursor: pointer;
-  font-size: 12px; color: var(--text2); transition: all .12s; user-select: none;
-}
-.tdp-member-chip input { display: none; }
-.tdp-member-chip.checked { border-color: var(--accent); color: var(--text); background: var(--accent-dim); }
 .tdp-member-av {
   width: 20px; height: 20px; border-radius: 50%; font-size: 8px; font-weight: 700;
   color: #fff; display: flex; align-items: center; justify-content: center;
 }
+
+/* Assign To / Share With — closed-by-default dropdown instead of an
+   always-expanded row of every team member's chip. */
+.tdp-mdrop { position: relative; flex: 1; }
+.tdp-mdrop-trigger {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  background: var(--surface3); border: 1px solid var(--border2); border-radius: 8px;
+  padding: 6px 10px; cursor: pointer; font-family: inherit;
+}
+.tdp-mdrop-trigger:hover { border-color: var(--accent); }
+.tdp-mdrop-summary { display: flex; align-items: center; flex-wrap: wrap; min-height: 20px; }
+.tdp-mdrop-placeholder { font-size: 12.5px; color: var(--text3); }
+.tdp-mdrop-av {
+  width: 20px; height: 20px; border-radius: 50%; font-size: 8px; font-weight: 700;
+  color: #fff; display: flex; align-items: center; justify-content: center;
+  margin-left: -4px; border: 2px solid var(--surface3);
+}
+.tdp-mdrop-av:first-child { margin-left: 0; }
+.tdp-mdrop-more { font-size: 10.5px; color: var(--text3); margin-left: 4px; }
+.tdp-mdrop-caret { color: var(--text3); font-size: 10px; flex-shrink: 0; }
+.tdp-mdrop-panel {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 50;
+  background: var(--surface-solid); border: 1px solid var(--border2); border-radius: 8px;
+  box-shadow: var(--shadow-lg); padding: 6px; max-height: 220px; overflow-y: auto;
+}
+.tdp-mdrop-row {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px;
+  cursor: pointer; font-size: 12.5px; color: var(--text2);
+}
+.tdp-mdrop-row:hover { background: var(--surface3); }
+.tdp-mdrop-row input { margin: 0; }
 .tdp-desc-wrap { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; flex: 1; }
 .tdp-desc {
   background: var(--surface); border: 1px solid var(--border); border-radius: 0 0 8px 8px;
@@ -1269,6 +1292,7 @@ body::before {
 }
 .tdp-subtask-title { flex: 1; outline: none; }
 .tdp-subtask-title:focus { background: var(--surface3); border-radius: 4px; padding: 0 4px; }
+.tdp-subtask-done .tdp-subtask-title { text-decoration: line-through; color: var(--text3); }
 .tdp-link-row a { flex: 1; color: var(--accent); text-decoration: none; word-break: break-all; }
 .tdp-link-row a:hover { text-decoration: underline; }
 .tdp-subtask-add, .tdp-link-add { display: flex; gap: 8px; }
@@ -1277,8 +1301,8 @@ body::before {
   padding: 6px 10px; font-size: 12.5px; color: var(--text); outline: none; font-family: inherit;
 }
 .tdp-subtask-add input:focus, .tdp-link-add input:focus { border-color: var(--accent); }
-.tdp-comments-wrap { margin-top: 18px; display: flex; flex-direction: column; flex: 1; min-height: 160px; }
-.tdp-comments-wrap .tdp-feed { max-height: 320px; }
+.tdp-comments-wrap { margin-top: 18px; display: flex; flex-direction: column; }
+.tdp-comments-wrap .tdp-feed { min-height: 280px; max-height: 460px; overflow-y: auto; }
 .rte-toolbar-color { width: 26px; height: 26px; padding: 0; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; background: none; }
 .tdp-time-summary { border-top: 1px solid var(--border); padding-top: 14px; margin-top: 4px; }
 .tdp-time-total { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
@@ -1310,14 +1334,20 @@ body::before {
 .tda-link-btn { background: none; border: none; padding: 0; font-size: 11px; color: var(--text3); cursor: pointer; text-decoration: underline; }
 .tda-link-btn:hover { color: var(--accent); }
 .tda-edit-box { margin-top: 4px; }
-.tda-edit-box textarea { width: 100%; font-size: 12.5px; }
 .tdp-comment-box { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
-.tdp-comment-textarea {
-  width: 100%; background: var(--surface); border: 1px solid var(--border2);
-  border-radius: 8px; color: var(--text); font-size: 12.5px; padding: 8px 10px;
-  resize: none; font-family: inherit; outline: none; box-sizing: border-box;
+/* Comments are rich text now (same execCommand pattern as the description),
+   just in a shorter box and with a tighter toolbar. */
+.rte-toolbar-compact { padding: 4px; gap: 4px; }
+.rte-toolbar-compact button { padding: 3px 7px; font-size: 11px; }
+.tdp-comment-editor {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 0 0 8px 8px;
+  color: var(--text); font-size: 12.5px; padding: 8px 10px;
+  font-family: inherit; outline: none; min-height: 56px; max-height: 200px; overflow-y: auto;
+  box-sizing: border-box;
 }
-.tdp-comment-textarea:focus { border-color: var(--accent); }
+.tdp-comment-editor:focus { border-color: var(--accent); }
+.tda-edit-box .tdp-comment-editor { min-height: 44px; }
+.tda-text.rte-editor { min-height: 0; }
 
 /* shared utils */
 .btn-danger {

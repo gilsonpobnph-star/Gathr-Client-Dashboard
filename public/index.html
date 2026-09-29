@@ -1508,12 +1508,12 @@
 
       <div class="tdp-field-row" id="task-assign-wrap">
         <span class="tdp-field-label">Assign To</span>
-        <div id="task-assignees" class="tdp-member-picks"></div>
+        <div id="task-assignees" class="tdp-mdrop"></div>
       </div>
 
       <div class="tdp-field-row">
         <span class="tdp-field-label">Share With</span>
-        <div id="task-shared" class="tdp-member-picks"></div>
+        <div id="task-shared" class="tdp-mdrop"></div>
       </div>
 
       <div class="tdp-desc-wrap">
@@ -1577,7 +1577,15 @@
         <span class="tdp-field-label">Comments</span>
         <div id="task-activity-feed" class="tdp-feed"></div>
         <div class="tdp-comment-box">
-          <textarea id="task-comment-input" class="tdp-comment-textarea" placeholder="Post an update…" rows="2"></textarea>
+          <div class="rte-toolbar rte-toolbar-compact">
+            <button type="button" title="Bold" onclick="rteCmd('task-comment-input','bold')"><b>B</b></button>
+            <button type="button" title="Italic" onclick="rteCmd('task-comment-input','italic')"><i>I</i></button>
+            <button type="button" title="Bullet list" onclick="rteCmd('task-comment-input','insertUnorderedList')">&#8226; List</button>
+            <button type="button" title="Numbered list" onclick="rteCmd('task-comment-input','insertOrderedList')">1. List</button>
+            <button type="button" title="Link" onclick="rteLink('task-comment-input')">Link</button>
+            <button type="button" title="Clear formatting" onclick="rteCmd('task-comment-input','removeFormat')">Clear</button>
+          </div>
+          <div id="task-comment-input" class="tdp-comment-editor rte-editor" contenteditable="true" data-placeholder="Post an update…"></div>
           <div style="display:flex;justify-content:flex-end;margin-top:8px">
             <button class="btn-primary" style="font-size:12px;padding:6px 16px" onclick="postTaskComment()">Post</button>
           </div>
