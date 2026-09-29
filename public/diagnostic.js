@@ -1083,25 +1083,6 @@
       <p style="margin-top:26px; font-size:15px;">More leads come from doing Jobs 1 and 2 better. Better book, show and close come from Job 3.</p>
     </div>`);
 
-    // Low-hanging fruit for their field — once the AI has run, this is its
-    // field_best_practices (specific to the exact practitionerType, e.g. a
-    // chiro's list differs from a psychologist's even in the same
-    // compliance group); before that, the static per-group starter list.
-    // Always shown regardless of score — these are foundational "just go
-    // do this" items.
-    const fieldPractices = aiData?.field_best_practices?.length ? aiData.field_best_practices : group?.lowHangingFruit;
-    if (fieldPractices?.length) {
-      const fieldLabel = PRACTITIONER_TYPES.find(t => t.v === a.answers.practitionerType)?.l || group?.label?.replace(/^Group [A-Z] — /, '') || 'your field';
-      sections.push(`<div class="doc-section">
-        <div class="eyebrow-sm">LOW-HANGING FRUIT</div>
-        <h2 class="doc-h2">Best practices for your field</h2>
-        <p style="font-size:14.5px; color:#57524c;">Specific to ${esc(fieldLabel)} — mostly free, mostly quick.</p>
-        <ul class="plan-checklist">
-          ${fieldPractices.map(item => `<li><span class="chk"></span>${esc(item)}</li>`).join('')}
-        </ul>
-      </div>`);
-    }
-
     // Your plan for the first 30 days — the biggest three things to fix,
     // weighted by actual business impact: whichever funnel stage is the
     // real bottleneck (computeRecommendation's mode) claims priority,
@@ -1120,8 +1101,7 @@
       <p style="font-size:14.5px; color:#57524c;">${esc(aiData?.priority_summary || rec.priorityBlurb || 'Based on where you stand today, here are the three biggest things to fix first.')}</p>
       <ul class="plan-checklist">
         ${top3.map(c => `<li><span class="chk"></span><span class="plan-item-label">${esc(c.label)}</span> ${esc(quickWinFor(c.key))}</li>`).join('')}
-      </ul>
-      ${aiData ? `<div style="font-size:11px; color:#a89f8f; margin-top:10px; letter-spacing:.03em;">Sharpened by AI, based on this business's own numbers and goals.</div>` : ''}` : `
+      </ul>` : `
       <p style="font-size:14.5px; color:#57524c;">You're already doing the fundamentals well across every channel — nothing urgent to fix this month. Keep it up.</p>`}
     </div>`);
 
@@ -1214,7 +1194,6 @@
       // What Gathr can actually deliver — the AI's recommendations must be
       // grounded in these, not invented services.
       gathrServices: GATHR_SERVICES.map(s => ({ name: s.name, price: s.price, blurb: s.blurb, notes: s.notes, deliverables: s.deliverables })),
-      fieldLowHangingFruit: group?.lowHangingFruit || [],
     };
   }
   // Paint the AI recommendation into the DOM — used both for an instantly

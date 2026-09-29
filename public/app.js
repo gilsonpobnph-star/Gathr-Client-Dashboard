@@ -890,6 +890,22 @@ document.getElementById('task-filter-assignee')?.addEventListener('change', rend
 // Only applies when creating a new task (taskId is null); editing an
 // existing task never locks the field, since changing its client later is
 // still meant to be possible from either place.
+// Small generic rich-text toolbar helpers — deliberately simple
+// (execCommand), same pattern already used for Knowledge Base docs.
+// Reusable for any contenteditable editor by passing its element id.
+function rteCmd(editorId, name, value) {
+  const el = document.getElementById(editorId);
+  if (el) el.focus();
+  document.execCommand(name, false, value || null);
+}
+function rteLink(editorId) {
+  const url = prompt('Link URL:');
+  if (!url) return;
+  const el = document.getElementById(editorId);
+  if (el) el.focus();
+  document.execCommand('createLink', false, url);
+}
+
 function openTaskModal(taskId, presetClientId, growthRef) {
   editingTaskId = taskId || null;
   taskGrowthRef = (!taskId && growthRef) ? growthRef : null;
@@ -898,7 +914,7 @@ function openTaskModal(taskId, presetClientId, growthRef) {
   const myName  = currentUser.name || '';
 
   document.getElementById('task-title').value    = t?.title       || '';
-  document.getElementById('task-desc').value     = t?.description || '';
+  document.getElementById('task-desc').innerHTML = t?.description || '';
   document.getElementById('task-priority').value = t?.priority    || 'Medium';
   document.getElementById('task-deadline').value = t?.deadline    || '';
   document.getElementById('task-status').value   = t?.status      || 'To Do';
@@ -1088,6 +1104,11 @@ async function openGrowthCardForClient(growthClientId) {
   if (window.Growth && typeof window.Growth.openClientById === 'function') await window.Growth.openClientById(growthClientId);
 }
 
+// Tracks which comment (if any) is currently showing its inline edit box —
+// module-level so add/cancel/save can all re-render the feed and land back
+// in the right state.
+let editingCommentId = null;
+
 function renderTaskActivity(t) {
   const feed = document.getElementById('task-activity-feed');
   if (!feed) return;
@@ -1096,27 +1117,79 @@ function renderTaskActivity(t) {
 
   let items = [];
   if (created) items.push({ ts: created, type: 'system', text: `Task created by <strong>${escHtml(t.createdBy||'Team')}</strong>` });
-  comments.forEach(c => items.push({ ts: c.ts, type: 'comment', text: escHtml(c.text), author: c.author }));
+  comments.forEach(c => items.push({ ts: c.ts, type: 'comment', id: c.id, text: c.text, author: c.author, editedAt: c.editedAt }));
   items.sort((a,b) => new Date(b.ts) - new Date(a.ts));
 
   if (!items.length) {
     feed.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px 0">No activity yet.</div>';
     return;
   }
+  const myName = currentUser.name || '';
+  const isAdmin = currentUser.role === 'admin';
   feed.innerHTML = items.map(item => {
     const time = new Date(item.ts).toLocaleDateString('en-GB', { day:'numeric', month:'short' }) +
                  ' ' + new Date(item.ts).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
     if (item.type === 'system') {
       return `<div class="tda-system"><span>${item.text}</span><span class="tda-time">${time}</span></div>`;
     }
+    const canEdit = isAdmin || item.author === myName;
+    if (editingCommentId === item.id) {
+      return `<div class="tda-comment">
+        <span class="tda-av" style="background:${stringToColor(item.author)}">${initials(item.author)}</span>
+        <div class="tda-body">
+          <div class="tda-author">${escHtml(item.author)} <span class="tda-time">${time}</span></div>
+          <div class="tda-edit-box">
+            <textarea id="tda-edit-${item.id}" rows="2">${escHtml(item.text)}</textarea>
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <button class="btn-primary" style="font-size:11px;padding:4px 10px" onclick="saveEditedComment('${item.id}')">Save</button>
+              <button class="btn-view" style="font-size:11px;padding:4px 10px" onclick="cancelEditComment()">Cancel</button>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    }
     return `<div class="tda-comment">
       <span class="tda-av" style="background:${stringToColor(item.author)}">${initials(item.author)}</span>
       <div class="tda-body">
-        <div class="tda-author">${escHtml(item.author)} <span class="tda-time">${time}</span></div>
-        <div class="tda-text">${item.text.replace(/\n/g,'<br>')}</div>
+        <div class="tda-author">${escHtml(item.author)} <span class="tda-time">${time}</span>${item.editedAt ? ' <span class="tda-time">(edited)</span>' : ''}</div>
+        <div class="tda-text">${escHtml(item.text).replace(/\n/g,'<br>')}</div>
+        ${canEdit ? `<div class="tda-actions"><button class="tda-link-btn" onclick="editComment('${item.id}')">edit</button><button class="tda-link-btn" onclick="deleteComment('${item.id}')">delete</button></div>` : ''}
       </div>
     </div>`;
   }).join('');
+}
+function editComment(commentId) {
+  editingCommentId = commentId;
+  renderTaskActivity(myTasks.find(x => x.id === editingTaskId));
+  const ta = document.getElementById('tda-edit-' + commentId);
+  if (ta) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+}
+function cancelEditComment() {
+  editingCommentId = null;
+  renderTaskActivity(myTasks.find(x => x.id === editingTaskId));
+}
+async function saveEditedComment(commentId) {
+  const ta = document.getElementById('tda-edit-' + commentId);
+  const text = ta?.value.trim();
+  if (!text) return;
+  const res = await fetch(`/api/tasks/${editingTaskId}/comments/${commentId}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }),
+  });
+  if (!res.ok) { alert('Could not save comment.'); return; }
+  const data = await res.json();
+  const idx = myTasks.findIndex(x => x.id === editingTaskId);
+  if (idx !== -1) myTasks[idx] = data.task;
+  editingCommentId = null;
+  renderTaskActivity(data.task);
+}
+async function deleteComment(commentId) {
+  if (!confirm('Delete this comment? This cannot be undone.')) return;
+  const res = await fetch(`/api/tasks/${editingTaskId}/comments/${commentId}`, { method: 'DELETE' });
+  if (!res.ok) { alert('Could not delete comment.'); return; }
+  const data = await res.json();
+  const idx = myTasks.findIndex(x => x.id === editingTaskId);
+  if (idx !== -1) myTasks[idx] = data.task;
+  renderTaskActivity(data.task);
 }
 
 function closeTaskModal() {
@@ -1141,7 +1214,7 @@ async function saveTask() {
 
   const payload = {
     title,
-    description: document.getElementById('task-desc').value.trim(),
+    description: document.getElementById('task-desc').innerHTML,
     priority:    document.getElementById('task-priority').value,
     status:      document.getElementById('task-status').value,
     deadline:    document.getElementById('task-deadline').value,

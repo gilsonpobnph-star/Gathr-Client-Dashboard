@@ -1606,7 +1606,20 @@
 
       <div class="tdp-desc-wrap">
         <span class="tdp-field-label">Description</span>
-        <textarea id="task-desc" class="tdp-desc" placeholder="Add details, links, context…" rows="4"></textarea>
+        <div class="rte-toolbar">
+          <button type="button" title="Bold" onclick="rteCmd('task-desc','bold')"><b>B</b></button>
+          <button type="button" title="Italic" onclick="rteCmd('task-desc','italic')"><i>I</i></button>
+          <select title="Heading size" onchange="rteCmd('task-desc','formatBlock', this.value); this.selectedIndex=0" class="rte-toolbar-select">
+            <option value="" selected disabled>Size</option>
+            <option value="h3">Heading</option>
+            <option value="p">Normal</option>
+          </select>
+          <button type="button" title="Bullet list" onclick="rteCmd('task-desc','insertUnorderedList')">&#8226; List</button>
+          <button type="button" title="Numbered list" onclick="rteCmd('task-desc','insertOrderedList')">1. List</button>
+          <button type="button" title="Link" onclick="rteLink('task-desc')">Link</button>
+          <button type="button" title="Clear formatting" onclick="rteCmd('task-desc','removeFormat')">Clear</button>
+        </div>
+        <div id="task-desc" class="tdp-desc rte-editor" contenteditable="true" data-placeholder="Add details, links, context…"></div>
       </div>
 
       <div class="tdp-footer">

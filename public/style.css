@@ -1204,11 +1204,31 @@ body::before {
 }
 .tdp-desc-wrap { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; flex: 1; }
 .tdp-desc {
-  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-  color: var(--text); font-size: 13px; padding: 10px 12px; resize: vertical;
-  font-family: inherit; outline: none;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 0 0 8px 8px;
+  color: var(--text); font-size: 13px; padding: 10px 12px;
+  font-family: inherit; outline: none; min-height: 90px; overflow-y: auto;
 }
 .tdp-desc:focus { border-color: var(--accent); }
+
+/* Generic small rich-text toolbar — used wherever a plain textarea was
+   swapped for a contenteditable editor (currently just the task
+   description). Deliberately simple (execCommand), matching the same
+   pattern already used for Knowledge Base docs. */
+.rte-toolbar {
+  display: flex; gap: 6px; flex-wrap: wrap; padding: 6px;
+  background: var(--surface3); border: 1px solid var(--border); border-bottom: none;
+  border-radius: 8px 8px 0 0;
+}
+.rte-toolbar button, .rte-toolbar-select {
+  border: 1px solid var(--border); background: var(--surface-solid); color: var(--text);
+  border-radius: 6px; padding: 4px 8px; font-size: 11.5px; cursor: pointer;
+}
+.rte-toolbar button:hover { background: var(--accent-dim); border-color: var(--accent); }
+.rte-editor:empty::before { content: attr(data-placeholder); color: var(--text3); }
+.rte-editor ul, .rte-editor ol { margin: 6px 0 6px 20px; }
+.rte-editor h3 { font-size: 15px; margin: 8px 0 4px; }
+.rte-editor p { margin: 0 0 8px; }
+.rte-editor a { color: var(--accent); }
 .tdp-footer {
   display: flex; align-items: center; justify-content: space-between;
   margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border);
@@ -1255,6 +1275,11 @@ body::before {
 .tda-body   { flex: 1; min-width: 0; }
 .tda-author { font-size: 11.5px; font-weight: 600; color: var(--text2); margin-bottom: 3px; }
 .tda-text   { font-size: 12.5px; color: var(--text); line-height: 1.5; word-break: break-word; }
+.tda-actions { display: flex; gap: 10px; margin-top: 4px; }
+.tda-link-btn { background: none; border: none; padding: 0; font-size: 11px; color: var(--text3); cursor: pointer; text-decoration: underline; }
+.tda-link-btn:hover { color: var(--accent); }
+.tda-edit-box { margin-top: 4px; }
+.tda-edit-box textarea { width: 100%; font-size: 12.5px; }
 .tdp-comment-box { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
 .tdp-comment-textarea {
   width: 100%; background: var(--surface); border: 1px solid var(--border2);

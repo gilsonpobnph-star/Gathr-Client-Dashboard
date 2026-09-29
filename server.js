@@ -839,7 +839,10 @@ app.post('/api/tasks', requireAuth, (req, res) => {
   const task = {
     id,
     title:       req.body.title       || 'Untitled',
-    description: req.body.description || '',
+    // Description is edited as rich text (bold/lists/headings) — sanitize
+    // the same way Knowledge Base docs are, since it's stored and later
+    // rendered as HTML.
+    description: sanitizeDocHtml(req.body.description || ''),
     priority:    req.body.priority     || 'Medium',
     status:      req.body.status       || 'To Do',
     deadline:    req.body.deadline     || '',
@@ -870,7 +873,7 @@ app.patch('/api/tasks/:id', requireAuth, (req, res) => {
   if (!task) return res.status(404).json({ error: 'Not found' });
   if (!canSeeTask(task, req.session)) return res.status(403).json({ error: 'Forbidden' });
   const allowed = ['title','description','priority','status','deadline','clientId','growthClientId','growthPeriodId','assignedTo','sharedWith','archived'];
-  allowed.forEach(k => { if (req.body[k] !== undefined) task[k] = req.body[k]; });
+  allowed.forEach(k => { if (req.body[k] !== undefined) task[k] = k === 'description' ? sanitizeDocHtml(req.body[k]) : req.body[k]; });
   task.updatedAt = new Date().toISOString();
   store.tasks[req.params.id] = task;
   logActivity(store, req, 'Task updated', { details: task.title });
@@ -898,6 +901,43 @@ app.post('/api/tasks/:id/comments', requireAuth, (req, res) => {
   store.tasks[req.params.id] = task;
   writeStore(store);
   res.json({ comment, task });
+});
+
+app.patch('/api/tasks/:id/comments/:commentId', requireAuth, (req, res) => {
+  const { text } = req.body;
+  if (!text?.trim()) return res.status(400).json({ error: 'text required' });
+  const store = readStore();
+  ensureTasks(store);
+  const task = store.tasks[req.params.id];
+  if (!task) return res.status(404).json({ error: 'Not found' });
+  const comment = (task.comments || []).find(c => c.id === req.params.commentId);
+  if (!comment) return res.status(404).json({ error: 'Comment not found' });
+  // Only the comment's own author (or an admin) can edit or delete it —
+  // same rule as deleting a whole task.
+  const isAdmin = req.session.role === 'admin';
+  if (!isAdmin && comment.author !== (req.session.name || '')) return res.status(403).json({ error: 'Forbidden' });
+  comment.text = text.trim();
+  comment.editedAt = new Date().toISOString();
+  task.updatedAt = new Date().toISOString();
+  store.tasks[req.params.id] = task;
+  writeStore(store);
+  res.json({ comment, task });
+});
+
+app.delete('/api/tasks/:id/comments/:commentId', requireAuth, (req, res) => {
+  const store = readStore();
+  ensureTasks(store);
+  const task = store.tasks[req.params.id];
+  if (!task) return res.status(404).json({ error: 'Not found' });
+  const comment = (task.comments || []).find(c => c.id === req.params.commentId);
+  if (!comment) return res.status(404).json({ error: 'Comment not found' });
+  const isAdmin = req.session.role === 'admin';
+  if (!isAdmin && comment.author !== (req.session.name || '')) return res.status(403).json({ error: 'Forbidden' });
+  task.comments = task.comments.filter(c => c.id !== req.params.commentId);
+  task.updatedAt = new Date().toISOString();
+  store.tasks[req.params.id] = task;
+  writeStore(store);
+  res.json({ task });
 });
 
 app.delete('/api/tasks/:id', requireAuth, (req, res) => {
@@ -1208,10 +1248,6 @@ function aiRecommendationSchema(serviceNames, channelKeys) {
     type: 'object',
     properties: {
       priority_summary: { type: 'string', description: "Two to three sentences summarizing your holistic read of this business's whole diagnostic — where it genuinely stands right now and what matters most. Reference their actual numbers, not generic advice." },
-      field_best_practices: {
-        type: 'array', items: { type: 'string' },
-        description: "5 to 8 real, specific marketing tactics that the best, highest-performing practitioners in THIS EXACT profession (practitionerType, not just the broader compliance group) actually do — named platforms, habits, and proof formats, not generic advice. E.g. a chiropractor's list should differ from a psychologist's or a personal trainer's even though they may share a compliance group.",
-      },
       channels: {
         type: 'array',
         description: `Exactly one entry for EVERY one of these channel keys, no more, no fewer, none skipped: ${channelKeys.join(', ')}.`,
@@ -1232,7 +1268,7 @@ function aiRecommendationSchema(serviceNames, channelKeys) {
         },
       },
     },
-    required: ['priority_summary', 'field_best_practices', 'channels'],
+    required: ['priority_summary', 'channels'],
     additionalProperties: false,
   };
 }
@@ -1298,19 +1334,17 @@ app.post('/api/diagnostic/ai-recommendations', requireAuth, async (req, res) => 
   try {
     const prompt = `You are a senior marketing strategist for Gathr Grow, holistically rewriting the marketing-strategy report for a health/fitness/beauty practitioner business right after a diagnostic assessment.
 
-Keep in mind the report's scores, funnel numbers, and structure are already fixed and correct — your job is ONLY to write the content that goes inside each channel's card (best practices, a quick win, which Gathr service helps) plus a field-specific best-practices list. Analyse the ENTIRE business context below holistically before writing anything — every channel's score together, the funnel numbers as a whole, client LTV against their target, and their own words on their biggest gap. Don't treat each channel in isolation.
+Keep in mind the report's scores, funnel numbers, and structure are already fixed and correct — your job is ONLY to write the content that goes inside each channel's card (best practices, a quick win, which Gathr service helps). Analyse the ENTIRE business context below holistically before writing anything — every channel's score together, the funnel numbers as a whole, client LTV against their target, and their own words on their biggest gap. Don't treat each channel in isolation.
 
 Business context (JSON):
 ${JSON.stringify(context, null, 2)}
 
-Each entry in "channels" is a marketing/sales function already scored 0-100 by a fixed rubric (higher = healthier), with a "weight" (its max points) and a "chip" status of Strong / Needs work / Missing / Too early (unmeasured). "practitionerType" is their exact profession (e.g. "chiro", "psychologist", "pt") — use this, not just the broader "practitionerGroup", when deciding what real high-performers in their specific field actually do. "fieldLowHangingFruit" lists a starting set of real, mostly-free tactics for their field (directories, booking platforms, proof formats) — treat it as a floor to build on, not the ceiling.
+Each entry in "channels" is a marketing/sales function already scored 0-100 by a fixed rubric (higher = healthier), with a "weight" (its max points) and a "chip" status of Strong / Needs work / Missing / Too early (unmeasured). "practitionerType" is their exact profession (e.g. "chiro", "psychologist", "pt") — use this, not just the broader "practitionerGroup", when deciding what real high-performers in their specific field actually do.
 
 Gathr's actual services — read each one's "notes" (real overlaps between services — e.g. one already includes another's scope) AND "deliverables" (what actually gets built, week by week) carefully. Every "help_reason" must name a real deliverable from the matching service, never generic filler. Every "help_service" must be exactly one of these names, never invented:
 ${JSON.stringify(services, null, 2)}
 ${knowledgeSection}${webResearchSection}
-Write:
-- field_best_practices: 5 to 8 real, specific tactics that the best-performing practitioners in THIS EXACT profession actually do — go beyond fieldLowHangingFruit with genuine marketing knowledge for this specific field, not the broader compliance group it happens to share with other professions
-- For EVERY channel listed (all of them, none skipped):
+Write, for EVERY channel listed (all of them, none skipped):
   - best_practices: what genuinely good execution of this specific channel looks like for this kind of practitioner business, from real marketing knowledge — not the generic advice a template would give
   - quick_win: one concrete, free, doable-in-30-days action tailored to THIS business's actual score and gap on this channel — specific enough that a solo practitioner could just go do it, not "improve your X"
   - help_service + help_reason: whichever one Gathr service is the smart fit, naming the actual deliverable that closes this specific gap (reasoning about the service overlaps above rather than a fixed mapping) — the "action" in quick_win must always be free and independent of any paid service
@@ -1318,7 +1352,7 @@ Write:
 Be concrete and specific throughout, and write like a person talking to a colleague, not a report generator. Plain sentences only: no em dashes or en dashes, no semicolons used as a dash substitute, no "Label: description" or "Label - description" fragments, no bullet-speak crammed into one sentence. If a sentence needs a pause, use a period or "and"/"so"/"which means" instead of a dash. This should read like a strategist who actually looked at this business's numbers, not a template applied to every client. Reference the business's own numbers where it strengthens the case.${customInstruction ? `\n\nThe team has this additional instruction for you — follow it, but do not violate any rule above (still one entry per channel, still free quick wins, still real Gathr services and their actual deliverables, still plain human sentences with no dashes) unless the instruction explicitly says otherwise:\n"${String(customInstruction).slice(0, 1000)}"` : ''}`;
     // Cost-efficient model on purpose: Sonnet, not Opus, at low effort.
     // max_tokens is generous (16000) because this asks for one full entry
-    // per channel (12 of them) plus field_best_practices in one response —
+    // per channel (12 of them) in one response —
     // 8000 was cutting the response off mid-JSON on a real run: Anthropic
     // still bills the tokens generated before the cutoff, and the
     // truncated JSON then fails to parse, which is exactly the "it failed
