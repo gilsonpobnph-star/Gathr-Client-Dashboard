@@ -19,6 +19,7 @@ let timeEntries = [];
   let activeSubTab = 'list';
   let toolbarClientId = '';
   let toolbarProjectId = '';
+  let toolbarAssignee = '';
   let toolbarSearch = '';
   let hideDone = false;
   let myClientsCache = [];
@@ -66,6 +67,7 @@ let timeEntries = [];
       <div class="pt-toolbar">
         <select id="pt-filter-client" class="inline-select"><option value="">All clients</option></select>
         <select id="pt-filter-project" class="inline-select"><option value="">All projects</option></select>
+        <select id="pt-filter-assignee" class="inline-select"><option value="">Everyone's tasks</option></select>
         <input id="pt-filter-search" class="pt-search" placeholder="Search tasks…">
         <label class="pt-hide-done"><input type="checkbox" id="pt-hide-done"> Hide done</label>
         <div class="pt-toolbar-spacer"></div>
@@ -88,6 +90,19 @@ let timeEntries = [];
     document.getElementById('pt-filter-project').onchange = e => { toolbarProjectId = e.target.value; render(); };
     document.getElementById('pt-filter-search').oninput = e => { toolbarSearch = e.target.value.toLowerCase(); render(); };
     document.getElementById('pt-hide-done').onchange = e => { hideDone = e.target.checked; render(); };
+
+    const assigneeSel = document.getElementById('pt-filter-assignee');
+    const myName = currentUser.name || '';
+    const everyone = [...new Set([...team, myName])].filter(Boolean);
+    assigneeSel.innerHTML = '<option value="">Everyone\'s tasks</option>' +
+      '<option value="__unassigned__">Unassigned</option>' +
+      everyone.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+    assigneeSel.onchange = () => { toolbarAssignee = assigneeSel.value; render(); };
+  }
+  function matchesAssignee(t) {
+    if (!toolbarAssignee) return true;
+    if (toolbarAssignee === '__unassigned__') return !(t.assignedTo || []).length;
+    return (t.assignedTo || []).includes(toolbarAssignee);
   }
   function refreshProjectFilterOptions() {
     const sel = document.getElementById('pt-filter-project');
@@ -121,6 +136,7 @@ let timeEntries = [];
     if (toolbarClientId) list = list.filter(t => t.clientId === toolbarClientId);
     if (toolbarProjectId) list = list.filter(t => t.projectId === toolbarProjectId);
     if (toolbarSearch) list = list.filter(t => (t.title || '').toLowerCase().includes(toolbarSearch));
+    list = list.filter(matchesAssignee);
     return list;
   }
   function priorityColor(name) {
@@ -308,8 +324,8 @@ let timeEntries = [];
   }
 
   /* ── Client Health view ────────────────────────────────────────────────── */
-  function clientOpenTasks(clientId) { return myTasks.filter(t => t.clientId === clientId && !t.parentId && !t.done); }
-  function clientAllTasks(clientId)  { return myTasks.filter(t => t.clientId === clientId && !t.parentId); }
+  function clientOpenTasks(clientId) { return myTasks.filter(t => t.clientId === clientId && !t.parentId && !t.done).filter(matchesAssignee); }
+  function clientAllTasks(clientId)  { return myTasks.filter(t => t.clientId === clientId && !t.parentId).filter(matchesAssignee); }
 
   function renderClientHealth() {
     const el = document.getElementById('pt-view-health');
@@ -430,26 +446,47 @@ let timeEntries = [];
       modal.onclick = e => { if (e.target === modal) closeProjectModal(); };
       document.body.appendChild(modal);
     }
-    modal.innerHTML = `<div class="modal" style="max-width:420px;padding:24px">
+    modal.innerHTML = `<div class="modal" style="max-width:480px;padding:0">
       <button class="modal-close" onclick="ProjectsTasks.closeProjectModal()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
-      <h3 style="margin:0 0 16px">${p ? 'Edit project' : 'New project'}</h3>
-      <div class="detail-row"><span class="detail-label">Name</span><input id="pj-name" style="flex:1" value="${esc(p?.name||'')}"></div>
-      <div class="detail-row"><span class="detail-label">Client</span>
-        <select id="pj-client" style="flex:1">${clients.map(c => `<option value="${c.id}" ${(p?.clientId||presetClientId)===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
+      <div class="pt-modal-header">
+        <span class="dash-card-dot" style="background:var(--accent)"></span>
+        <h3>${p ? 'Edit project' : 'New project'}</h3>
       </div>
-      <div class="detail-row"><span class="detail-label">Status</span>
-        <select id="pj-status" style="flex:1">
-          ${['planned','in progress','on hold','done'].map(s => `<option value="${s}" ${(p?.status||'planned')===s?'selected':''}>${s}</option>`).join('')}
-        </select>
+      <div class="pt-modal-body">
+        <div class="pt-modal-field">
+          <label>Name</label>
+          <input id="pj-name" class="pt-modal-input" placeholder="e.g. Website refresh" value="${esc(p?.name||'')}">
+        </div>
+        <div class="pt-modal-field">
+          <label>Client</label>
+          <select id="pj-client" class="pt-modal-input">${clients.map(c => `<option value="${c.id}" ${(p?.clientId||presetClientId)===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</select>
+        </div>
+        <div class="pt-modal-row">
+          <div class="pt-modal-field">
+            <label>Status</label>
+            <select id="pj-status" class="pt-modal-input">
+              ${['planned','in progress','on hold','done'].map(s => `<option value="${s}" ${(p?.status||'planned')===s?'selected':''}>${s}</option>`).join('')}
+            </select>
+          </div>
+          <div class="pt-modal-field">
+            <label>Start</label>
+            <input id="pj-start" type="date" class="pt-modal-input" value="${p?.start||''}">
+          </div>
+          <div class="pt-modal-field">
+            <label>Due</label>
+            <input id="pj-due" type="date" class="pt-modal-input" value="${p?.due||''}">
+          </div>
+        </div>
+        <div class="pt-modal-field">
+          <label>Notes</label>
+          <textarea id="pj-notes" class="pt-modal-input" rows="3" placeholder="Optional context…">${esc(p?.notes||'')}</textarea>
+        </div>
       </div>
-      <div class="detail-row"><span class="detail-label">Start</span><input id="pj-start" type="date" style="flex:1" value="${p?.start||''}"></div>
-      <div class="detail-row"><span class="detail-label">Due</span><input id="pj-due" type="date" style="flex:1" value="${p?.due||''}"></div>
-      <div class="detail-row"><span class="detail-label">Notes</span><textarea id="pj-notes" style="flex:1" rows="3">${esc(p?.notes||'')}</textarea></div>
-      <div style="margin-top:16px;display:flex;gap:10px;justify-content:space-between">
-        <button class="btn-primary" onclick="ProjectsTasks.saveProject()">Save</button>
-        ${p ? `<button class="tdp-delete-btn" onclick="ProjectsTasks.deleteProject()">Delete project</button>` : '<span></span>'}
+      <div class="pt-modal-footer">
+        <button class="btn-primary" onclick="ProjectsTasks.saveProject()">Save project</button>
+        ${p ? `<button class="tdp-delete-btn" onclick="ProjectsTasks.deleteProject()">Delete project</button>` : ''}
       </div>
     </div>`;
     modal.classList.remove('hidden');

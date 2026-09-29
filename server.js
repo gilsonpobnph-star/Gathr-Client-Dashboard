@@ -835,7 +835,7 @@ function ensureTaskConfig(store) {
   // Seeded from what the UI already used before this module existed, so
   // the "last status = done" convention lines up with the "Done" status
   // that was already hardcoded everywhere.
-  if (!Array.isArray(store.taskConfig.statuses) || !store.taskConfig.statuses.length) store.taskConfig.statuses = ['To Do', 'In Progress', 'Done'];
+  if (!Array.isArray(store.taskConfig.statuses) || !store.taskConfig.statuses.length) store.taskConfig.statuses = ['To Do', 'In Progress', 'On Hold', 'Cancelled', 'Done'];
   if (!Array.isArray(store.taskConfig.priorities) || !store.taskConfig.priorities.length) store.taskConfig.priorities = ['Low', 'Medium', 'High'];
   if (!Array.isArray(store.taskConfig.columns)) store.taskConfig.columns = [];
 }
